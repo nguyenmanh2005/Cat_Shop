@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+/* Design system for Cham Pets - warm, friendly pet store theme
 All colors MUST be HSL.
 */
 
@@ -17,24 +17,28 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Warm orange primary color from Cham Pets design */
+    --primary: 25 100% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 35 100% 75%;
+    --primary-dark: 20 100% 45%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Warm secondary colors */
+    --secondary: 45 100% 96%;
+    --secondary-foreground: 25 100% 45%;
 
-    --muted: 210 40% 96.1%;
+    --muted: 0 0% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 35 100% 85%;
+    --accent-foreground: 25 100% 35%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 25 100% 60%;
 
     --radius: 0.5rem;
 
@@ -65,8 +69,10 @@ All colors MUST be HSL.
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
+    --primary: 25 100% 65%;
     --primary-foreground: 222.2 47.4% 11.2%;
+    --primary-light: 35 100% 75%;
+    --primary-dark: 20 100% 50%;
 
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
