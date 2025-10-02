@@ -1,9 +1,28 @@
-import { Search, Phone, Facebook, Instagram, Twitter, Youtube, Mail } from "lucide-react";
+import { Search, Phone, Facebook, Instagram, Twitter, Youtube, Mail, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.png";
+import AuthModal from "./AuthModal";
+import ProfileMenu from "./ProfileMenu";
+import { useAuth } from "@/contexts/AuthContext";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 
 const Header = () => {
+  const { isAuthenticated, isAdmin } = useAuth();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+
+  const handleOpenLogin = () => {
+    setAuthMode("login");
+    setIsAuthModalOpen(true);
+  };
+
+  const handleOpenRegister = () => {
+    setAuthMode("register");
+    setIsAuthModalOpen(true);
+  };
+
   return (
     <header className="bg-background border-b border-border">
       {/* Top bar with social and contact */}
@@ -34,13 +53,13 @@ const Header = () => {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between gap-8">
           {/* Logo */}
-          <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <img src={logo} alt="Cham Pets" className="h-12 w-auto" />
             <div className="flex flex-col">
               <span className="text-xl font-bold text-primary">Cham Pets</span>
               <span className="text-xs text-muted-foreground">Chăm sóc - Yêu thương</span>
             </div>
-          </div>
+          </Link>
 
           {/* Search bar */}
           <div className="flex-1 max-w-md mx-8">
@@ -60,10 +79,52 @@ const Header = () => {
             </div>
           </div>
 
-          {/* Contact info - desktop only */}
-          <div className="hidden lg:flex items-center gap-2 text-sm">
-            <Phone className="h-4 w-4 text-primary" />
-            <span className="font-semibold">0911.079.086</span>
+          {/* Auth buttons or Profile menu */}
+          <div className="flex items-center gap-2">
+            {isAuthenticated ? (
+              <>
+                {isAdmin && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.location.href = "/admin"}
+                    className="hidden sm:flex"
+                  >
+                    Admin Panel
+                  </Button>
+                )}
+                <ProfileMenu />
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOpenLogin}
+                  className="hidden sm:flex"
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  Đăng nhập
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleOpenRegister}
+                  className="hidden sm:flex"
+                >
+                  Đăng ký
+                </Button>
+                {/* Mobile menu button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleOpenLogin}
+                  className="sm:hidden"
+                >
+                  <User className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -72,21 +133,28 @@ const Header = () => {
       <nav className="bg-primary">
         <div className="container mx-auto px-4">
           <div className="flex items-center gap-8">
-            <a href="#" className="py-3 px-4 text-primary-foreground font-medium hover:bg-primary-light/20 transition-colors">
+            <Link to="/" className="py-3 px-4 text-primary-foreground font-medium hover:bg-primary-light/20 transition-colors">
               TRANG CHỦ
-            </a>
-            <a href="#" className="py-3 px-4 text-primary-foreground font-medium hover:bg-primary-light/20 transition-colors">
+            </Link>
+            <Link to="/about" className="py-3 px-4 text-primary-foreground font-medium hover:bg-primary-light/20 transition-colors">
               GIỚI THIỆU
-            </a>
-            <a href="#" className="py-3 px-4 text-primary-foreground font-medium hover:bg-primary-light/20 transition-colors">
+            </Link>
+            <Link to="/blog" className="py-3 px-4 text-primary-foreground font-medium hover:bg-primary-light/20 transition-colors">
               BLOG
-            </a>
-            <a href="#" className="py-3 px-4 text-primary-foreground font-medium hover:bg-primary-light/20 transition-colors">
-              THỨ CƯNG
-            </a>
+            </Link>
+            <Link to="/pets" className="py-3 px-4 text-primary-foreground font-medium hover:bg-primary-light/20 transition-colors">
+              MÈO CẢNH
+            </Link>
           </div>
         </div>
       </nav>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        initialMode={authMode}
+      />
     </header>
   );
 };

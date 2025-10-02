@@ -4,18 +4,18 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useState } from "react";
 
 const petBreeds = [
-  "Chó Akita",
-  "Chó Alabai", 
-  "Chó Alaska",
-  "Chó Bắc Hà",
-  "Chó Basenji",
-  "Chó Basset Hound",
-  "Chó Beagle",
-  "Chó Becgie",
-  "Chó Bichon",
-  "Chó Border Collie",
-  "Chó Boxer",
-  "Chó Bull Pháp"
+  "Mèo Bengal",
+  "Mèo British Shorthair", 
+  "Mèo Maine Coon",
+  "Mèo Persian",
+  "Mèo Ragdoll",
+  "Mèo Scottish Fold",
+  "Mèo Sphynx",
+  "Mèo ta",
+  "Mèo Abyssinian",
+  "Mèo Siamese",
+  "Mèo Russian Blue",
+  "Mèo Norwegian Forest"
 ];
 
 const Sidebar = () => {
@@ -43,7 +43,7 @@ const Sidebar = () => {
               variant="ghost"
               className="w-full justify-between text-left p-2 h-auto font-semibold hover:bg-accent"
             >
-              Thú cưng
+              Mèo cảnh
               <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </Button>
           </CollapsibleTrigger>

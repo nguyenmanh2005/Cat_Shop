@@ -27,11 +27,11 @@ const mockPets: Pet[] = [
   },
   {
     id: "2", 
-    name: "Aaari",
+    name: "Mochi",
     image: pet2,
     price: "8.000.000 VNĐ",
     age: "2 tháng",
-    breed: "Pomeranian"
+    breed: "Ragdoll"
   },
   {
     id: "3",
@@ -51,11 +51,11 @@ const mockPets: Pet[] = [
   },
   {
     id: "5",
-    name: "Buddy",
+    name: "Luna",
     image: pet1,
     price: "12.000.000 VNĐ",
     age: "4 tháng", 
-    breed: "Golden Retriever"
+    breed: "Maine Coon"
   },
   {
     id: "6",
@@ -63,11 +63,11 @@ const mockPets: Pet[] = [
     image: pet2,
     price: "5.500.000 VNĐ",
     age: "2 tháng",
-    breed: "Chihuahua"
+    breed: "Persian"
   },
   {
     id: "7",
-    name: "Luna",
+    name: "Shadow",
     image: pet3,
     price: "9.000.000 VNĐ",
     age: "3.5 tháng",
@@ -75,11 +75,11 @@ const mockPets: Pet[] = [
   },
   {
     id: "8",
-    name: "Max",
+    name: "Whiskers",
     image: pet4,
     price: "11.000.000 VNĐ",
     age: "4 tháng",
-    breed: "Labrador"
+    breed: "Sphynx"
   }
 ];
 
@@ -89,7 +89,7 @@ const PetGrid = () => {
 
   const breadcrumbItems = [
     { label: "TRANG CHỦ", href: "/" },
-    { label: "THỨ CƯNG" }
+    { label: "MÈO CẢNH" }
   ];
 
   useEffect(() => {
@@ -121,7 +121,7 @@ const PetGrid = () => {
         <Breadcrumb items={breadcrumbItems} />
         
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-foreground">THỨ CƯNG</h1>
+          <h1 className="text-2xl font-bold text-foreground">MÈO CẢNH</h1>
           <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Sắp xếp mặc định" />
