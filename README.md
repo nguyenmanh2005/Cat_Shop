@@ -1,5 +1,4 @@
-<!-- README.md for E-Cat Shop (MFA demo) -->
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; line-height:1.45; color:#0f172a;">
+
 
 <!-- Header banner -->
 <div style="display:flex;align-items:center;gap:16px;margin:20px 0;padding:18px;border-radius:14px;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);box-shadow:0 8px 24px rgba(15,23,42,0.06)">
