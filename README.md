@@ -60,7 +60,7 @@ cd frontend
 npm install
 npm run dev
 
-# Database
+# Database: PostgreSQL
 # Cấu hình PostgreSQL trong application.yml
   </pre>
 </section>
