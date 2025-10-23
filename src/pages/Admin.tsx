@@ -6,7 +6,13 @@ import AdminDashboard from "@/components/AdminDashboard";
 import UserManagement from "@/components/admin/UserManagement";
 import PetManagement from "@/components/admin/PetManagement";
 import OrderManagement from "@/components/admin/OrderManagement";
+import UserManagementDB from "@/components/admin/UserManagementDB";
+import ProductManagement from "@/components/admin/ProductManagement";
+import CategoryManagement from "@/components/admin/CategoryManagement";
+import OrderManagementDB from "@/components/admin/OrderManagementDB";
 import Analytics from "@/components/admin/Analytics";
+import { DebugAuth } from "@/components/DebugAuth";
+import { AdminCredentials } from "@/components/AdminCredentials";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Admin = () => {
@@ -74,25 +80,16 @@ const Admin = () => {
         {/* Main Content */}
         <div className="flex-1">
           {activeTab === "dashboard" && <AdminDashboard />}
-          {activeTab === "users" && (
-            <div className="p-6">
-              <h1 className="text-2xl font-bold mb-4">Quản lý Users</h1>
-              <p className="text-muted-foreground">Chức năng quản lý users chi tiết...</p>
-            </div>
-          )}
-          {activeTab === "pets" && (
-            <div className="p-6">
-              <h1 className="text-2xl font-bold mb-4">Quản lý Mèo</h1>
-              <p className="text-muted-foreground">Chức năng quản lý mèo chi tiết...</p>
-            </div>
-          )}
-          {activeTab === "orders" && (
-            <div className="p-6">
-              <h1 className="text-2xl font-bold mb-4">Quản lý Đơn hàng</h1>
-              <p className="text-muted-foreground">Chức năng quản lý đơn hàng chi tiết...</p>
-            </div>
-          )}
+          {activeTab === "users" && <UserManagement />}
+          {activeTab === "users-db" && <UserManagementDB />}
+          {activeTab === "products" && <ProductManagement />}
+          {activeTab === "categories" && <CategoryManagement />}
+          {activeTab === "pets" && <PetManagement />}
+          {activeTab === "orders" && <OrderManagement />}
+          {activeTab === "orders-db" && <OrderManagementDB />}
           {activeTab === "analytics" && <Analytics />}
+          {activeTab === "debug" && <DebugAuth />}
+          {activeTab === "credentials" && <AdminCredentials />}
           {activeTab === "notifications" && (
             <div className="p-6">
               <h1 className="text-2xl font-bold mb-4">Thông báo</h1>

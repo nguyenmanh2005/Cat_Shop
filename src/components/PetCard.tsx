@@ -1,33 +1,48 @@
+import { Product, CatDetail } from "@/types";
+
 interface PetCardProps {
-  id: string;
-  name: string;
-  image: string;
-  price?: string;
-  age?: string;
-  breed?: string;
+  product: Product & { catDetail?: CatDetail };
+  onClick?: () => void;
 }
 
-const PetCard = ({ name, image, price, age, breed }: PetCardProps) => {
+const PetCard = ({ product, onClick }: PetCardProps) => {
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(price);
+  };
+
   return (
-    <div className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group">
+    <div 
+      className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group"
+      onClick={onClick}
+    >
       <div className="aspect-square overflow-hidden">
         <img 
-          src={image} 
-          alt={name}
+          src={product.image_url || "/placeholder.svg"} 
+          alt={product.product_name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
       </div>
       <div className="p-4">
-        <h3 className="font-semibold text-lg text-foreground mb-2">{name}</h3>
-        {breed && (
-          <p className="text-sm text-muted-foreground mb-1">Giống: {breed}</p>
+        <h3 className="font-semibold text-lg text-foreground mb-2">{product.product_name}</h3>
+        {product.catDetail?.breed && (
+          <p className="text-sm text-muted-foreground mb-1">Giống: {product.catDetail.breed}</p>
         )}
-        {age && (
-          <p className="text-sm text-muted-foreground mb-1">Tuổi: {age}</p>
+        {product.catDetail?.age !== undefined && (
+          <p className="text-sm text-muted-foreground mb-1">Tuổi: {product.catDetail.age} tháng</p>
         )}
-        {price && (
-          <p className="text-lg font-bold text-primary mt-2">{price}</p>
+        {product.catDetail?.gender && (
+          <p className="text-sm text-muted-foreground mb-1">Giới tính: {product.catDetail.gender}</p>
         )}
+        {product.catDetail?.vaccinated !== undefined && (
+          <p className="text-sm text-muted-foreground mb-1">
+            Tiêm phòng: {product.catDetail.vaccinated ? "✅ Đã tiêm" : "❌ Chưa tiêm"}
+          </p>
+        )}
+        <p className="text-lg font-bold text-primary mt-2">{formatPrice(product.price)}</p>
+        <p className="text-sm text-muted-foreground mt-1">Còn lại: {product.stock_quantity} con</p>
       </div>
     </div>
   );

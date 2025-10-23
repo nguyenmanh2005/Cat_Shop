@@ -7,7 +7,16 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    port: 5173, // Đổi port về 5173 để tránh conflict với Spring Boot
+    // Proxy để tránh CORS khi phát triển
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080', // Spring Boot chạy trên port 8080
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, '/api') // Giữ nguyên path /api
+      }
+    }
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

@@ -13,7 +13,9 @@ import {
   Shield,
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Bug,
+  Key
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -33,8 +35,30 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
       icon: LayoutDashboard,
       badge: null
     },
- 
-  
+    {
+      id: "users",
+      label: "Quản lý Users",
+      icon: Users,
+      badge: "12"
+    },
+    {
+      id: "users-db",
+      label: "Users (Database)",
+      icon: Users,
+      badge: "5"
+    },
+    {
+      id: "products",
+      label: "Quản lý Sản phẩm",
+      icon: PawPrint,
+      badge: "25"
+    },
+    {
+      id: "categories",
+      label: "Quản lý Danh mục",
+      icon: FileText,
+      badge: "8"
+    },
     {
       id: "orders",
       label: "Đơn hàng",
@@ -42,10 +66,28 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
       badge: "156"
     },
     {
+      id: "orders-db",
+      label: "Đơn hàng (Database)",
+      icon: ShoppingCart,
+      badge: "5"
+    },
+    {
       id: "analytics",
       label: "Phân tích",
       icon: BarChart3,
       badge: null
+    },
+    {
+      id: "debug",
+      label: "Debug Auth",
+      icon: Bug,
+      badge: "Test"
+    },
+    {
+      id: "credentials",
+      label: "Admin Credentials",
+      icon: Key,
+      badge: "Info"
     },
     {
       id: "notifications",

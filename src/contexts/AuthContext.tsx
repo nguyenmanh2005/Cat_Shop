@@ -1,7 +1,11 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { authService } from "@/services/authService";
+import type { LoginRequest, RegisterRequest } from "@/services/authService";
+import { User } from "@/types";
 
-interface User {
-  id: string;
+// Interface cho User trong AuthContext (tương thích với database schema)
+interface AuthUser {
+  id: number;
   fullName: string;
   email: string;
   phone: string;
@@ -9,7 +13,7 @@ interface User {
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
   login: (email: string, password: string) => Promise<boolean>;
@@ -38,71 +42,50 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Kiểm tra thông tin đăng nhập từ localStorage khi component mount
-    const checkAuthStatus = () => {
+    // Kiểm tra thông tin đăng nhập từ token khi component mount
+    const checkAuthStatus = async () => {
       try {
-        const savedUser = localStorage.getItem("cham_pets_user");
-        if (savedUser) {
-          const userData = JSON.parse(savedUser);
-          setUser(userData);
+        if (authService.isAuthenticated()) {
+          // Nếu có token, lấy thông tin user từ API
+          const userData = await authService.getProfile();
+          setUser({
+            id: userData.user_id,
+            fullName: userData.username, // Sử dụng username làm fullName
+            email: userData.email,
+            phone: userData.phone,
+            role: userData.role_id === 1 ? 'admin' : 'user' // Giả sử role_id = 1 là admin
+          });
         }
       } catch (error) {
-        console.error("Error loading user data:", error);
-        localStorage.removeItem("cham_pets_user");
+        console.error("Error checking auth status:", error);
+        // Nếu lỗi, xóa token và logout
+        authService.logout();
       } finally {
         setIsLoading(false);
       }
     };
 
-    // Tạo admin user mặc định nếu chưa có
-    const createDefaultAdmin = () => {
-      const usersData = localStorage.getItem("cham_pets_users");
-      const users = usersData ? JSON.parse(usersData) : [];
-      
-      const adminExists = users.find((u: any) => u.email === "admin@champets.com");
-      if (!adminExists) {
-        const defaultAdmin = {
-          id: "admin-001",
-          fullName: "Administrator",
-          email: "admin@champets.com",
-          phone: "0123456789",
-          password: "admin123",
-          role: "admin",
-          createdAt: new Date().toISOString(),
-        };
-        users.push(defaultAdmin);
-        localStorage.setItem("cham_pets_users", JSON.stringify(users));
-      }
-    };
-
-    createDefaultAdmin();
     checkAuthStatus();
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      // Lấy danh sách users từ localStorage
-      const usersData = localStorage.getItem("cham_pets_users");
-      const users = usersData ? JSON.parse(usersData) : [];
-
-      // Tìm user với email và password tương ứng
-      const foundUser = users.find(
-        (u: any) => u.email === email && u.password === password
-      );
-
-      if (foundUser) {
-        // Lưu thông tin user đã đăng nhập (không lưu password)
-        const { password: _, ...userWithoutPassword } = foundUser;
-        setUser(userWithoutPassword);
-        localStorage.setItem("cham_pets_user", JSON.stringify(userWithoutPassword));
-        return true;
-      }
-
-      return false;
+      const response = await authService.login({ email, password });
+      
+      // Cập nhật user state
+      setUser({
+        id: response.user.user_id,
+        fullName: response.user.username,
+        email: response.user.email,
+        phone: response.user.phone,
+        role: response.user.role_id === 1 ? 'admin' : 'user'
+      });
+      
+      return true;
     } catch (error) {
       console.error("Login error:", error);
       return false;
@@ -116,29 +99,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     password: string;
   }): Promise<boolean> => {
     try {
-      // Lấy danh sách users hiện tại
-      const usersData = localStorage.getItem("cham_pets_users");
-      const users = usersData ? JSON.parse(usersData) : [];
-
-      // Kiểm tra email đã tồn tại chưa
-      const existingUser = users.find((u: any) => u.email === userData.email);
-      if (existingUser) {
-        return false; // Email đã tồn tại
-      }
-
-      // Tạo user mới
-      const newUser = {
-        id: Date.now().toString(),
-        ...userData,
-        role: 'user' as const,
-        createdAt: new Date().toISOString(),
-      };
-
-      // Thêm user mới vào danh sách
-      users.push(newUser);
-      localStorage.setItem("cham_pets_users", JSON.stringify(users));
-
-      // Không tự động đăng nhập, chỉ trả về thành công
+      const response = await authService.register({
+        username: userData.fullName,
+        email: userData.email,
+        password: userData.password,
+        phone: userData.phone,
+        address: '' // Có thể thêm field này vào form
+      });
+      
+      // Không tự động đăng nhập sau khi đăng ký
       return true;
     } catch (error) {
       console.error("Register error:", error);
@@ -146,9 +115,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("cham_pets_user");
+  const logout = async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      setUser(null);
+    }
   };
 
   const value: AuthContextType = {
