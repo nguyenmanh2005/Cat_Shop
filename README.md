@@ -53,7 +53,7 @@
 <section style="margin:18px 0;padding:16px;border-radius:10px;background:#f8fafc;border:1px dashed rgba(2,6,23,0.04);">
   <h2 style="margin:0 0 8px;font-size:18px;color:#0b1220">🚀 Hướng dẫn chạy (Local)</h2>
   <pre style="background:#0f172a;color:#f8fafc;padding:12px;border-radius:8px;overflow:auto;font-size:13px;"># Backend
-./mvnw spring-boot:run
+mvn spring-boot:run
 
 # Frontend
 cd frontend
