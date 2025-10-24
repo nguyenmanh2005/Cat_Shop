@@ -18,17 +18,25 @@ public class FileStorageService {
     public String saveFile(MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) return null;
 
-        Path dirPath = Paths.get(uploadDir);
-        if (!Files.exists(dirPath)) {
-            Files.createDirectories(dirPath);
+        // Lấy đường dẫn tuyệt đối đến thư mục upload
+        Path folderPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+
+        // Kiểm tra nếu thư mục chưa tồn tại thì tạo mới
+        if (!Files.exists(folderPath)) {
+            Files.createDirectories(folderPath);
         }
 
+        // Đặt tên file: thêm timestamp để tránh trùng tên file
         String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-        Path filePath = dirPath.resolve(fileName);
-        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-        // Trả về tên file hoặc đường dẫn public
-        return "/uploads/" + fileName;
+        // Xác định đường dẫn cuối cùng của file cần lưu ( đường dẫn tuyệt đối ở class Paths , cụ thể phương thức get -> có thể chuyển thành tương đối và tuyệt đối , trong bài này chuyển thành tuyệt đối + filename )
+        Path targetPath = folderPath.resolve(fileName);
+
+        // Ghi file từ input stream vào thư mục (ghi đè nếu trùng tên)
+        Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+
+        // Trả về đường dẫn file đã lưu (để controller trả về client)
+        return targetPath.toString();
     }
 
     public void deleteFile(String filePath) {
