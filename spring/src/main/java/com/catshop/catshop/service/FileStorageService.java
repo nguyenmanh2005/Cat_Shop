@@ -1,5 +1,6 @@
 package com.catshop.catshop.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -7,6 +8,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.*;
 
+@Slf4j
 @Service
 public class FileStorageService {
 
@@ -34,7 +36,7 @@ public class FileStorageService {
             Path path = Paths.get(filePath);
             Files.deleteIfExists(path);
         } catch (IOException e) {
-            System.err.println("Không thể xóa file: " + filePath);
+            log.warn("Không thể xóa file: " + filePath);
         }
     }
 
