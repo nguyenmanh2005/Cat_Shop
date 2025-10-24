@@ -4,9 +4,13 @@ import com.catshop.catshop.dto.request.ProductRequest;
 import com.catshop.catshop.dto.response.ApiResponse;
 import com.catshop.catshop.dto.response.ProductResponse;
 import com.catshop.catshop.service.ProductService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -19,17 +23,32 @@ public class ProductController {
     private final ProductService productService;
 
     // ==================== ADMIN ====================
-    @PostMapping("/admin/products")
-    public ResponseEntity<ApiResponse<ProductResponse>> createProduct(@RequestBody ProductRequest request) {
-        ProductResponse response = productService.createProduct(request);
+    @PostMapping(
+            value = "/admin/products",
+            consumes = { MediaType.MULTIPART_FORM_DATA_VALUE }
+    )
+    public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
+            @RequestPart("product") String productJson,
+            @RequestPart(value = "file", required = false) MultipartFile file
+    ) throws JsonProcessingException {
+
+        // Chuyển JSON sang object thủ công
+        ObjectMapper mapper = new ObjectMapper();
+        ProductRequest request = mapper.readValue(productJson, ProductRequest.class);
+
+        ProductResponse response = productService.createProductWithFile(request, file);
         return ResponseEntity.ok(ApiResponse.success(response, "Tạo sản phẩm thành công"));
     }
+
+
 
     @PutMapping("/admin/products/{id}")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
             @PathVariable Long id,
-            @RequestBody ProductRequest request) {
-        ProductResponse response = productService.updateProduct(id, request);
+            @ModelAttribute ProductRequest request,
+            @RequestParam(value = "file", required = false) MultipartFile file) {
+
+        ProductResponse response = productService.updateProduct(id, request, file);
         return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật sản phẩm thành công"));
     }
 

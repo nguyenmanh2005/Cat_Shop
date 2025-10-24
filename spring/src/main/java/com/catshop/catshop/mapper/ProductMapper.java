@@ -11,14 +11,14 @@ import java.util.List;
 public interface ProductMapper {
 
     // ✅ Entity -> DTO (Response)
-    @Mapping(source = "productType.typeId", target = "typeId")
+//    @Mapping(source = "productType.typeId", target = "typeId")
     @Mapping(source = "productType.typeName", target = "typeName")
     @Mapping(source = "category.categoryId", target = "categoryId")
     @Mapping(source = "category.categoryName", target = "categoryName")
     ProductResponse toDto(Product product);
 
     // ✅ List<Entity> -> List<DTO>
-    @Mapping(source = "productType.typeId", target = "typeId")
+//    @Mapping(source = "productType.typeId", target = "typeId")
     @Mapping(source = "productType.typeName", target = "typeName")
     @Mapping(source = "category.categoryId", target = "categoryId")
     @Mapping(source = "category.categoryName", target = "categoryName")
