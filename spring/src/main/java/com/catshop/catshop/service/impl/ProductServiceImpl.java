@@ -3,6 +3,7 @@ package com.catshop.catshop.service.impl;
 import com.catshop.catshop.dto.request.ProductRequest;
 import com.catshop.catshop.dto.response.ProductResponse;
 import com.catshop.catshop.entity.*;
+import com.catshop.catshop.exception.BadRequestException;
 import com.catshop.catshop.exception.ResourceNotFoundException;
 import com.catshop.catshop.mapper.ProductMapper;
 import com.catshop.catshop.repository.*;
@@ -46,10 +47,10 @@ public class ProductServiceImpl implements ProductService {
         product.setCategory(category);
 
         try {
-            String imageUrl = fileStorageService.saveFile(file);
+            String imageUrl = fileStorageService.saveFile(file,product.getProductName());
             product.setImageUrl(imageUrl);
         } catch (IOException e) {
-            throw new RuntimeException("Lưu file thất bại: " + e.getMessage());
+            throw new BadRequestException("Lưu file thất bại: " + e.getMessage());
         }
 
         return productMapper.toDto(productRepository.save(product));
@@ -76,7 +77,6 @@ public class ProductServiceImpl implements ProductService {
         existing.setStockQuantity(request.getStockQuantity());
         existing.setDescription(request.getDescription());
 
-        // ✅ Nếu có ảnh mới -> xóa ảnh cũ + lưu ảnh mới
         if (file != null && !file.isEmpty()) {
             try {
                 // Xóa file cũ nếu có
@@ -84,10 +84,10 @@ public class ProductServiceImpl implements ProductService {
                     fileStorageService.deleteFile(existing.getImageUrl());
                 }
                 // Lưu file mới
-                String imageUrl = fileStorageService.saveFile(file);
+                String imageUrl = fileStorageService.saveFile(file,existing.getProductName());
                 existing.setImageUrl(imageUrl);
             } catch (IOException e) {
-                throw new RuntimeException("Lưu file thất bại: " + e.getMessage());
+                throw new BadRequestException("Lưu file thất bại: " + e.getMessage());
             }
         }
 
@@ -99,7 +99,7 @@ public class ProductServiceImpl implements ProductService {
         Product existing = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm (id=" + id + ")"));
 
-        // ✅ Xóa file ảnh khỏi local
+        // Xóa file ảnh khỏi local
         if (existing.getImageUrl() != null) {
             fileStorageService.deleteFile(existing.getImageUrl());
         }

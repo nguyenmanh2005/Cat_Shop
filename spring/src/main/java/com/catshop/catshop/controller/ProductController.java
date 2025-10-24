@@ -27,13 +27,16 @@ public class ProductController {
             value = "/admin/products",
             consumes = { MediaType.MULTIPART_FORM_DATA_VALUE }
     )
+    //@RequestPart dùng để lấy từng phần (part) trong request kiểu multipart/form-data.
+    //Tức là khi request có nhiều “part” (vd: JSON + file), thì @RequestPart giúp Spring Boot bắt đúng từng phần ra.
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
             @RequestPart("product") String productJson,
-            @RequestPart(value = "file", required = false) MultipartFile file
+            @RequestPart(value = "file", required = true) MultipartFile file
     ) throws JsonProcessingException {
 
         // Chuyển JSON sang object thủ công
         ObjectMapper mapper = new ObjectMapper();
+        // Chuyển từ String thành đối tượng của ProductRequest
         ProductRequest request = mapper.readValue(productJson, ProductRequest.class);
 
         ProductResponse response = productService.createProductWithFile(request, file);
@@ -43,11 +46,13 @@ public class ProductController {
 
 
     @PutMapping("/admin/products/{id}")
-    public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
+    public ResponseEntity<ApiResponse<ProductResponse>> updateProduct (
             @PathVariable Long id,
-            @ModelAttribute ProductRequest request,
-            @RequestParam(value = "file", required = false) MultipartFile file) {
+            @RequestPart String productJson,
+            @RequestPart(value = "file", required = false) MultipartFile file) throws JsonProcessingException{
 
+        ObjectMapper objectMapper = new ObjectMapper();
+        ProductRequest request = objectMapper.readValue(productJson,ProductRequest.class);
         ProductResponse response = productService.updateProduct(id, request, file);
         return ResponseEntity.ok(ApiResponse.success(response, "Cập nhật sản phẩm thành công"));
     }
