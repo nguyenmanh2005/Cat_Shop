@@ -1,5 +1,6 @@
 package com.catshop.catshop.security;
 
+import com.catshop.catshop.exception.JwtValidationException;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
@@ -43,19 +44,22 @@ public class JwtUtils {
     // 🔹 Kiểm tra token hợp lệ
     public boolean validateToken(String token) {
         try {
-            Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(token);
+            Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token); // nếu token sai => ném exception luôn
             return true;
         } catch (ExpiredJwtException e) {
-            System.out.println("JWT expired");
+            throw new JwtValidationException("Token đã hết hạn, vui lòng đăng nhập lại!");
         } catch (UnsupportedJwtException e) {
-            System.out.println("JWT unsupported");
+            throw new JwtValidationException("Token không được hỗ trợ!");
         } catch (MalformedJwtException e) {
-            System.out.println("JWT malformed");
+            throw new JwtValidationException("Token không đúng định dạng!");
         } catch (SignatureException e) {
-            System.out.println("Invalid signature");
+            throw new JwtValidationException("Chữ ký token không hợp lệ!");
         } catch (IllegalArgumentException e) {
-            System.out.println("Claims empty");
+            throw new JwtValidationException("Token trống hoặc không hợp lệ!");
         }
-        return false;
     }
+
 }

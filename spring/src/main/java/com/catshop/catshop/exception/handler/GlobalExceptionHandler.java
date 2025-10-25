@@ -78,6 +78,14 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(com.catshop.catshop.exception.JwtValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleJwtValidationException(com.catshop.catshop.exception.JwtValidationException ex) {
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(401, ex.getMessage()));
+    }
+
+
 //    @ExceptionHandler(MethodArgumentNotValidException.class)
 //    public ResponseEntity<ApiResponse<Void>> handleValidationException(org.springframework.web.bind.MethodArgumentNotValidException ex){
 //        String message = ex.getFieldError().getDefaultMessage();
