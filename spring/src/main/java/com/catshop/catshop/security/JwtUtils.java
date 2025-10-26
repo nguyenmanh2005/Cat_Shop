@@ -1,10 +1,23 @@
 package com.catshop.catshop.security;
 
+import com.catshop.catshop.dto.response.ApiResponse;
 import com.catshop.catshop.exception.JwtValidationException;
+import com.catshop.catshop.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
 
+import java.io.IOException;
 import java.security.Key;
 import java.util.Date;
 
@@ -63,3 +76,4 @@ public class JwtUtils {
     }
 
 }
+

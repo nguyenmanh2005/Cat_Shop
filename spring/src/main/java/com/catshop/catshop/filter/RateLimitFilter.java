@@ -43,7 +43,7 @@ public class RateLimitFilter implements Filter {
         Long count = redisTemplate.opsForValue().increment(redisKey);
 
         if (count != null && count == 1) {
-            // Nếu là request đầu tiên, đặt thời gian hết hạn key
+            // Nếu là request đầu tiên, đặt thời gian hết hạn key, hết thời gian tự xóa trong bộ nhớ Redis
             redisTemplate.expire(redisKey, TIME_WINDOW, TimeUnit.SECONDS);
         }
 

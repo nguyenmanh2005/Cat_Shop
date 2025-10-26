@@ -1,6 +1,8 @@
 package com.catshop.catshop.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.*;
+
 import java.time.LocalDateTime;
 
 @Getter
@@ -13,6 +15,8 @@ public class ApiResponse<T> {
     private int code;
     private String message;
     private T data;
+
+    @JsonFormat(pattern = "dd/MM/yyyy HH:mm:ss") // ✅ Đảm bảo Jackson hiển thị đúng định dạng thời gian
     private LocalDateTime timestamp;
 
     public static <T> ApiResponse<T> success(T data, String message) {
