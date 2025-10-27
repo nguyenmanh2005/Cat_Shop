@@ -65,11 +65,13 @@
   <pre style="background:#0f172a;color:#f8fafc;padding:12px;border-radius:8px;overflow:auto;font-size:13px;">
   
 # --- Backend ---
+
 # Open the backend folder in IntelliJ IDEA
 # Ensure Java 21 is selected as the SDK
 mvn spring-boot:run
 
 # --- Frontend ---
+
 # Open the frontend folder in Visual Studio code 
 cd frontend
 npm install
