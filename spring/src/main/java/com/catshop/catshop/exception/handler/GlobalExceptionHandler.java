@@ -3,6 +3,7 @@ package com.catshop.catshop.exception.handler;
 import com.catshop.catshop.dto.response.ApiResponse;
 import com.catshop.catshop.exception.BadRequestException;
 import com.catshop.catshop.exception.ResourceNotFoundException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -22,6 +23,11 @@ public class GlobalExceptionHandler {
                         404,ex.getMessage()
                 )
         );
+    }
+
+    @ExceptionHandler(JsonProcessingException.class)
+    public ResponseEntity<ApiResponse<Void>> handleJsonProcessing (JsonProcessingException exception){
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(404,"Lỗi chuyển đổi từ json sang đối tượng"));
     }
 
     @ExceptionHandler(NoHandlerFoundException.class)
@@ -71,6 +77,15 @@ public class GlobalExceptionHandler {
                 ApiResponse.error(400,message)
         );
     }
+
+    @ExceptionHandler(com.catshop.catshop.exception.JwtValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleJwtValidationException(com.catshop.catshop.exception.JwtValidationException ex) {
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(401, ex.getMessage()));
+    }
+
+
 
 //    @ExceptionHandler(MethodArgumentNotValidException.class)
 //    public ResponseEntity<ApiResponse<Void>> handleValidationException(org.springframework.web.bind.MethodArgumentNotValidException ex){

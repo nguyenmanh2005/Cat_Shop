@@ -2,19 +2,19 @@ package com.catshop.catshop.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import lombok.*;
+import jakarta.validation.constraints.Pattern;
+import lombok.Getter;
+import lombok.Setter;
 
-@AllArgsConstructor
 @Getter
 @Setter
-@Builder
-@NoArgsConstructor
-public class LoginRequest {
+public class OtpRequest {
 
     @Email(message = "Email không hợp lệ")
     @NotBlank(message = "Email không được để trống")
     private String email;
 
-    @NotBlank(message = "Mật khẩu không được để trống")
-    private String password;
+    @NotBlank(message = "OTP không được để trống")
+    @Pattern(regexp = "\\d{6}", message = "OTP phải gồm 6 chữ số")
+    private String otp;
 }
