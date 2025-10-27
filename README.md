@@ -55,6 +55,7 @@
   <pre style="background:#0f172a;color:#f8fafc;padding:12px;border-radius:8px;overflow:auto;font-size:13px;">
   
 # Backend
+cd backend
 mvn spring-boot:run
 
 # Frontend
