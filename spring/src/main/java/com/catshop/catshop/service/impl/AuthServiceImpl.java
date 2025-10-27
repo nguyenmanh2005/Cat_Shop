@@ -12,6 +12,8 @@ import com.catshop.catshop.repository.RoleRepository;
 import com.catshop.catshop.repository.UserRepository;
 import com.catshop.catshop.security.JwtUtils;
 import com.catshop.catshop.service.AuthService;
+import com.catshop.catshop.service.EmailService;
+import com.catshop.catshop.service.OtpService;
 import lombok.AllArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,18 +27,26 @@ public class AuthServiceImpl implements AuthService {
     private final RoleRepository roleRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
-    private final JwtUtils jwtUtils;
+    private final EmailService emailService;
+    private final OtpService otpService;
+
 
     @Override
     public String login(LoginRequest loginRequest) {
-        User user  = userRepository.findByEmail(loginRequest.getEmail()).orElseThrow(
-                () -> new ResourceNotFoundException("Email: " + loginRequest.getEmail() + " không tồn tại")
-        );
-        if (!passwordEncoder.matches(loginRequest.getPassword(),user.getPasswordHash())){
-            throw  new BadRequestException("Mật khẩu không đúng");
+        User user = userRepository.findByEmail(loginRequest.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("Email: " + loginRequest.getEmail() + " không tồn tại"));
+
+        if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPasswordHash())) {
+            throw new BadRequestException("Mật khẩu không đúng");
         }
-        return jwtUtils.generateToken(user.getEmail(),user.getRole().getRoleName());
+
+        // ✅ Nếu đúng password → tạo OTP & gửi mail
+        String otp = otpService.generateOtp(user.getEmail());
+        emailService.sendOtpEmail(user.getEmail(), otp);
+
+        return "✅ Mã OTP đã được gửi đến email của bạn. Hãy nhập OTP để hoàn tất đăng nhập.";
     }
+
 
 
     @Override
