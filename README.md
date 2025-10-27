@@ -49,22 +49,35 @@
   </ol>
 </section>
 
+<!-- Development Environment -->
+<section style="margin:18px 0;padding:16px;border-radius:10px;background:#ffffff;border:1px solid rgba(2,6,23,0.04);">
+  <h2 style="margin:0 0 10px;font-size:18px;color:#0b1220">💻 Development Environment</h2>
+  <ul style="margin:8px 0 0 20px;color:#334155;font-size:15px;">
+    <li><strong>Backend:</strong> Recommended to run in <strong>IntelliJ IDEA</strong> for better Spring Boot integration and debugging.</li>
+    <li><strong>Frontend:</strong> Recommended to run in <strong>Visual Studio Code (VS Code)</strong> for modern React development and live reload.</li>
+    <li><strong>Java Version:</strong> <strong>Java 21</strong> is recommended for compatibility and performance improvements.</li>
+  </ul>
+</section>
+
 <!-- Run Instructions -->
 <section style="margin:18px 0;padding:16px;border-radius:10px;background:#f8fafc;border:1px dashed rgba(2,6,23,0.04);">
   <h2 style="margin:0 0 8px;font-size:18px;color:#0b1220">🚀 How to Run (Local)</h2>
   <pre style="background:#0f172a;color:#f8fafc;padding:12px;border-radius:8px;overflow:auto;font-size:13px;">
   
-# Backend
-cd backend
+# --- Backend ---
+# Open the backend folder in IntelliJ IDEA
+# Ensure Java 21 is selected as the SDK
 mvn spring-boot:run
 
-# Frontend
+# --- Frontend ---
+# Open the frontend folder in Visual Studio code 
 cd frontend
 npm install
 npm run dev
 
-# Database: PostgreSQL
+# --- Database: PostgreSQL ---
 # Configure PostgreSQL in application.yml
+
   </pre>
 </section>
 
