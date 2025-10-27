@@ -3,10 +3,10 @@
 
 <!-- Header -->
 <div style="margin:20px 0;padding:20px;border-radius:14px;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);box-shadow:0 6px 18px rgba(15,23,42,0.08)">
-  <h1 style="margin:0;font-size:28px;color:#0b1220">🐾 E-Cat Shop – Hệ thống Xác thực Đa yếu tố (MFA)</h1>
+  <h1 style="margin:0;font-size:28px;color:#0b1220">🐾 E-Cat Shop – Multi-Factor Authentication System (MFA)</h1>
   <p style="margin:6px 0 0;color:#334155;font-size:15px">
-    Dự án website thương mại điện tử bán mèo, tích hợp xác thực đa yếu tố (MFA – Multi-Factor Authentication)
-    nhằm tăng cường bảo mật tài khoản người dùng và an toàn khi giao dịch trực tuyến.
+    An e-commerce website project for selling cats, integrated with Multi-Factor Authentication (MFA)
+    to enhance user account security and ensure safe online transactions.
   </p>
 </div>
 
@@ -20,17 +20,17 @@
 
 <!-- Objectives -->
 <section style="margin:18px 0;padding:16px;border-radius:10px;background:#ffffff;border:1px solid rgba(2,6,23,0.04);">
-  <h2 style="margin:0 0 8px;font-size:18px;color:#0b1220">🎯 Mục tiêu dự án</h2>
+  <h2 style="margin:0 0 8px;font-size:18px;color:#0b1220">🎯 Project Objectives</h2>
   <ul style="margin:8px 0 0 20px;color:#334155;font-size:15px;">
-    <li>Tăng cường bảo mật đăng nhập bằng nhiều lớp xác thực (<strong>Mật khẩu + OTP + CMS + Mã QR</strong>).</li>
-    <li>Ứng dụng MFA trong môi trường thương mại điện tử thực tế.</li>
-    <li>Xây dựng giao diện thân thiện, hiện đại và dễ sử dụng.</li>
+    <li>Enhance login security using multiple authentication layers (<strong>Password + OTP + CMS + QR Code</strong>).</li>
+    <li>Apply MFA in a practical e-commerce environment.</li>
+    <li>Build a modern, user-friendly, and accessible interface.</li>
   </ul>
 </section>
 
 <!-- Tech Stack -->
 <section style="margin:18px 0;padding:16px;border-radius:10px;background:linear-gradient(180deg,#f8fafc 0%,#ffffff 100%);border:1px solid rgba(2,6,23,0.03)">
-  <h2 style="margin:0 0 12px;font-size:18px;color:#0b1220">🛠 Công nghệ sử dụng</h2>
+  <h2 style="margin:0 0 12px;font-size:18px;color:#0b1220">🛠 Tech Stack</h2>
   <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:15px;">
     <div style="padding:10px 16px;border-radius:8px;background:#0ea5a4;color:white;font-weight:600;">Backend: Spring Boot</div>
     <div style="padding:10px 16px;border-radius:8px;background:#06b6d4;color:white;font-weight:600;">Frontend: React.js + Tailwind CSS</div>
@@ -40,18 +40,18 @@
 
 <!-- MFA Flow -->
 <section style="margin:18px 0;padding:16px;border-radius:10px;background:#fff;border:1px solid rgba(2,6,23,0.04);">
-  <h2 style="margin:0 0 10px;font-size:18px;color:#0b1220">🔐 Luồng Xác thực (MFA)</h2>
+  <h2 style="margin:0 0 10px;font-size:18px;color:#0b1220">🔐 Authentication Flow (MFA)</h2>
   <ol style="margin:8px 0 0 20px;color:#334155;font-size:15px;">
-    <li>Người dùng đăng nhập bằng <strong>tên đăng nhập & mật khẩu</strong>.</li>
-    <li>Hệ thống gửi <strong>OTP</strong> qua SMS/Email để xác minh.</li>
-    <li>Có thể thêm lớp bảo mật <strong>CMS token</strong> hoặc <strong>QR code</strong> từ ứng dụng xác thực.</li>
-    <li>Sau khi xác thực thành công, hệ thống cấp <strong>JWT token</strong> cho người dùng.</li>
+    <li>User logs in using <strong>username & password</strong>.</li>
+    <li>The system sends an <strong>OTP</strong> via SMS/Email for verification.</li>
+    <li>Additional security layers such as <strong>CMS token</strong> or <strong>QR code</strong> from an authenticator app can be added.</li>
+    <li>After successful verification, the system issues a <strong>JWT token</strong> for the user.</li>
   </ol>
 </section>
 
 <!-- Run Instructions -->
 <section style="margin:18px 0;padding:16px;border-radius:10px;background:#f8fafc;border:1px dashed rgba(2,6,23,0.04);">
-  <h2 style="margin:0 0 8px;font-size:18px;color:#0b1220">🚀 Hướng dẫn chạy (Local)</h2>
+  <h2 style="margin:0 0 8px;font-size:18px;color:#0b1220">🚀 How to Run (Local)</h2>
   <pre style="background:#0f172a;color:#f8fafc;padding:12px;border-radius:8px;overflow:auto;font-size:13px;">
   
 # Backend
@@ -63,14 +63,14 @@ npm install
 npm run dev
 
 # Database: PostgreSQL
-# Cấu hình PostgreSQL trong application.yml
+# Configure PostgreSQL in application.yml
   </pre>
 </section>
 
 <!-- Footer -->
 <div style="padding:14px;margin-top:20px;border-radius:8px;background:linear-gradient(90deg,#eef2ff,#ecfeff);border:1px solid rgba(2,6,23,0.03);">
   <strong style="font-size:15px;color:#0b1220;">E-Cat Shop</strong><br/>
-  <span style="font-size:13px;color:#334155;">Bảo mật vững chắc, mèo xinh an toàn 🐱</span>
+  <span style="font-size:13px;color:#334155;">Solid security, adorable cats 🐱</span>
 </div>
 
 </div>
