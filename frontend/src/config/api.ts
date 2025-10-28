@@ -1,7 +1,8 @@
 // Cấu hình API
 export const API_CONFIG = {
-  // URL của backend API Java Spring Boot - thay đổi theo server của bạn T
-  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
+  // URL của backend API Java Spring Boot
+  // Sử dụng '/api' để proxy Vite chuyển hướng đến http://localhost:8080
+  BASE_URL: import.meta.env.VITE_API_BASE_URL || '/api',
   TIMEOUT: parseInt(import.meta.env.VITE_API_TIMEOUT || '10000'),
   
   // Endpoints - Spring Boot REST API

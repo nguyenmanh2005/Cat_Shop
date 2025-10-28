@@ -74,21 +74,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      console.log('📝 AuthContext: Logging in user', email);
+      
       const response = await authService.login({ email, password });
       
+      console.log('✅ AuthContext: Login successful', response);
+      
       // Cập nhật user state
+      // Backend trả về: { userId, username, email, phone, address, roleId, roleName }
       setUser({
-        id: response.user.user_id,
-        fullName: response.user.username,
-        email: response.user.email,
-        phone: response.user.phone,
-        role: response.user.role_id === 1 ? 'admin' : 'user'
+        id: response.userId,
+        fullName: response.username,
+        email: response.email,
+        phone: response.phone,
+        role: response.roleId === 2 ? 'admin' : 'user' // Role ID 2 là Admin, 1 là Customer
       });
       
+      console.log('✅ AuthContext: User state updated');
+      
       return true;
-    } catch (error) {
-      console.error("Login error:", error);
-      return false;
+    } catch (error: any) {
+      console.error("❌ AuthContext: Login error:", error);
+      throw error; // Throw để LoginForm có thể hiển thị message
     }
   };
 
@@ -99,7 +106,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     password: string;
   }): Promise<boolean> => {
     try {
-      const response = await authService.register({
+      console.log('📝 AuthContext: Registering user', userData);
+      
+      await authService.register({
         username: userData.fullName,
         email: userData.email,
         password: userData.password,
@@ -107,11 +116,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         address: '' // Có thể thêm field này vào form
       });
       
+      console.log('✅ AuthContext: Register successful');
+      
       // Không tự động đăng nhập sau khi đăng ký
       return true;
-    } catch (error) {
-      console.error("Register error:", error);
-      return false;
+    } catch (error: any) {
+      console.error("❌ AuthContext: Register error:", error);
+      // Throw lại error để component có thể xử lý message
+      throw error;
     }
   };
 

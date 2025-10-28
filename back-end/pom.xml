@@ -30,6 +30,42 @@
 		<java.version>17</java.version>
 	</properties>
     <dependencies>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+
+        <!-- Google Authenticator (TOTP) -->
+        <dependency>
+            <groupId>com.warrenstrange</groupId>
+            <artifactId>googleauth</artifactId>
+            <version>1.4.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>3.5.3</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+            <version>3.5.3</version>
+        </dependency>
+
+
+
+
+
+
+        <!-- (Tùy chọn) Thymeleaf cho hiển thị QR -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
         <!-- Spring Boot Starter Web: hỗ trợ REST API, MVC -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

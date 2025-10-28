@@ -2,6 +2,7 @@ package com.catshop.catshop.exception.handler;
 
 import com.catshop.catshop.dto.response.ApiResponse;
 import com.catshop.catshop.exception.BadRequestException;
+import com.catshop.catshop.exception.ConflictException;
 import com.catshop.catshop.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -42,6 +43,17 @@ public class GlobalExceptionHandler {
                 .body(
                         ApiResponse.error(
                                 400,ex.getMessage()
+                        )
+                );
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleConflict(ConflictException ex){
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(
+                        ApiResponse.error(
+                                409,ex.getMessage()
                         )
                 );
     }

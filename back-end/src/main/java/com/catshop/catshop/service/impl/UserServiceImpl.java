@@ -5,6 +5,7 @@ import com.catshop.catshop.dto.response.UserResponse;
 import com.catshop.catshop.entity.Role;
 import com.catshop.catshop.entity.User;
 import com.catshop.catshop.exception.BadRequestException;
+import com.catshop.catshop.exception.ConflictException;
 import com.catshop.catshop.exception.ResourceNotFoundException;
 import com.catshop.catshop.mapper.UserMapper;
 import com.catshop.catshop.repository.RoleRepository;
@@ -13,6 +14,7 @@ import com.catshop.catshop.service.UserService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 
@@ -23,6 +25,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
 
     @Override
@@ -60,17 +63,19 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserResponse insertUser(UserRequest userRequest) {
         if (userRepository.findByEmail(userRequest.getEmail()).isPresent()) {
-            throw new ResourceNotFoundException("Email đã tồn tại: " + userRequest.getEmail());
+            throw new ConflictException("Email đã tồn tại: " + userRequest.getEmail());
         }
 
-        if (userRepository.findByPhoneNumber(userRequest.getPhone()).isPresent()) {
-            throw new ResourceNotFoundException("Số điện thoại đã tồn tại: " + userRequest.getPhone());
+        if (userRequest.getPhone() != null && userRepository.findByPhoneNumber(userRequest.getPhone()).isPresent()) {
+            throw new ConflictException("Số điện thoại đã tồn tại: " + userRequest.getPhone());
         }
 
         Role role = roleRepository.findById(1L)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Role với id: " + 1L));
 
         User user = userMapper.FromUserRequestToUser(userRequest);
+        // Hash mật khẩu từ request
+        user.setPasswordHash(passwordEncoder.encode(userRequest.getPassword()));
         user.setRole(role);
 
         User savedUser = userRepository.save(user);
@@ -85,7 +90,7 @@ public class UserServiceImpl implements UserService {
                         "Không tìm thấy tài khoản với Id là: " + userId));
 
         user.setUsername(request.getUsername());
-        user.setPasswordHash(request.getPassword());
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
         user.setAddress(request.getAddress());

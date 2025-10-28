@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-CatshopApplication<catshop>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.catshop.catshop.CatshopApplication",
+            "projectName": "catshop",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}

@@ -37,6 +37,9 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('📋 Register Form: Form submitted');
+    console.log('📋 Form data:', formData);
+    
     if (formData.password !== formData.confirmPassword) {
       toast({
         title: "Lỗi xác nhận mật khẩu",
@@ -49,31 +52,29 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
     setIsLoading(true);
     
     try {
-      const success = await register({
+      console.log('📋 Register Form: Calling register function');
+      
+      await register({
         fullName: formData.fullName,
         email: formData.email,
         phone: formData.phone,
         password: formData.password,
       });
       
-      if (success) {
-        toast({
-          title: "Đăng ký thành công!",
-          description: "Vui lòng đăng nhập để tiếp tục",
-        });
-        // Chuyển sang form đăng nhập thay vì đóng modal
-        onSwitchToLogin();
-      } else {
-        toast({
-          title: "Đăng ký thất bại",
-          description: "Email này đã được sử dụng",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
+      console.log('✅ Register Form: Success');
+      
+      toast({
+        title: "Đăng ký thành công!",
+        description: "Vui lòng đăng nhập để tiếp tục",
+      });
+      // Chuyển sang form đăng nhập thay vì đóng modal
+      onSwitchToLogin();
+    } catch (error: any) {
+      console.error('❌ Register Form: Error', error);
+      
       toast({
         title: "Lỗi đăng ký",
-        description: "Đã xảy ra lỗi, vui lòng thử lại",
+        description: error.message || "Đã xảy ra lỗi, vui lòng thử lại",
         variant: "destructive",
       });
     } finally {

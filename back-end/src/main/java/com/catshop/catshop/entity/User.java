@@ -2,6 +2,7 @@ package com.catshop.catshop.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -33,13 +34,22 @@ public class User {
     @Column(length = 255)
     private String address;
 
+    @Column(length = 32)
+    private String otpSecret;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Order> orders;
+    @Builder.Default
+    private List<Order> orders = new ArrayList<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Review> reviews;
+    @Builder.Default
+    private List<Review> reviews = new ArrayList<>();
+
+    // Nếu Lombok vẫn lỗi getter/setter, bạn có thể thêm thủ công:
+    // public String getOtpSecret() { return otpSecret; }
+    // public void setOtpSecret(String otpSecret) { this.otpSecret = otpSecret; }
 }
