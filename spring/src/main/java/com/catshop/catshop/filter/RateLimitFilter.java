@@ -19,7 +19,7 @@ public class RateLimitFilter implements Filter {
     }
 
     // Cấu hình
-    private static final int MAX_REQUESTS = 5;        // tối đa 5 request
+    private static final int MAX_REQUESTS = 30;        // tối đa 5 request
     private static final int TIME_WINDOW = 10;        // trong 10 giây
 
     @Override

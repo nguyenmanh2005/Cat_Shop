@@ -40,9 +40,9 @@ public class OtpService {
             if (attempts >= 5) {
                 redisTemplate.delete(email);
                 redisTemplate.delete(attemptKey);
-                throw new BadRequestException("🚫 Quá số lần thử OTP cho phép");
+                throw new BadRequestException("Quá số lần thử OTP cho phép");
             }
-            throw new BadRequestException("❌ Mã OTP không đúng, còn " + (5 - attempts) + " lần thử");
+            throw new BadRequestException("Mã OTP không đúng, còn " + (5 - attempts) + " lần thử");
         }
     }
 }

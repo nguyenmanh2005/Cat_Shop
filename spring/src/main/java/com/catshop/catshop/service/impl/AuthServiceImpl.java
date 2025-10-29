@@ -1,6 +1,7 @@
 package com.catshop.catshop.service.impl;
 
 import com.catshop.catshop.dto.request.LoginRequest;
+import com.catshop.catshop.dto.request.OtpRequest;
 import com.catshop.catshop.dto.request.UserRequest;
 import com.catshop.catshop.dto.response.UserResponse;
 import com.catshop.catshop.entity.Role;
@@ -28,6 +29,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final JwtUtils jwtUtils;
     private final OtpService otpService;
 
 
@@ -47,6 +49,18 @@ public class AuthServiceImpl implements AuthService {
         return "✅ Mã OTP đã được gửi đến email của bạn. Hãy nhập OTP để hoàn tất đăng nhập.";
     }
 
+    public String verifyOtp(OtpRequest request) {
+        boolean valid = otpService.verifyOtp(request.getEmail(), request.getOtp());
+        if (!valid) {
+            throw new BadRequestException("OTP không hợp lệ");
+        }
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+
+        // ✅ Trả token nếu xác thực thành công
+        return jwtUtils.generateToken(user.getEmail(), user.getRole().getRoleName());
+    }
 
 
     @Override

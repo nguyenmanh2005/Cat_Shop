@@ -17,7 +17,7 @@ public class InterceptorConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(apiKeyInterceptor)
-                .addPathPatterns("/api/users/**"); // Áp dụng toàn bộ API users
+                .addPathPatterns("/api/**"); // Áp dụng toàn bộ API users
 
 
         registry.addInterceptor(roleInterceptor)

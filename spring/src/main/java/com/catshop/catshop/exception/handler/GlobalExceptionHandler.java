@@ -6,6 +6,7 @@ import com.catshop.catshop.exception.ResourceNotFoundException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -23,6 +24,11 @@ public class GlobalExceptionHandler {
                         404,ex.getMessage()
                 )
         );
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMthodNotSupport ( HttpRequestMethodNotSupportedException exception ){
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(404,"Phương thức HTTP không được hỗ trợ cho endpoint này!"));
     }
 
     @ExceptionHandler(JsonProcessingException.class)

@@ -5,7 +5,6 @@ import com.catshop.catshop.dto.request.OtpRequest;
 import com.catshop.catshop.dto.request.UserRequest;
 import com.catshop.catshop.dto.response.ApiResponse;
 import com.catshop.catshop.service.AuthService;
-import com.catshop.catshop.service.OtpAuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,7 +17,6 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
-    private final OtpAuthService otpAuthService;
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<String>> login(@RequestBody LoginRequest loginRequest) {
@@ -29,7 +27,7 @@ public class AuthController {
     // ✅ Xác thực OTP
     @PostMapping("/verify-otp")
     public ResponseEntity<ApiResponse<String>> verifyOtp(@Valid @RequestBody OtpRequest otpRequest) {
-        String token = otpAuthService.verifyOtp(otpRequest);
+        String token = authService.verifyOtp(otpRequest);
         return ResponseEntity.ok(ApiResponse.success(token, "OTP verified, login success"));
     }
 

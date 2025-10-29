@@ -21,14 +21,14 @@ public class EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setTo(toEmail);
-            helper.setSubject("🔐 Xác thực đăng nhập - OTP của bạn");
+            helper.setSubject("Xác thực đăng nhập - OTP của bạn");
 
             String htmlContent = """
                 <div style="font-family: Arial; padding: 20px; background-color: #f9fafc;">
-                    <h2 style="color: #2b6cb0;">🔑 Mã OTP của bạn</h2>
+                    <h2 style="color: #2b6cb0;">Mã OTP của bạn</h2>
                     <p>Xin chào, mã xác thực đăng nhập của bạn là:</p>
                     <h1 style="text-align:center;color:#e53e3e;">%s</h1>
-                    <p>⏰ Mã này hết hạn sau 5 phút.</p>
+                    <p>Mã này hết hạn sau 5 phút.</p>
                 </div>
             """.formatted(otp);
 

@@ -1,23 +1,10 @@
 package com.catshop.catshop.security;
 
-import com.catshop.catshop.dto.response.ApiResponse;
 import com.catshop.catshop.exception.JwtValidationException;
-import com.catshop.catshop.repository.UserRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
 import java.security.Key;
 import java.util.Date;
 
@@ -37,6 +24,8 @@ public class JwtUtils {
         return Jwts.builder()
                 .setSubject(email) // -> subject: tùy bạn chọn (email, username,...)
                 .claim("role", roleName) // -> claim tùy chỉnh (payload)
+                .setIssuer("AdminCatShop")
+                .setAudience("FE who using api")
                 .setIssuedAt(new Date()) // -> iat: thời điểm tạo
                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs)) // -> exp: thời điểm hết hạn
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256) // -> header + signature
@@ -53,6 +42,16 @@ public class JwtUtils {
                 .getBody();
         return claims.getSubject();
     }
+
+//    public String extractRole(String token){
+//        String email = Jwts.parserBuilder()
+//                .setSigningKey(getSigningKey())
+//                .build()
+//                .parseClaimsJws(token)
+//                .getBody()
+//                .getSubject();
+//
+//    }
 
     // 🔹 Kiểm tra token hợp lệ
     public boolean validateToken(String token) {
