@@ -1,6 +1,7 @@
 package com.catshop.catshop.security;
 
 import com.catshop.catshop.dto.response.ApiResponse;
+import com.catshop.catshop.entity.User;
 import com.catshop.catshop.exception.JwtValidationException;
 import com.catshop.catshop.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,16 +10,20 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+
 import java.io.IOException;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
@@ -44,9 +49,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (jwtUtils.validateToken(token)) {
                 String email = jwtUtils.getEmailFromToken(token);
 
-                var userOpt = userRepository.findByEmail(email);
+                Optional<User> userOpt = userRepository.findByEmail(email);
                 if (userOpt.isPresent()) {
-                    var user = userOpt.get();
+                    User user = userOpt.get();
 
                     //✅ Tạo object Authentication chứa thông tin user
                     //(UsernamePasswordAuthenticationToken là 1 implement của Authentication)
@@ -60,13 +65,36 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     //→ Đồng thời bạn có thể lấy user trong Controller như sau:
 
                     UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(user, null, null);
+                            new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
 
                     authToken.setDetails(
                             new WebAuthenticationDetailsSource().buildDetails(request)
                     );
 
                     SecurityContextHolder.getContext().setAuthentication(authToken);
+
+                    // ✅ Kiểm tra quyền hạn truy cập (chặn DELETE / PUT nếu không phải ADMIN)
+                    String method = request.getMethod();
+                    String uri = request.getRequestURI();
+                    String role = user.getRole().getRoleName();
+
+                    if ((method.equalsIgnoreCase("DELETE") || method.equalsIgnoreCase("PUT"))
+                            && !role.equalsIgnoreCase("ADMIN")
+                            && uri.startsWith("/api/admin")) {
+
+                        log.warn("🚫 Forbidden: User '{}' (Role={}) tried to {} {}",
+                                email, role, method, uri);
+
+                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                        response.setContentType("application/json;charset=UTF-8");
+                        response.getWriter().write(objectMapper.writeValueAsString(
+                                ApiResponse.error(403, "Forbidden: Only Admin can modify or delete data!")
+                        ));
+                        return;
+                    }
+
+                    log.info("✅ Authenticated user: {}, role={}, method={}, uri={}",
+                            email, role, method, uri);
                 }
             }
 

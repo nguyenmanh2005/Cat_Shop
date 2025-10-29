@@ -46,7 +46,7 @@ public class AuthServiceImpl implements AuthService {
         String otp = otpService.generateOtp(user.getEmail());
         emailService.sendOtpEmail(user.getEmail(), otp);
 
-        return "✅ Mã OTP đã được gửi đến email của bạn. Hãy nhập OTP để hoàn tất đăng nhập.";
+        return "Mã OTP đã được gửi đến email của bạn. Hãy nhập OTP để hoàn tất đăng nhập.";
     }
 
     public String verifyOtp(OtpRequest request) {

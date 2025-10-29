@@ -43,15 +43,16 @@ public class JwtUtils {
         return claims.getSubject();
     }
 
-//    public String extractRole(String token){
-//        String email = Jwts.parserBuilder()
-//                .setSigningKey(getSigningKey())
-//                .build()
-//                .parseClaimsJws(token)
-//                .getBody()
-//                .getSubject();
-//
-//    }
+    // 🔹 Lấy role
+    public String extractRole(String token) {
+        return (String) Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("role");
+    }
+
 
     // 🔹 Kiểm tra token hợp lệ
     public boolean validateToken(String token) {
