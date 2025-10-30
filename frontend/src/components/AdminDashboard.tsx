@@ -17,6 +17,9 @@ import UserManagement from "./admin/UserManagement";
 import PetManagement from "./admin/PetManagement";
 import OrderManagement from "./admin/OrderManagement";
 import Analytics from "./admin/Analytics";
+import { FoodDetailManagement } from "./admin/FoodDetailManagement";
+import { ShipmentManagement } from "./admin/ShipmentManagement";
+import { PaymentManagement } from "./admin/PaymentManagement";
 
 // Mock data
 const mockStats = {
@@ -136,7 +139,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Tabs */}
-        <div className="flex space-x-4 mb-6">
+        <div className="flex flex-wrap gap-2 mb-6">
           <Button
             variant={activeTab === "overview" ? "default" : "outline"}
             onClick={() => setActiveTab("overview")}
@@ -160,6 +163,24 @@ const AdminDashboard = () => {
             onClick={() => setActiveTab("orders")}
           >
             Quản lý Đơn hàng
+          </Button>
+          <Button
+            variant={activeTab === "food-details" ? "default" : "outline"}
+            onClick={() => setActiveTab("food-details")}
+          >
+            Chi tiết Thức ăn
+          </Button>
+          <Button
+            variant={activeTab === "shipments" ? "default" : "outline"}
+            onClick={() => setActiveTab("shipments")}
+          >
+            Vận chuyển
+          </Button>
+          <Button
+            variant={activeTab === "payments" ? "default" : "outline"}
+            onClick={() => setActiveTab("payments")}
+          >
+            Thanh toán
           </Button>
         </div>
 
@@ -227,6 +248,12 @@ const AdminDashboard = () => {
         {activeTab === "pets" && <PetManagement />}
 
         {activeTab === "orders" && <OrderManagement />}
+
+        {activeTab === "food-details" && <FoodDetailManagement />}
+
+        {activeTab === "shipments" && <ShipmentManagement />}
+
+        {activeTab === "payments" && <PaymentManagement />}
       </div>
     </div>
   );

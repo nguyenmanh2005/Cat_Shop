@@ -1,15 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { authService } from "@/services/authService";
-import type { LoginRequest, RegisterRequest } from "@/services/authService";
-import { User } from "@/types";
 
-// Interface cho User trong AuthContext (tương thích với database schema)
 interface AuthUser {
   id: number;
   fullName: string;
   email: string;
   phone: string;
-  role: 'user' | 'admin';
+  role: "user" | "admin";
 }
 
 interface AuthContextType {
@@ -22,6 +19,7 @@ interface AuthContextType {
     email: string;
     phone: string;
     password: string;
+    address?: string;
   }) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
@@ -31,9 +29,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };
 
@@ -46,48 +42,52 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Kiểm tra thông tin đăng nhập từ token khi component mount
-    const checkAuthStatus = async () => {
-      try {
-        if (authService.isAuthenticated()) {
-          // Nếu có token, lấy thông tin user từ API
-          const userData = await authService.getProfile();
-          setUser({
-            id: userData.user_id,
-            fullName: userData.username, // Sử dụng username làm fullName
-            email: userData.email,
-            phone: userData.phone,
-            role: userData.role_id === 1 ? 'admin' : 'user' // Giả sử role_id = 1 là admin
-          });
-        }
-      } catch (error) {
-        console.error("Error checking auth status:", error);
-        // Nếu lỗi, xóa token và logout
-        authService.logout();
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAuthStatus();
+    const token = authService.getToken();
+    if (token) fetchUserProfile();
+    else setIsLoading(false);
   }, []);
+
+  const fetchUserProfile = async () => {
+    try {
+      const res = await authService.getProfile();
+      if (res?.data) {
+        const data = res.data;
+        setUser({
+          id: data.user_id,
+          fullName: data.username,
+          email: data.email,
+          phone: data.phone,
+          role: data.role_id === 1 ? "admin" : "user",
+        });
+      }
+    } catch {
+      authService.logout();
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const response = await authService.login({ email, password });
-      
-      // Cập nhật user state
+      const res = await authService.login({ email, password });
+
+      const data = res.data; // ✅ backend trả về "data"
+
+      // ✅ Lưu token
+      authService.saveToken(data.accessToken);
+
+      // ✅ Cập nhật state user
       setUser({
-        id: response.user.user_id,
-        fullName: response.user.username,
-        email: response.user.email,
-        phone: response.user.phone,
-        role: response.user.role_id === 1 ? 'admin' : 'user'
+        id: data.user_id,
+        fullName: data.username,
+        email: data.email,
+        phone: data.phone,
+        role: data.role_id === 1 ? "admin" : "user",
       });
-      
+
       return true;
-    } catch (error) {
-      console.error("Login error:", error);
+    } catch (err) {
+      console.error("Login error:", err);
       return false;
     }
   };
@@ -99,15 +99,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     password: string;
   }): Promise<boolean> => {
     try {
-      const response = await authService.register({
+      await authService.register({
         username: userData.fullName,
         email: userData.email,
         password: userData.password,
         phone: userData.phone,
-        address: '' // Có thể thêm field này vào form
+        address: "",
       });
-      
-      // Không tự động đăng nhập sau khi đăng ký
       return true;
     } catch (error) {
       console.error("Register error:", error);
@@ -115,20 +113,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  const logout = async () => {
-    try {
-      await authService.logout();
-    } catch (error) {
-      console.error("Logout error:", error);
-    } finally {
-      setUser(null);
-    }
+  const logout = () => {
+    authService.logout();
+    setUser(null);
   };
 
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
-    isAdmin: user?.role === 'admin',
+    isAdmin: user?.role === "admin",
     login,
     register,
     logout,

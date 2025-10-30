@@ -88,23 +88,27 @@ const createApiInstance = (): AxiosInstance => {
 // Tạo instance chính
 export const api = createApiInstance();
 
-// API Response Types
+// API Response Types - Updated to match backend format
 export interface ApiResponse<T = any> {
-  success: boolean;
+  status: 'success' | 'fail' | 'error';
+  code: number;
+  message: string;
   data: T;
-  message?: string;
-  errors?: string[];
+  timestamp?: string;
 }
 
 export interface PaginatedResponse<T = any> {
-  success: boolean;
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
+  content: T[];
+  pageable: {
+    pageNumber: number;
+    pageSize: number;
+    sort: any;
   };
+  totalPages: number;
+  totalElements: number;
+  last: boolean;
+  size: number;
+  number: number;
 }
 
 // Generic API methods
@@ -137,6 +141,12 @@ export const apiService = {
   delete: async <T = any>(url: string, config?: AxiosRequestConfig): Promise<T> => {
     const response = await api.delete<ApiResponse<T>>(url, config);
     return response.data.data;
+  },
+
+  // GET request with full response (for pagination)
+  getFull: async <T = any>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> => {
+    const response = await api.get<ApiResponse<T>>(url, config);
+    return response.data;
   },
 
   // Upload file

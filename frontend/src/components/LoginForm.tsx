@@ -35,7 +35,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     setIsLoading(true);
     
     try {
-      const success = await login(formData.email, formData.password);
+      const success = await login(formData.email.trim(), formData.password);
       
       if (success) {
         toast({

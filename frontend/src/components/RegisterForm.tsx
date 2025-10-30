@@ -50,11 +50,13 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
     
     try {
       const success = await register({
-        fullName: formData.fullName,
-        email: formData.email,
-        phone: formData.phone,
-        password: formData.password,
-      });
+    fullName: formData.fullName.trim(),
+    email: formData.email.trim(),
+    phone: formData.phone.trim(),
+    password: formData.password,
+    address: "" // ✅ bổ sung theo backend
+  });
+
       
       if (success) {
         toast({

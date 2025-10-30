@@ -1,76 +1,80 @@
 // Frontend types - tương thích với backend API
 export interface Role {
-  role_id: number;
-  role_name: string;
+  roleId: number;
+  roleName: string;
 }
 
 export interface User {
-  user_id: number;
+  userId: number;
   username: string;
-  password_hash: string;
+  password?: string;
   email: string;
   phone?: string;
   address?: string;
-  role_id: number;
-  role?: Role;
+  roleName?: string;
 }
 
 export interface ProductType {
-  type_id: number;
-  type_name: string;
+  typeId: number;
+  typeName: string;
 }
 
 export interface Category {
-  category_id: number;
-  category_name: string;
+  categoryId: number;
+  categoryName: string;
   description?: string;
-  type_id: number;
-  type?: ProductType;
+  typeId: number;
+  typeName?: string;
 }
 
 export interface Product {
-  product_id: number;
-  product_name: string;
-  type_id: number;
-  category_id?: number;
+  productId: number;
+  productName: string;
+  typeId: number;
+  categoryId?: number;
   price: number;
-  stock_quantity: number;
+  stockQuantity: number;
   description?: string;
-  image_url?: string;
-  type?: ProductType;
-  category?: Category;
+  imageUrl?: string;
+  typeName?: string;
+  categoryName?: string;
 }
 
 export interface Order {
-  order_id: number;
-  user_id: number;
-  order_date: string;
+  orderId: number;
+  userId: number;
+  orderDate: string;
   status: string;
-  total_amount: number;
+  totalAmount: number;
   user?: User;
 }
 
 export interface OrderDetail {
-  order_detail_id: number;
-  order_id: number;
-  product_id: number;
+  id: number;
+  orderId: number;
+  productId: number;
   quantity: number;
   price: number;
   product?: Product;
 }
 
 export interface Review {
-  review_id: number;
-  user_id: number;
-  product_id: number;
+  reviewId: number;
+  userId: number;
+  productId: number;
   rating: number;
   comment?: string;
-  created_at: string;
+  createdAt?: string;
   user?: User;
 }
 
 export interface CatDetail {
-  cat_id: number;
+  productId: number;
+  productName?: string;
+  price?: number;
+  stockQuantity?: number;
+  imageUrl?: string;
+  description?: string;
   breed: string;
   age: number;
   gender: string;
@@ -78,24 +82,92 @@ export interface CatDetail {
 }
 
 export interface FoodDetail {
-  food_id: number;
-  brand?: string;
-  weight_kg?: number;
+  foodId: number;
+  weightKg?: number;
   ingredients?: string;
-  expiry_date?: string;
+  expiryDate?: string;
   product?: Product;
 }
 
 export interface CageDetail {
-  cage_id: number;
+  productId: number;
   material?: string;
   dimensions?: string;
   product?: Product;
 }
 
 export interface CleaningDetail {
-  cleaning_id: number;
-  volume_ml?: number;
+  productId: number;
+  volumeMl?: number;
   usage?: string;
   product?: Product;
+}
+
+// New types for additional features
+export interface Shipment {
+  shipmentId: number;
+  orderId: number;
+  shippingAddress: string;
+  status: string;
+  createdAt?: string;
+  updatedAt?: string;
+  order?: Order;
+}
+
+export interface Payment {
+  paymentId: number;
+  orderId: number;
+  method: string;
+  amount: number;
+  status?: string;
+  createdAt?: string;
+  order?: Order;
+}
+
+// API Response types
+export interface ApiResponse<T = any> {
+  status: 'success' | 'fail' | 'error';
+  code: number;
+  message: string;
+  data: T;
+  timestamp?: string;
+}
+
+export interface PaginatedResponse<T = any> {
+  content: T[];
+  pageable: {
+    pageNumber: number;
+    pageSize: number;
+    sort: any;
+  };
+  totalPages: number;
+  totalElements: number;
+  last: boolean;
+  size: number;
+  number: number;
+}
+
+// Search and filter types
+export interface SearchParams {
+  page?: number;
+  size?: number;
+  sort?: string;
+  keyword?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  categoryId?: number;
+  typeId?: number;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface ProductSearchParams extends SearchParams {
+  ingredients?: string;
+  breed?: string;
+  gender?: string;
+  vaccinated?: boolean;
+  material?: string;
+  usage?: string;
+  expiryBefore?: string;
 }
