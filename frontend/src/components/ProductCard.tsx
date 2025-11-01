@@ -124,6 +124,3 @@ const ProductCard = ({ product, onClick }: ProductCardProps) => {
 };
 
 export default ProductCard;
-
-
-
