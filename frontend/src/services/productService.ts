@@ -106,5 +106,9 @@ export const categoryService = {
   async deleteCategory(id: number): Promise<void> {
     const url = buildUrl(API_CONFIG.ENDPOINTS.CATEGORIES.DELETE, { id });
     return apiService.delete<void>(url);
+  },
+  async getAllProductsCustomer(): Promise<Product[]> {
+  return apiService.get<Product[]>("/customer/products");
   }
+
 };
