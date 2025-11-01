@@ -9,6 +9,8 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer;
+import org.springframework.security.config.annotation.web.configurers.SessionManagementConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,7 +32,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                // viết Tắt CSRF (Cross Site Request Forgery)
                 .csrf(csrf -> csrf.disable())
+
+                // Quy định quyền truy cập cho các request
                 .authorizeHttpRequests(auth -> auth
                         // 👇 Các endpoint public (đăng ký, đăng nhập, lấy ảnh,...)
                         .requestMatchers("/auth/**").permitAll()
@@ -60,7 +65,11 @@ public class SecurityConfig {
                         // 👇 Các API còn lại chỉ cần đăng nhập (USER, ADMIN đều được)
                         .anyRequest().authenticated()
                 )
+
+                // Tắt session, vì ta dùng JWT (stateless)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                // Thêm filter của mình (JWT) vào chuỗi filter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
