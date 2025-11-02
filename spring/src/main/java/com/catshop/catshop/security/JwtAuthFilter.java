@@ -17,7 +17,6 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-
 import java.io.IOException;
 import java.util.Optional;
 
@@ -26,10 +25,8 @@ import java.util.Optional;
 @Slf4j
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-
     private final JwtUtils jwtUtils;
     private final UserRepository userRepository;
-    private final ObjectMapper objectMapper; // ✅ inject từ JacksonConfig
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -47,69 +44,40 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = authHeader.substring(7);
 
         try {
-            if (jwtUtils.validateToken(token)) {
-                String email = jwtUtils.getEmailFromToken(token);
-
-                Optional<User> userOpt = userRepository.findByEmail(email);
-                if (userOpt.isPresent()) {
-                    User user = userOpt.get();
-
-                    //✅ Tạo object Authentication chứa thông tin user
-                    //(UsernamePasswordAuthenticationToken là 1 implement của Authentication)
-                    //
-                    //✅ Gắn thông tin request (IP, session, user-agent)
-                    //
-                    //✅ Đưa toàn bộ thông tin này vào SecurityContextHolder
-                    //
-                    //→ Bây giờ Spring Security hiểu rõ user đang login là ai
-                    //→ Cho phép đi qua các API yêu cầu authenticated()
-                    //→ Đồng thời bạn có thể lấy user trong Controller như sau:
-
-                    UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
-
-                    authToken.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request)
-                    );
-
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
-
-                    // ✅ Kiểm tra quyền hạn truy cập (chặn DELETE / PUT nếu không phải ADMIN)
-                    String method = request.getMethod();
-                    String uri = request.getRequestURI();
-                    String role = user.getRole().getRoleName();
-
-                    if ((method.equalsIgnoreCase("DELETE") || method.equalsIgnoreCase("PUT"))
-                            && !role.equalsIgnoreCase("ADMIN")
-                            && uri.startsWith("/api/admin")) {
-
-                        log.warn("🚫 Forbidden: User '{}' (Role={}) tried to {} {}",
-                                email, role, method, uri);
-
-                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                        response.setContentType("application/json;charset=UTF-8");
-                        response.getWriter().write(objectMapper.writeValueAsString(
-                                ApiResponse.error(403, "Forbidden: Only Admin can modify or delete data!")
-                        ));
-                        return;
-                    }
-
-                    log.info("✅ Authenticated user: {}, role={}, method={}, uri={}",
-                            email, role, method, uri);
-                }
+            if (!jwtUtils.validateToken(token)) {
+                throw new JwtValidationException("Token không hợp lệ hoặc đã hết hạn!");
             }
 
+            String email = jwtUtils.getEmailFromToken(token);
+            Optional<User> userOpt = userRepository.findByEmail(email);
+
+            if (userOpt.isEmpty()) {
+                throw new JwtValidationException("Không tìm thấy người dùng với email: " + email);
+            }
+
+            User user = userOpt.get();
+
+            // ✅ Tạo Authentication object
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+
+            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+
+            log.info("✅ Authenticated user: {}, role={}, method={}, uri={}",
+                    email, user.getRole().getRoleName(), request.getMethod(), request.getRequestURI());
+
         } catch (JwtValidationException e) {
-            logger.warn("Token không hợp lệ hoặc đã hết hạn!");
-
+            log.warn("❌ JWT Error: {}", e.getMessage());
+            // ném ra để AuthenticationEntryPoint xử lý JSON
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.setCharacterEncoding("UTF-8");
-
-            // ✅ Dùng objectMapper có sẵn (đã được cấu hình format thời gian)
-            ApiResponse<?> error = ApiResponse.error(401, e.getMessage());
-            String json = objectMapper.writeValueAsString(error);
-            response.getWriter().write(json);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write(
+                    new ObjectMapper().writeValueAsString(
+                            ApiResponse.error(401, e.getMessage())
+                    )
+            );
             return;
         }
 

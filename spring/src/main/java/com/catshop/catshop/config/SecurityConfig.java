@@ -1,6 +1,8 @@
 package com.catshop.catshop.config;
 
+import com.catshop.catshop.security.JwtAuthEntryPoint;
 import com.catshop.catshop.security.JwtAuthFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,21 +10,23 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer;
-import org.springframework.security.config.annotation.web.configurers.SessionManagementConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @RequiredArgsConstructor
-@EnableWebSecurity
 @Configuration
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final JwtAuthEntryPoint jwtAuthEntryPoint;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -32,16 +36,25 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // viết Tắt CSRF (Cross Site Request Forgery)
+                // CORS cho tất cả FE
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                // Tắt CSRF vì dùng JWT
                 .csrf(csrf -> csrf.disable())
 
-                // Quy định quyền truy cập cho các request
-                .authorizeHttpRequests(auth -> auth
-                        // 👇 Các endpoint public (đăng ký, đăng nhập, lấy ảnh,...)
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/public/**").permitAll()
+                // Exception handling 401 và 403
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(jwtAuthEntryPoint) // 401 Unauthorized
+                        .accessDeniedHandler((request, response, accessDeniedException) -> { // 403 Forbidden
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write("{\"error\":\"Forbidden: Bạn không có quyền truy cập\"}");
+                        })
+                )
 
-                        // 👇 Các API chỉ Admin mới được quyền
+                // Quy định quyền truy cập
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/auth/**", "/public/**").permitAll() // public
                         .requestMatchers(
                                 "/api/users/**",
                                 "/api/categories/admin/**",
@@ -57,24 +70,32 @@ public class SecurityConfig {
                                 "/api/admin/cat-details/**",
                                 "/api/admin/cage-details/**"
                         ).hasRole("ADMIN")
-
-                        // 👇 Các request PUT, DELETE cũng yêu cầu ADMIN
                         .requestMatchers(HttpMethod.PUT, "/api/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
-
-                        // 👇 Các API còn lại chỉ cần đăng nhập (USER, ADMIN đều được)
                         .anyRequest().authenticated()
                 )
 
-                // Tắt session, vì ta dùng JWT (stateless)
+                // Stateless session
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // Thêm filter của mình (JWT) vào chuỗi filter
+                // Thêm filter JWT
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
+    // CORS config mở cho tất cả FE
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of("*")); // mọi FE
+        config.setAllowedMethods(List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(false); // JWT gửi header -> false
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
