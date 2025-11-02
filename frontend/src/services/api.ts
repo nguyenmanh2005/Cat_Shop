@@ -88,12 +88,13 @@ const createApiInstance = (): AxiosInstance => {
 // Tạo instance chính
 export const api = createApiInstance();
 
-// API Response Types
+// API Response Types - khớp với backend Java ApiResponse
 export interface ApiResponse<T = any> {
-  success: boolean;
+  status: string;
+  code: number;
+  message: string;
   data: T;
-  message?: string;
-  errors?: string[];
+  timestamp: string;
 }
 
 export interface PaginatedResponse<T = any> {

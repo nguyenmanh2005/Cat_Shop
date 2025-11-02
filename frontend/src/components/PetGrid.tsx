@@ -9,7 +9,7 @@ import {
 import ProductCard from "./ProductCard";
 import Breadcrumb from "./Breadcrumb";
 import { useProductTypes, useCategories } from "@/hooks/useApi";
-import { Product, ProductType, Category } from "@/types";
+import { Product, ProductType, Category } from "@/types/index";
 import { productService } from "@/services/productService"; // 🆕 import trực tiếp service
 
 const PetGrid = () => {
@@ -57,14 +57,14 @@ const PetGrid = () => {
     // Lọc theo loại
     if (selectedType !== "all") {
       filtered = filtered.filter(
-        (p) => p.type_id === parseInt(selectedType)
+        (p) => p.typeId === parseInt(selectedType)
       );
     }
 
     // Lọc theo danh mục
     if (selectedCategory !== "all") {
       filtered = filtered.filter(
-        (p) => p.category_id === parseInt(selectedCategory)
+        (p) => p.categoryId === parseInt(selectedCategory)
       );
     }
 
@@ -78,12 +78,12 @@ const PetGrid = () => {
         break;
       case "name-a-z":
         filtered.sort((a, b) =>
-          a.product_name.localeCompare(b.product_name)
+          a.productName.localeCompare(b.productName)
         );
         break;
       case "name-z-a":
         filtered.sort((a, b) =>
-          b.product_name.localeCompare(a.product_name)
+          b.productName.localeCompare(a.productName)
         );
         break;
     }
@@ -123,10 +123,10 @@ const PetGrid = () => {
                 <SelectItem value="all">Tất cả loại</SelectItem>
                 {productTypes.map((type) => (
                   <SelectItem
-                    key={type.type_id}
-                    value={type.type_id.toString()}
+                    key={type.typeId}
+                    value={type.typeId.toString()}
                   >
-                    {type.type_name}
+                    {type.typeName}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -144,10 +144,10 @@ const PetGrid = () => {
                 <SelectItem value="all">Tất cả danh mục</SelectItem>
                 {categories.map((category) => (
                   <SelectItem
-                    key={category.category_id}
-                    value={category.category_id.toString()}
+                    key={category.categoryId}
+                    value={category.categoryId.toString()}
                   >
-                    {category.category_name}
+                    {category.categoryName}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -177,10 +177,10 @@ const PetGrid = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredProducts.map((product) => (
             <ProductCard
-              key={product.product_id}
+              key={product.productId}
               product={product}
               onClick={() => {
-                console.log("Clicked product:", product.product_name);
+                console.log("Clicked product:", product.productName);
               }}
             />
           ))}

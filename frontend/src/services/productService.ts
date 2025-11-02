@@ -51,6 +51,11 @@ export const productService = {
   async deleteProduct(id: number): Promise<void> {
     const url = buildUrl(API_CONFIG.ENDPOINTS.PRODUCTS.DELETE, { id });
     return apiService.delete<void>(url);
+  },
+
+  // Lấy tất cả sản phẩm cho customer (public API)
+  async getAllProductsCustomer(): Promise<Product[]> {
+    return apiService.get<Product[]>("/customer/products");
   }
 };
 
@@ -106,9 +111,5 @@ export const categoryService = {
   async deleteCategory(id: number): Promise<void> {
     const url = buildUrl(API_CONFIG.ENDPOINTS.CATEGORIES.DELETE, { id });
     return apiService.delete<void>(url);
-  },
-  async getAllProductsCustomer(): Promise<Product[]> {
-  return apiService.get<Product[]>("/customer/products");
   }
-
 };
