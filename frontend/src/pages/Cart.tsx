@@ -1,82 +1,66 @@
-import React from "react";
-import { getCartItems, removeFromCart, updateCartQuantity } from "@/utils/cartUtils";
+import { useCart } from "@/contexts/CartContext";
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
-const Cart: React.FC = () => {
-  const [cartItems, setCartItems] = React.useState(getCartItems());
-
-  const handleRemove = (id: number) => {
-    removeFromCart(id);
-    setCartItems(getCartItems());
-  };
-
-  const handleQuantityChange = (id: number, quantity: number) => {
-    updateCartQuantity(id, quantity);
-    setCartItems(getCartItems());
-  };
-
-  const totalPrice = cartItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
+const Cart = () => {
+  const { cart, removeFromCart, updateQuantity, total, clearCart } = useCart();
 
   return (
-    <div className="max-w-4xl mx-auto mt-10 p-6 bg-white shadow rounded-lg">
-      <h2 className="text-2xl font-semibold mb-4">🛒 Giỏ hàng của bạn</h2>
-
-      {cartItems.length === 0 ? (
-        <p>Giỏ hàng trống.</p>
+    <div className="max-w-5xl mx-auto py-10">
+      <h1 className="text-3xl font-bold mb-6">Giỏ hàng của bạn</h1>
+      {cart.length === 0 ? (
+        <p>Giỏ hàng trống. <Link to="/pets" className="text-primary underline">Quay lại mua sắm</Link></p>
       ) : (
-        <div className="space-y-4">
-          {cartItems.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center justify-between border-b pb-2"
-            >
-              <div className="flex items-center space-x-4">
-                <img
-                  src={item.image_url || "/placeholder.svg"}
-                  alt={item.product_name}
-                  className="w-16 h-16 object-cover rounded"
-                />
-                <div>
-                  <h3 className="font-semibold">{item.product_name}</h3>
-                  <p className="text-sm text-gray-500">
-                    {item.price.toLocaleString("vi-VN")} ₫
-                  </p>
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) =>
-                      handleQuantityChange(item.id, Number(e.target.value))
-                    }
-                    className="border rounded w-16 mt-1 px-1"
-                  />
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="font-bold">
-                  {(item.price * item.quantity).toLocaleString("vi-VN")} ₫
-                </p>
-                <button
-                  onClick={() => handleRemove(item.id)}
-                  className="text-red-500 hover:underline text-sm"
-                >
-                  Xóa
-                </button>
-              </div>
-            </div>
-          ))}
+        <>
+          <table className="w-full mb-6">
+            <thead>
+              <tr className="text-left border-b border-border">
+                <th className="py-2">Sản phẩm</th>
+                <th>Giá</th>
+                <th>Số lượng</th>
+                <th>Tổng</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {cart.map(item => (
+                <tr key={item.id} className="border-b border-border">
+                  <td className="py-2 flex items-center gap-3">
+                    {item.image && <img src={item.image} alt={item.name} className="w-12 h-12 object-cover rounded"/>}
+                    {item.name}
+                  </td>
+                  <td>{item.price.toLocaleString()}₫</td>
+                  <td>
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      min={1}
+                      className="w-16 border px-2 py-1 rounded"
+                      onChange={(e) => updateQuantity(item.id, parseInt(e.target.value))}
+                    />
+                  </td>
+                  <td>{(item.price * item.quantity).toLocaleString()}₫</td>
+                  <td>
+                    <Button variant="destructive" size="sm" onClick={() => removeFromCart(item.id)}>Xóa</Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-          <div className="text-right mt-6">
-            <p className="text-lg font-bold">
-              Tổng cộng: {totalPrice.toLocaleString("vi-VN")} ₫
-            </p>
-            <button className="mt-3 px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600">
-              Thanh toán
-            </button>
+          <div className="flex justify-between items-center">
+            <Button variant="outline" onClick={clearCart}>Xóa toàn bộ</Button>
+            <div className="text-lg font-bold">
+              Tổng tiền: {total.toLocaleString()}₫
+            </div>
           </div>
-        </div>
+
+          <div className="mt-6 text-right">
+            <Button size="lg" onClick={() => alert("Thanh toán giả lập! Thực hiện tích hợp Stripe/PayPal sau.")}>
+              Thanh toán
+            </Button>
+          </div>
+        </>
       )}
     </div>
   );

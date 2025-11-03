@@ -1,6 +1,8 @@
+// src/config/api.ts
+
 // Cấu hình API
 export const API_CONFIG = {
-  // URL của backend API Java Spring Boot - thay đổi theo server của bạn T
+  // URL của backend API Java Spring Boot - thay đổi theo server của bạn
   BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
   TIMEOUT: parseInt(import.meta.env.VITE_API_TIMEOUT || '10000'),
   
@@ -117,4 +119,3 @@ export const buildUrl = (endpoint: string, params?: Record<string, string | numb
   
   return url;
 };
-
