@@ -1,5 +1,6 @@
 package com.catshop.catshop.config;
 
+import com.catshop.catshop.security.CustomOAuth2SuccessHandler;
 import com.catshop.catshop.security.JwtAuthEntryPoint;
 import com.catshop.catshop.security.JwtAuthFilter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,15 +28,25 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final JwtAuthEntryPoint jwtAuthEntryPoint;
+    private final CustomOAuth2SuccessHandler customOAuth2SuccessHandler;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                .oauth2Login(oauth2 -> oauth2
+                        .loginPage("/oauth2/authorization/google")
+                        .successHandler(customOAuth2SuccessHandler)
+                        .failureHandler(((request, response, exception) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write("{\"error\":\"Đăng nhập Google thất bại\"}");
+
+                        }))
+                )
                 // CORS cho tất cả FE
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
