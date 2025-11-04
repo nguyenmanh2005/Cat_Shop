@@ -88,12 +88,13 @@ const createApiInstance = (): AxiosInstance => {
 // Tạo instance chính
 export const api = createApiInstance();
 
-// API Response Types
+// API Response Types - khớp với backend Java ApiResponse
 export interface ApiResponse<T = any> {
-  success: boolean;
+  status: string;
+  code: number;
+  message: string;
   data: T;
-  message?: string;
-  errors?: string[];
+  timestamp: string;
 }
 
 export interface PaginatedResponse<T = any> {
@@ -112,6 +113,11 @@ export const apiService = {
   // GET request
   get: async <T = any>(url: string, config?: AxiosRequestConfig): Promise<T> => {
     const response = await api.get<ApiResponse<T>>(url, config);
+    console.log(`📡 API GET ${url}:`, {
+      fullResponse: response.data,
+      extractedData: response.data.data,
+      dataLength: Array.isArray(response.data.data) ? response.data.data.length : 'not array'
+    });
     return response.data.data;
   },
 

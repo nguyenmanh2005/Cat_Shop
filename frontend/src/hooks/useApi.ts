@@ -144,9 +144,13 @@ export const useProductTypes = () => {
     try {
       setLoading(true);
       setError(null);
+      console.log("🔄 useProductTypes: Đang tải product types...");
       const data = await productTypeService.getAllProductTypes();
-      setProductTypes(data);
+      console.log("✅ useProductTypes: Nhận được product types:", data);
+      console.log("📊 Số lượng product types:", data?.length || 0);
+      setProductTypes(data || []);
     } catch (err) {
+      console.error("❌ useProductTypes: Lỗi khi tải product types:", err);
       setError(err instanceof Error ? err.message : 'Lỗi không xác định');
     } finally {
       setLoading(false);
@@ -175,9 +179,13 @@ export const useCategories = () => {
     try {
       setLoading(true);
       setError(null);
+      console.log("🔄 useCategories: Đang tải categories...");
       const data = await categoryService.getAllCategories();
-      setCategories(data);
+      console.log("✅ useCategories: Nhận được categories:", data);
+      console.log("📊 Số lượng categories:", data?.length || 0);
+      setCategories(data || []);
     } catch (err) {
+      console.error("❌ useCategories: Lỗi khi tải categories:", err);
       setError(err instanceof Error ? err.message : 'Lỗi không xác định');
     } finally {
       setLoading(false);

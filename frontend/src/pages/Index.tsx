@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import ProductCard from "@/components/ProductCard";
 import { 
   Heart, 
   Shield, 
@@ -14,8 +15,13 @@ import {
   CheckCircle
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { productService } from "@/services/productService";
+import { Product } from "@/types";
 
 const Index = () => {
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     document.title = "Cham Pets - Chăm sóc và yêu thương mèo cảnh";
     
@@ -34,7 +40,23 @@ const Index = () => {
     if (ogDescription) {
       ogDescription.setAttribute('content', 'Cham Pets - Chuyên cung cấp mèo cảnh chất lượng cao, dịch vụ chăm sóc và yêu thương mèo tận tâm.');
     }
+
+    // Load featured products
+    loadFeaturedProducts();
   }, []);
+
+  const loadFeaturedProducts = async () => {
+    try {
+      setLoading(true);
+      const products = await productService.getAllProductsCustomer();
+      // Lấy 8 sản phẩm đầu tiên để hiển thị
+      setFeaturedProducts(products.slice(0, 8));
+    } catch (error) {
+      console.error("Error loading featured products:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const features = [
     {
@@ -129,8 +151,46 @@ const Index = () => {
           </div>
         </section>
 
-        {/* Services */}
+        {/* Featured Products */}
         <section className="py-16 bg-muted/30">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-foreground mb-4">
+                Sản phẩm nổi bật
+              </h2>
+              <p className="text-muted-foreground">
+                Khám phá những sản phẩm được yêu thích nhất
+              </p>
+            </div>
+            {loading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="text-lg text-muted-foreground">Đang tải sản phẩm...</div>
+              </div>
+            ) : featuredProducts.length > 0 ? (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                  {featuredProducts.map((product) => (
+                    <ProductCard key={product.productId} product={product} />
+                  ))}
+                </div>
+                <div className="text-center">
+                  <Link to="/pets">
+                    <Button size="lg" variant="outline">
+                      Xem tất cả sản phẩm <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-center items-center h-64">
+                <div className="text-lg text-muted-foreground">Chưa có sản phẩm</div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Services */}
+        <section className="py-16">
           <div className="max-w-7xl mx-auto px-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
               <div>

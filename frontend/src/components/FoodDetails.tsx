@@ -121,7 +121,7 @@ const FoodDetails: React.FC = () => {
     };
 
     // Fetch food details nếu có ID và sản phẩm là loại food
-    if (id && product?.type_id === 2) {
+    if (id && product?.typeId === 2) {
       fetchFoodDetails();
     }
     
@@ -131,7 +131,7 @@ const FoodDetails: React.FC = () => {
 
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value);
-    if (value > 0 && value <= (product?.stock_quantity || 0)) {
+    if (value > 0 && value <= (product?.stockQuantity || 0)) {
       setQuantity(value);
     }
   };
@@ -139,13 +139,13 @@ const FoodDetails: React.FC = () => {
   const handleAddToCart = async () => {
     try {
       await axios.post('/api/cart/add', {
-        productId: product?.product_id,
+        productId: product?.productId,
         quantity: quantity
       });
       
       toast({
         title: "Success",
-        description: `Added ${quantity} ${product?.product_name} to cart`,
+        description: `Added ${quantity} ${product?.productName} to cart`,
       });
     } catch (error) {
       toast({
@@ -174,7 +174,7 @@ const FoodDetails: React.FC = () => {
     </div>
   );
 
-  const isInStock = product.stock_quantity > 0;
+  const isInStock = product.stockQuantity > 0;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -182,22 +182,22 @@ const FoodDetails: React.FC = () => {
         {/* Product Image */}
         <div className="md:w-1/2">
           <img
-            src={product.image_url || '/placeholder-food.png'}
-            alt={product.product_name}
+            src={product.imageUrl || '/placeholder-food.png'}
+            alt={product.productName}
             className="w-full h-auto rounded-lg shadow-lg object-cover aspect-square"
           />
         </div>
 
         {/* Product Details */}
         <div className="md:w-1/2">
-          <h1 className="text-3xl font-bold mb-4">{product.product_name}</h1>
+          <h1 className="text-3xl font-bold mb-4">{product.productName}</h1>
           <p className="text-2xl text-primary mb-4">${product.price.toFixed(2)}</p>
           <div className="prose max-w-none mb-6">
             <p>{product.description || 'No description available'}</p>
           </div>
 
           {/* Food Details Section - Read Only */}
-          {product.type_id === 2 && foodDetails && (
+          {product.typeId === 2 && foodDetails && (
             <div className="bg-gray-50 p-4 rounded-lg mb-6">
               <h3 className="font-medium mb-2">Product Information</h3>
               <div className="space-y-2 text-sm">
@@ -212,7 +212,7 @@ const FoodDetails: React.FC = () => {
           <div className="mb-6">
             <span className="text-sm font-medium">
               Status: {isInStock ? (
-                <span className="text-green-600">In Stock ({product.stock_quantity} available)</span>
+                <span className="text-green-600">In Stock ({product.stockQuantity} available)</span>
               ) : (
                 <span className="text-red-600">Out of Stock</span>
               )}
@@ -238,11 +238,11 @@ const FoodDetails: React.FC = () => {
                   value={quantity}
                   onChange={handleQuantityChange}
                   min="1"
-                  max={product.stock_quantity}
+                  max={product.stockQuantity}
                   className="w-20 px-3 py-2 border rounded-md text-center"
                 />
                 <button 
-                  onClick={() => quantity < product.stock_quantity && setQuantity(q => q + 1)}
+                  onClick={() => quantity < product.stockQuantity && setQuantity(q => q + 1)}
                   className="px-3 py-2 border rounded-md hover:bg-gray-100"
                 >
                   +
@@ -375,11 +375,11 @@ const FoodDetails: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-gray-50 p-4 rounded-lg">
             <h3 className="font-medium mb-2">Category</h3>
-            <p>{product.category?.category_name || 'Uncategorized'}</p>
+            <p>{product.categoryName || 'Uncategorized'}</p>
           </div>
           <div className="bg-gray-50 p-4 rounded-lg">
             <h3 className="font-medium mb-2">Type</h3>
-            <p>{product.type?.type_name || 'Unspecified'}</p>
+            <p>{product.typeName || 'Unspecified'}</p>
           </div>
         </div>
       </div>

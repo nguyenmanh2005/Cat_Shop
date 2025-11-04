@@ -1,44 +1,44 @@
-// Frontend types - tương thích với backend API
+// Frontend types - tương thích với backend API (camelCase)
 export interface Role {
-  role_id: number;
-  role_name: string;
+  roleId: number;
+  roleName: string;
 }
 
 export interface User {
-  user_id: number;
+  userId: number;
   username: string;
-  password_hash: string;
+  passwordHash: string;
   email: string;
   phone?: string;
   address?: string;
-  role_id: number;
+  roleId: number;
   role?: Role;
 }
 
 export interface ProductType {
-  type_id: number;
-  type_name: string;
+  typeId: number;
+  typeName: string;
 }
 
 export interface Category {
-  category_id: number;
-  category_name: string;
+  categoryId: number;
+  categoryName: string;
   description?: string;
-  type_id: number;
+  typeId: number;
   type?: ProductType;
 }
 
 export interface Product {
-  product_id: number;
-  product_name: string;
-  type_id: number;
-  category_id?: number;
+  productId: number;
+  productName: string;
+  typeId: number;
+  categoryId?: number;
   price: number;
-  stock_quantity: number;
+  stockQuantity: number;
   description?: string;
-  image_url?: string;
-  type?: ProductType;
-  category?: Category;
+  imageUrl?: string;
+  typeName?: string;
+  categoryName?: string;
 }
 
 export interface Order {

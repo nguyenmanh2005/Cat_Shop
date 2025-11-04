@@ -1,7 +1,11 @@
 // Cấu hình API
 export const API_CONFIG = {
-  // URL của backend API Java Spring Boot - thay đổi theo server của bạn T
-  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
+  // URL của backend API Java Spring Boot
+  // Development: dùng relative path để đi qua Vite proxy (tránh CORS)
+  // Production: dùng absolute URL từ environment variable
+  BASE_URL: import.meta.env.DEV
+    ? '/api'  // Dev mode: dùng proxy của Vite
+    : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'), // Production: dùng absolute URL
   TIMEOUT: parseInt(import.meta.env.VITE_API_TIMEOUT || '10000'),
   
   // Endpoints - Spring Boot REST API
@@ -19,23 +23,25 @@ export const API_CONFIG = {
     
     // Products
     PRODUCTS: {
-      LIST: '/products',
-      DETAIL: '/products/:id',
+      LIST: '/customer/products',
+      DETAIL: '/customer/products/:id',
       CREATE: '/products',
       UPDATE: '/products/:id',
       DELETE: '/products/:id',
-      SEARCH: '/products/search',
-      BY_CATEGORY: '/products/category/:categoryId',
+      SEARCH: '/customer/products/search',
+      BY_CATEGORY: '/customer/products/category/:categoryId',
+      BY_TYPE: '/customer/products/type/:typeId',
       FEATURED: '/products/featured'
     },
     
     // Categories
     CATEGORIES: {
-      LIST: '/categories',
+      LIST: '/categories/customer', // Backend có /api/categories/customer (GET)
+      LIST_ADMIN: '/categories/admin', // Backend có /api/categories/admin (GET)
       DETAIL: '/categories/:id',
-      CREATE: '/categories',
-      UPDATE: '/categories/:id',
-      DELETE: '/categories/:id',
+      CREATE: '/categories/admin', // Backend có POST /api/categories/admin
+      UPDATE: '/categories/admin/:id', // Backend có PUT /api/categories/admin/:id
+      DELETE: '/categories/admin/:id', // Backend có DELETE /api/categories/admin/:id
       WITH_PRODUCTS: '/categories/:id/products'
     },
     

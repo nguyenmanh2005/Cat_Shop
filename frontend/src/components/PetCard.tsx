@@ -1,4 +1,5 @@
 import { Product, CatDetail } from "@/types";
+import { useNavigate } from "react-router-dom";
 
 interface PetCardProps {
   product: Product & { catDetail?: CatDetail };
@@ -6,6 +7,8 @@ interface PetCardProps {
 }
 
 const PetCard = ({ product, onClick }: PetCardProps) => {
+  const navigate = useNavigate();
+  
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
@@ -13,20 +16,29 @@ const PetCard = ({ product, onClick }: PetCardProps) => {
     }).format(price);
   };
 
+  const handleClick = () => {
+    if (onClick) {
+      onClick();
+    } else {
+      // Navigate to product detail page
+      navigate(`/product/${product.productId}`);
+    }
+  };
+
   return (
     <div 
       className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group"
-      onClick={onClick}
+      onClick={handleClick}
     >
       <div className="aspect-square overflow-hidden">
         <img 
-          src={product.image_url || "/placeholder.svg"} 
-          alt={product.product_name}
+          src={product.imageUrl || "/placeholder.svg"} 
+          alt={product.productName}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
       </div>
       <div className="p-4">
-        <h3 className="font-semibold text-lg text-foreground mb-2">{product.product_name}</h3>
+        <h3 className="font-semibold text-lg text-foreground mb-2">{product.productName}</h3>
         {product.catDetail?.breed && (
           <p className="text-sm text-muted-foreground mb-1">Giống: {product.catDetail.breed}</p>
         )}
@@ -42,7 +54,7 @@ const PetCard = ({ product, onClick }: PetCardProps) => {
           </p>
         )}
         <p className="text-lg font-bold text-primary mt-2">{formatPrice(product.price)}</p>
-        <p className="text-sm text-muted-foreground mt-1">Còn lại: {product.stock_quantity} con</p>
+        <p className="text-sm text-muted-foreground mt-1">Còn lại: {product.stockQuantity} con</p>
       </div>
     </div>
   );
