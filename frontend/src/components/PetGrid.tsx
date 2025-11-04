@@ -121,14 +121,28 @@ const PetGrid = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả loại</SelectItem>
-                {productTypes.map((type) => (
-                  <SelectItem
-                    key={type.typeId}
-                    value={type.typeId.toString()}
-                  >
-                    {type.typeName}
-                  </SelectItem>
-                ))}
+                {productTypes && productTypes.length > 0 ? (
+                  productTypes.map((type) => (
+                    type && type.typeId ? (
+                      <SelectItem
+                        key={type.typeId}
+                        value={String(type.typeId)}
+                      >
+                        {type.typeName || 'Không có tên'}
+                      </SelectItem>
+                    ) : null
+                  ))
+                ) : (
+                  // Fallback: Lấy unique types từ products nếu API chưa có
+                  Array.from(new Set(products.map(p => p.typeId).filter(Boolean))).map((typeId) => {
+                    const product = products.find(p => p.typeId === typeId);
+                    return (
+                      <SelectItem key={typeId} value={String(typeId)}>
+                        {product?.typeName || `Loại ${typeId}`}
+                      </SelectItem>
+                    );
+                  })
+                )}
               </SelectContent>
             </Select>
 
@@ -142,14 +156,28 @@ const PetGrid = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả danh mục</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem
-                    key={category.categoryId}
-                    value={category.categoryId.toString()}
-                  >
-                    {category.categoryName}
-                  </SelectItem>
-                ))}
+                {categories && categories.length > 0 ? (
+                  categories.map((category) => (
+                    category && category.categoryId ? (
+                      <SelectItem
+                        key={category.categoryId}
+                        value={String(category.categoryId)}
+                      >
+                        {category.categoryName || 'Không có tên'}
+                      </SelectItem>
+                    ) : null
+                  ))
+                ) : (
+                  // Fallback: Lấy unique categories từ products
+                  Array.from(new Set(products.map(p => p.categoryId).filter(Boolean))).map((categoryId) => {
+                    const product = products.find(p => p.categoryId === categoryId);
+                    return (
+                      <SelectItem key={categoryId} value={String(categoryId)}>
+                        {product?.categoryName || `Danh mục ${categoryId}`}
+                      </SelectItem>
+                    );
+                  })
+                )}
               </SelectContent>
             </Select>
 

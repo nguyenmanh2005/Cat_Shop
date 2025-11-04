@@ -1,23 +1,41 @@
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useProductTypes, useCategories } from "@/hooks/useApi";
 
 const Sidebar = () => {
   const [openTypes, setOpenTypes] = useState<Record<number, boolean>>({});
   const { productTypes, loading: typesLoading } = useProductTypes();
-  const { categories } = useCategories();
+  const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
+
+  // Debug logs
+  useEffect(() => {
+    console.log("🔍 Sidebar - productTypes:", productTypes);
+    console.log("🔍 Sidebar - categories:", categories);
+    console.log("🔍 Sidebar - categoriesLoading:", categoriesLoading);
+    console.log("🔍 Sidebar - categoriesError:", categoriesError);
+  }, [productTypes, categories, categoriesLoading, categoriesError]);
 
   const toggleType = (typeId: number) => {
     setOpenTypes(prev => ({ ...prev, [typeId]: !prev[typeId] }));
   };
 
-  if (typesLoading) {
+  if (typesLoading || categoriesLoading) {
     return (
       <div className="w-72 bg-background border-r border-border">
         <div className="p-4">
           <div className="text-sm text-muted-foreground">Đang tải...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (categoriesError) {
+    return (
+      <div className="w-72 bg-background border-r border-border">
+        <div className="p-4">
+          <div className="text-sm text-red-500">Lỗi: {categoriesError}</div>
         </div>
       </div>
     );
@@ -29,9 +47,13 @@ const Sidebar = () => {
         <h2 className="text-lg font-bold text-foreground mb-4">DANH MỤC SẢN PHẨM</h2>
         
         {/* Product Types với Categories */}
+        {productTypes.length === 0 && (
+          <div className="text-sm text-muted-foreground">Không có loại sản phẩm</div>
+        )}
         {productTypes.map((type) => {
           const typeCategories = categories.filter(cat => cat.typeId === type.typeId);
           const isOpen = openTypes[type.typeId] || false;
+          console.log(`🔍 Type ${type.typeName} (${type.typeId}): ${typeCategories.length} categories`);
           
           return (
             <div key={type.typeId} className="mb-2">

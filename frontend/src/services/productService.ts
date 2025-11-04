@@ -62,8 +62,18 @@ export const productService = {
 // ProductType Service
 export const productTypeService = {
   // Lấy tất cả loại sản phẩm
+  // Lưu ý: Backend có thể chưa có endpoint này, sẽ trả về empty array
   async getAllProductTypes(): Promise<ProductType[]> {
-    return apiService.get<ProductType[]>(API_CONFIG.ENDPOINTS.PRODUCT_TYPES.LIST);
+    try {
+      return await apiService.get<ProductType[]>(API_CONFIG.ENDPOINTS.PRODUCT_TYPES.LIST);
+    } catch (error: any) {
+      // Nếu endpoint chưa tồn tại (404), trả về empty array thay vì throw error
+      if (error.response?.status === 404) {
+        console.warn('⚠️ ProductTypes endpoint chưa có trong backend, trả về empty array');
+        return [];
+      }
+      throw error;
+    }
   },
 
   // Lấy loại sản phẩm theo ID
@@ -74,9 +84,14 @@ export const productTypeService = {
 
 // Category Service
 export const categoryService = {
-  // Lấy tất cả danh mục
+  // Lấy tất cả danh mục (customer - chỉ danh mục khả dụng)
   async getAllCategories(): Promise<Category[]> {
     return apiService.get<Category[]>(API_CONFIG.ENDPOINTS.CATEGORIES.LIST);
+  },
+
+  // Lấy tất cả danh mục (admin - tất cả danh mục)
+  async getAllCategoriesAdmin(): Promise<Category[]> {
+    return apiService.get<Category[]>(API_CONFIG.ENDPOINTS.CATEGORIES.LIST_ADMIN);
   },
 
   // Lấy danh mục theo ID
@@ -96,20 +111,25 @@ export const categoryService = {
     return apiService.get<Category & { products: Product[] }>(url);
   },
 
-  // Tạo danh mục mới
+  // Tạo danh mục mới (admin)
   async createCategory(categoryData: Omit<Category, 'category_id'>): Promise<Category> {
     return apiService.post<Category>(API_CONFIG.ENDPOINTS.CATEGORIES.CREATE, categoryData);
   },
 
-  // Cập nhật danh mục
+  // Cập nhật danh mục (admin)
   async updateCategory(id: number, categoryData: Partial<Category>): Promise<Category> {
     const url = buildUrl(API_CONFIG.ENDPOINTS.CATEGORIES.UPDATE, { id });
     return apiService.put<Category>(url, categoryData);
   },
 
-  // Xóa danh mục
+  // Xóa danh mục (admin)
   async deleteCategory(id: number): Promise<void> {
     const url = buildUrl(API_CONFIG.ENDPOINTS.CATEGORIES.DELETE, { id });
     return apiService.delete<void>(url);
+  },
+
+  // Lấy danh sách danh mục cho customer
+  async getAllCategoriesCustomer(): Promise<Category[]> {
+    return apiService.get<Category[]>(API_CONFIG.ENDPOINTS.CATEGORIES.LIST);
   }
 };

@@ -113,6 +113,11 @@ export const apiService = {
   // GET request
   get: async <T = any>(url: string, config?: AxiosRequestConfig): Promise<T> => {
     const response = await api.get<ApiResponse<T>>(url, config);
+    console.log(`📡 API GET ${url}:`, {
+      fullResponse: response.data,
+      extractedData: response.data.data,
+      dataLength: Array.isArray(response.data.data) ? response.data.data.length : 'not array'
+    });
     return response.data.data;
   },
 
