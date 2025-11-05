@@ -5,6 +5,7 @@ import com.catshop.catshop.security.JwtAuthEntryPoint;
 import com.catshop.catshop.security.JwtAuthFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -21,7 +22,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
-
+@Log4j2
 @RequiredArgsConstructor
 @Configuration
 public class SecurityConfig {
@@ -40,12 +41,12 @@ public class SecurityConfig {
                 .oauth2Login(oauth2 -> oauth2
                         .loginPage("/oauth2/authorization/google")
                         .successHandler(customOAuth2SuccessHandler)
-                        .failureHandler(((request, response, exception) -> {
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.setContentType("application/json;charset=UTF-8");
-                            response.getWriter().write("{\"error\":\"Đăng nhập Google thất bại\"}");
-
-                        }))
+                        .failureHandler((request, response, exception) -> {
+                            log.error("❌ OAuth2 login failed: {}", exception.getMessage(), exception);
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.getWriter().write("{\"error\": \"" + exception.getMessage() + "\"}");
+                        })
                 )
                 // CORS cho tất cả FE
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))

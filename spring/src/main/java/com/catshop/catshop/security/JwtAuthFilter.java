@@ -44,7 +44,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = authHeader.substring(7);
 
         try {
-            if (!jwtUtils.validateToken(token)) {
+            if (!jwtUtils.validateToken(token)) {   
                 throw new JwtValidationException("Token không hợp lệ hoặc đã hết hạn!");
             }
 
