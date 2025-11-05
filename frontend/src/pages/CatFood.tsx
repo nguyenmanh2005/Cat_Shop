@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import Sidebar from "@/components/Sidebar";
 import PetGrid from "@/components/PetGrid";
 
 const CatFood = () => {
@@ -12,8 +11,7 @@ const CatFood = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <main className="flex flex-1">
-        <Sidebar />
+      <main className="flex-1">
         <PetGrid />
       </main>
       <Footer />

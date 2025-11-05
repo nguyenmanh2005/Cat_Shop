@@ -146,8 +146,8 @@ const PetGrid = () => {
               </SelectContent>
             </Select>
 
-            {/* Lọc theo danh mục */}
-            <Select
+            {/* Lọc theo danh mục - Tạm thời ẩn */}
+            {/* <Select
               value={selectedCategory}
               onValueChange={setSelectedCategory}
             >
@@ -179,7 +179,7 @@ const PetGrid = () => {
                   })
                 )}
               </SelectContent>
-            </Select>
+            </Select> */}
 
             {/* Sắp xếp */}
             <Select value={sortBy} onValueChange={setSortBy}>

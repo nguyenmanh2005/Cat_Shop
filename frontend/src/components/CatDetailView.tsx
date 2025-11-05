@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, ShoppingCart, Heart } from "lucide-react";
 import axios from "axios";
+import PublicReview from "./PublicReview";
 
 interface CatDetail {
   catId: number;
@@ -101,6 +102,26 @@ const CatDetailView = () => {
     }).format(price);
   };
 
+  // Get stock unit based on product type
+  const getStockUnit = () => {
+    if (!product) return "sản phẩm";
+    
+    switch (product.typeId) {
+      case 1: // Cat (Mèo cảnh)
+        return "con";
+      case 2: // Food (Thức ăn)
+        return "sản phẩm";
+      case 3: // Cleaning products
+        return "sản phẩm";
+      case 4: // Cage
+        return "cái";
+      case 5: // Toys & Accessories
+        return "sản phẩm";
+      default:
+        return "sản phẩm";
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
@@ -191,7 +212,7 @@ const CatDetailView = () => {
             <p className="text-sm text-muted-foreground">
               Tình trạng:{" "}
               <span className={isInStock ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
-                {isInStock ? `Còn ${product.stockQuantity} con` : "Hết hàng"}
+                {isInStock ? `Còn ${product.stockQuantity} ${getStockUnit()}` : "Hết hàng"}
               </span>
             </p>
           </div>
@@ -227,6 +248,12 @@ const CatDetailView = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Reviews Section */}
+      <div className="container mx-auto px-4 mt-12">
+        <h2 className="text-2xl font-bold mb-6">Đánh giá sản phẩm</h2>
+        <PublicReview />
       </div>
     </div>
   );
