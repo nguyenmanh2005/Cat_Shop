@@ -1,17 +1,25 @@
-import { Search, Phone, Facebook, Instagram, Twitter, Youtube, Mail, User } from "lucide-react";
+import { Search, Phone, Facebook, Instagram, Twitter, Youtube, Mail, User, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import logo from "@/assets/logo.png";
 import AuthModal from "./AuthModal";
 import ProfileMenu from "./ProfileMenu";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useCategories } from "@/hooks/useApi";
 
 const Header = () => {
   const { isAuthenticated, isAdmin } = useAuth();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const { categories, loading: categoriesLoading } = useCategories();
 
   const handleOpenLogin = () => {
     setAuthMode("login");
@@ -25,25 +33,33 @@ const Header = () => {
 
   return (
     <header className="bg-background border-b border-border">
-      {/* Top bar with social and contact */}
-      <div className="bg-muted/30 py-2">
-        <div className="container mx-auto px-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>Chăm sóc - Yêu thương</span>
+      {/* Top bar with contact info */}
+      <div className="bg-muted/30 border-b border-border">
+        <div className="container mx-auto px-4 py-2">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">0911.079.086</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">info@champets.com</span>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Facebook className="h-4 w-4 text-muted-foreground hover:text-primary cursor-pointer" />
-              <Instagram className="h-4 w-4 text-muted-foreground hover:text-primary cursor-pointer" />
-              <Twitter className="h-4 w-4 text-muted-foreground hover:text-primary cursor-pointer" />
-              <Youtube className="h-4 w-4 text-muted-foreground hover:text-primary cursor-pointer" />
-              <Mail className="h-4 w-4 text-muted-foreground hover:text-primary cursor-pointer" />
-            </div>
-            <div className="flex items-center gap-1 text-sm">
-              <Phone className="h-4 w-4 text-primary" />
-              <span className="font-semibold">0911.079.086</span>
+            <div className="flex items-center gap-3">
+              <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                <Facebook className="h-4 w-4" />
+              </a>
+              <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                <Instagram className="h-4 w-4" />
+              </a>
+              <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                <Youtube className="h-4 w-4" />
+              </a>
+              <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                <Twitter className="h-4 w-4" />
+              </a>
             </div>
           </div>
         </div>
@@ -136,6 +152,39 @@ const Header = () => {
             <Link to="/" className="py-3 px-4 text-primary-foreground font-medium hover:bg-primary-light/20 transition-colors">
               TRANG CHỦ
             </Link>
+            
+            {/* THÚ CƯNG dropdown menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="py-3 px-4 text-primary-foreground font-medium hover:bg-primary-light/20 transition-colors flex items-center gap-1">
+                  THÚ CƯNG
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent 
+                align="start" 
+                className="w-64 max-h-96 overflow-y-auto bg-white"
+                onCloseAutoFocus={(e) => e.preventDefault()}
+              >
+                {categoriesLoading ? (
+                  <div className="p-4 text-sm text-muted-foreground">Đang tải...</div>
+                ) : categories.length === 0 ? (
+                  <div className="p-4 text-sm text-muted-foreground">Không có danh mục</div>
+                ) : (
+                  categories.map((category) => (
+                    <DropdownMenuItem key={category.categoryId} asChild>
+                      <Link
+                        to={`/pets?category=${category.categoryId}`}
+                        className="cursor-pointer px-4 py-2 hover:bg-accent hover:text-accent-foreground transition-colors"
+                      >
+                        {category.categoryName}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Link to="/about" className="py-3 px-4 text-primary-foreground font-medium hover:bg-primary-light/20 transition-colors">
               GIỚI THIỆU
             </Link>
