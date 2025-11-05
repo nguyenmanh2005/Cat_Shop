@@ -12,6 +12,8 @@ import com.catshop.catshop.repository.UserRepository;
 import com.catshop.catshop.service.UserService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,6 +25,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
 
     @Override
@@ -71,6 +74,9 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Role với id: " + 1L));
 
         User user = userMapper.FromUserRequestToUser(userRequest);
+        // Mã hóa password trước khi lưu
+        String encodedPassword = passwordEncoder.encode(userRequest.getPassword());
+        user.setPasswordHash(encodedPassword);
         user.setRole(role);
 
         User savedUser = userRepository.save(user);
@@ -85,7 +91,11 @@ public class UserServiceImpl implements UserService {
                         "Không tìm thấy tài khoản với Id là: " + userId));
 
         user.setUsername(request.getUsername());
-        user.setPasswordHash(request.getPassword());
+        // Chỉ mã hóa password nếu có thay đổi (không rỗng)
+        if (request.getPassword() != null && !request.getPassword().isEmpty()) {
+            String encodedPassword = passwordEncoder.encode(request.getPassword());
+            user.setPasswordHash(encodedPassword);
+        }
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
         user.setAddress(request.getAddress());

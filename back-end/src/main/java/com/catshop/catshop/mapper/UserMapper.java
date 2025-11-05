@@ -15,6 +15,8 @@ public interface UserMapper {
 
     List<UserResponse> FromUserToUserResponse (List<User> request);
 
+    @Mapping(source = "userId", target = "user_id")
+    @Mapping(source = "role.roleId", target = "role_id")
     UserResponse FromUserToUserResponse(User user);
 }
 
