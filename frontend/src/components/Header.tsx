@@ -192,7 +192,7 @@ const Header = () => {
               BLOG
             </Link>
             <Link to="/pets" className="py-3 px-4 text-primary-foreground font-medium hover:bg-primary-light/20 transition-colors">
-              MÈO CẢNH
+              SẢN PHẨM THÚ CƯNG
             </Link>
           </div>
         </div>

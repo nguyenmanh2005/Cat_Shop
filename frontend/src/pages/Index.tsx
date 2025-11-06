@@ -96,13 +96,24 @@ const Index = () => {
       
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="bg-gradient-to-r from-primary/10 to-primary/5 py-20">
-          <div className="max-w-7xl mx-auto px-6">
+        <section 
+          className="relative py-20 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: `url('https://img.freepik.com/premium-photo/british-cat-with-shopping-cart-isolated-white-kitten-osolated_767502-1922.jpg')`,
+            backgroundSize: 'auto',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          }}
+        >
+          {/* Overlay để text dễ đọc hơn */}
+          <div className="absolute inset-0 bg-black/30"></div>
+          
+          <div className="relative max-w-7xl mx-auto px-6 z-10">
             <div className="text-center">
-              <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-6">
+              <h1 className="text-5xl md:text-6xl font-bold text-white mb-6 drop-shadow-lg">
                 Chào mừng đến với <span className="text-primary">Cham Pets</span>
               </h1>
-              <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
+              <p className="text-xl text-white/90 max-w-3xl mx-auto mb-8 drop-shadow-md">
                 Chuyên cung cấp mèo cảnh chất lượng cao với sự chăm sóc tận tâm và yêu thương vô điều kiện
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -112,7 +123,7 @@ const Index = () => {
                   </Button>
                 </Link>
                 <Link to="/about">
-                  <Button variant="outline" size="lg" className="w-full sm:w-auto">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20">
                     Tìm hiểu thêm
                   </Button>
                 </Link>
