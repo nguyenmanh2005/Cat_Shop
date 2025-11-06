@@ -12,6 +12,8 @@ import com.catshop.catshop.repository.UserRepository;
 import com.catshop.catshop.service.UserService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -24,6 +26,12 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final RoleRepository roleRepository;
 
+
+    @Override
+    public Page<UserResponse> getAllUser(Pageable pageable) {
+        Page<User> userPage = userRepository.findAll(pageable);
+        return userPage.map(userMapper::FromUserToUserResponse);
+    }
 
     @Override
     public User getUserEntityByEmail(String email) {
