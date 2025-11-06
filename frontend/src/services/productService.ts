@@ -62,18 +62,8 @@ export const productService = {
 // ProductType Service
 export const productTypeService = {
   // Lấy tất cả loại sản phẩm
-  // Lưu ý: Backend có thể chưa có endpoint này, sẽ trả về empty array
   async getAllProductTypes(): Promise<ProductType[]> {
-    try {
-      return await apiService.get<ProductType[]>(API_CONFIG.ENDPOINTS.PRODUCT_TYPES.LIST);
-    } catch (error: any) {
-      // Nếu endpoint chưa tồn tại (404), trả về empty array thay vì throw error
-      if (error.response?.status === 404) {
-        console.warn('⚠️ ProductTypes endpoint chưa có trong backend, trả về empty array');
-        return [];
-      }
-      throw error;
-    }
+    return apiService.get<ProductType[]>(API_CONFIG.ENDPOINTS.PRODUCT_TYPES.LIST);
   },
 
   // Lấy loại sản phẩm theo ID
