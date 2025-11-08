@@ -5,9 +5,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 public class TokenResponse {
     private String accessToken;
     private String refreshToken;
+    private boolean mfaRequired = false;
 }

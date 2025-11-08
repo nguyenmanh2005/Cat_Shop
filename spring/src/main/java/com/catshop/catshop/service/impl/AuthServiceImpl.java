@@ -65,18 +65,25 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
 
-        // ✅ Sinh token
+        // Xóa OTP sau khi xác thực (để an toàn)
+        redisTemplate.delete("otp:" + user.getEmail());
+
+        // Nếu user bật MFA -> trả về thông báo cần MFA, không cấp JWT
+        if (Boolean.TRUE.equals(user.getMfaEnabled())) {
+            // Trả về mfaRequired = true để FE biết tiếp tục yêu cầu Google Authenticator
+            return new TokenResponse(null, null, true);
+        }
+
+        // Nếu không bật MFA -> cấp token như bình thường
         String accessToken = jwtUtils.generateAccessToken(user.getEmail(), user.getRole().getRoleName());
         String refreshToken = jwtUtils.generateRefreshToken(user.getEmail());
 
-        // ✅ Lưu refresh token vào Redis (7 ngày)
+        // Lưu refresh token vào Redis (7 ngày)
         redisTemplate.opsForValue().set("refresh:" + user.getEmail(), refreshToken, 7, TimeUnit.DAYS);
 
-        // ✅ Xóa OTP sau khi xác thực
-        redisTemplate.delete("otp:" + user.getEmail());
-
-        return new TokenResponse(accessToken, refreshToken);
+        return new TokenResponse(accessToken, refreshToken, false);
     }
+
 
     // ------------------------- REFRESH TOKEN -------------------------
     @Override
@@ -97,6 +104,22 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
         return jwtUtils.generateAccessToken(user.getEmail(), user.getRole().getRoleName());
     }
+
+    @Override
+    public String generateAccessTokenForUser(User user) {
+        return jwtUtils.generateAccessToken(user.getEmail(), user.getRole().getRoleName());
+    }
+
+    @Override
+    public String generateRefreshTokenForUser(User user) {
+        return jwtUtils.generateRefreshToken(user.getEmail());
+    }
+
+    @Override
+    public void saveRefreshToken(String email, String refreshToken) {
+        redisTemplate.opsForValue().set("refresh:" + email, refreshToken, 7, TimeUnit.DAYS);
+    }
+
 
     // ------------------------- LOGOUT -------------------------
     @Override

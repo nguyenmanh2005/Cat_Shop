@@ -4,6 +4,7 @@ import com.catshop.catshop.dto.request.LoginRequest;
 import com.catshop.catshop.dto.request.OtpRequest;
 import com.catshop.catshop.dto.request.UserRequest;
 import com.catshop.catshop.dto.response.TokenResponse;
+import com.catshop.catshop.entity.User;
 
 public interface AuthService {
 
@@ -21,4 +22,9 @@ public interface AuthService {
 
     // Đăng xuất (xóa refresh token)
     void logout(String email);
+
+    String generateAccessTokenForUser(User user);
+    String generateRefreshTokenForUser(User user);
+    void saveRefreshToken(String email, String refreshToken);
+
 }
