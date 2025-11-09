@@ -18,7 +18,13 @@ export const API_CONFIG = {
       LOGOUT: '/auth/logout',
       PROFILE: '/auth/profile',
       FORGOT_PASSWORD: '/auth/forgot-password',
-      RESET_PASSWORD: '/auth/reset-password'
+      RESET_PASSWORD: '/auth/reset-password',
+      // OTP Login
+      SEND_OTP: '/auth/send-otp',
+      VERIFY_OTP: '/auth/verify-otp',
+      // QR Code Login
+      GENERATE_QR: '/auth/generate-qr',
+      VERIFY_QR: '/auth/verify-qr'
     },
     
     // Products

@@ -122,5 +122,55 @@ export const authService = {
   // Lấy refresh token
   getRefreshToken(): string | null {
     return localStorage.getItem('refresh_token');
+  },
+
+  // Gửi OTP đến email
+  async sendOTP(email: string): Promise<{ message: string; sessionId?: string }> {
+    return apiService.post<{ message: string; sessionId?: string }>(
+      API_CONFIG.ENDPOINTS.AUTH.SEND_OTP,
+      { email: email }
+    );
+  },
+
+  // Xác thực OTP
+  async verifyOTP(email: string, otp: string, sessionId?: string): Promise<AuthResponse> {
+    const response = await apiService.post<AuthResponse>(
+      API_CONFIG.ENDPOINTS.AUTH.VERIFY_OTP,
+      { email: email, otp, sessionId }
+    );
+    
+    // Lưu token vào localStorage
+    localStorage.setItem('access_token', response.access_token);
+    localStorage.setItem('refresh_token', response.refresh_token);
+    
+    return response;
+  },
+
+  // Tạo QR code cho đăng nhập
+  async generateQRCode(): Promise<{ qrCode: string; sessionId: string; expiresAt: number }> {
+    return apiService.post<{ qrCode: string; sessionId: string; expiresAt: number }>(
+      API_CONFIG.ENDPOINTS.AUTH.GENERATE_QR
+    );
+  },
+
+  // Xác thực QR code (polling để kiểm tra khi user quét QR)
+  async verifyQRCode(sessionId: string): Promise<AuthResponse | null> {
+    try {
+      const response = await apiService.post<AuthResponse | null>(
+        API_CONFIG.ENDPOINTS.AUTH.VERIFY_QR,
+        { sessionId }
+      );
+      
+      if (response && response.access_token) {
+        // Lưu token vào localStorage
+        localStorage.setItem('access_token', response.access_token);
+        localStorage.setItem('refresh_token', response.refresh_token);
+        return response;
+      }
+      
+      return null;
+    } catch (error) {
+      return null;
+    }
   }
 };

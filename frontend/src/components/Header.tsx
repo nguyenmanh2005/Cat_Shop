@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useCategories } from "@/hooks/useApi";
+import { getCategoryDisplayName } from "@/utils/categoryMapping"; // 🔧 Import mapping utility
 
 const Header = () => {
   const { isAuthenticated, isAdmin } = useAuth();
@@ -171,16 +172,16 @@ const Header = () => {
                 ) : categories.length === 0 ? (
                   <div className="p-4 text-sm text-muted-foreground">Không có danh mục</div>
                 ) : (
-                  categories.map((category) => (
-                    <DropdownMenuItem key={category.categoryId} asChild>
-                      <Link
-                        to={`/pets?category=${category.categoryId}`}
-                        className="cursor-pointer px-4 py-2 hover:bg-accent hover:text-accent-foreground transition-colors"
-                      >
-                        {category.categoryName}
-                      </Link>
-                    </DropdownMenuItem>
-                  ))
+                        categories.map((category) => (
+                          <DropdownMenuItem key={category.categoryId} asChild>
+                            <Link
+                              to={`/pets?category=${category.categoryId}`}
+                              className="cursor-pointer px-4 py-2 hover:bg-accent hover:text-accent-foreground transition-colors"
+                            >
+                              {getCategoryDisplayName(category.categoryName)}
+                            </Link>
+                          </DropdownMenuItem>
+                        ))
                 )}
               </DropdownMenuContent>
             </DropdownMenu>

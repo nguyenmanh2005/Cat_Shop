@@ -11,6 +11,7 @@ import Breadcrumb from "./Breadcrumb";
 import { useProductTypes, useCategories } from "@/hooks/useApi";
 import { Product, ProductType, Category } from "@/types/index";
 import { productService } from "@/services/productService"; // 🆕 import trực tiếp service
+import { getCategoryDisplayName } from "@/utils/categoryMapping"; // 🔧 Import mapping utility
 
 const PetGrid = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -157,7 +158,7 @@ const PetGrid = () => {
                       key={category.categoryId}
                       value={String(category.categoryId)}
                     >
-                      {category.categoryName || 'Không có tên'}
+                      {getCategoryDisplayName(category.categoryName || 'Không có tên')}
                     </SelectItem>
                   ))
                 ) : null}
