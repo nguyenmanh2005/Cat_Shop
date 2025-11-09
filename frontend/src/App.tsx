@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 // 🧩 Các trang chính
 import Index from "@/pages/Index";
@@ -22,10 +22,22 @@ import OrderDetailsPage from "@/pages/orders/OrderDetailsPage";
 import PaymentsPage from "@/pages/orders/PaymentsPage";
 import ShipmentsPage from "@/pages/orders/ShipmentsPage";
 
-// 💼 Trang tổng hợp mới
+// 💼 Trang tổng hợp (admin)
 import TransactionPage from "@/pages/TransactionPage";
 
 const queryClient = new QueryClient();
+
+/**
+ * 🔐 Route bảo vệ cho admin
+ * Kiểm tra role từ localStorage/sessionStorage
+ */
+const AdminRoute = ({ element }: { element: JSX.Element }) => {
+  const role = localStorage.getItem("role");
+  if (role !== "admin") {
+    return <Navigate to="/" replace />;
+  }
+  return element;
+};
 
 const App = () => {
   return (
@@ -43,8 +55,7 @@ const App = () => {
           {/* 🛒 Giỏ hàng */}
           <Route path="/cart" element={<CartPage />} />
 
-          {/* 💼 Giao dịch & đơn hàng */}
-          <Route path="/transactions" element={<TransactionPage />} />
+          {/* 💼 Đơn hàng & thanh toán */}
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/orders/:id" element={<OrderDetailsPage />} />
           <Route path="/payments" element={<PaymentsPage />} />
@@ -52,6 +63,10 @@ const App = () => {
 
           {/* 🛠️ Trang quản trị */}
           <Route path="/admin" element={<Admin />} />
+          <Route
+            path="/admin/transactions"
+            element={<AdminRoute element={<TransactionPage />} />}
+          />
 
           {/* 🔐 Trang đăng nhập / test auth */}
           <Route path="/login-test" element={<LoginTest />} />

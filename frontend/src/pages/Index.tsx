@@ -9,7 +9,8 @@ import {
   Award, 
   Users,
   ArrowRight,
-  CheckCircle
+  CheckCircle,
+  MessageCircle
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -155,7 +156,32 @@ const Index = () => {
           </div>
         </section>
 
-        {/* 🔹 Section “Quản lý Giao dịch & Đơn hàng” đã bị loại bỏ */}
+        {/* Liên hệ thanh toán qua Zalo */}
+<section className="py-16 bg-primary text-primary-foreground text-center">
+  <div className="max-w-7xl mx-auto px-6">
+    <h2 className="text-3xl font-bold mb-4 flex justify-center items-center gap-2">
+      <span>💬</span> Liên hệ thanh toán qua Zalo
+    </h2>
+    <p className="mb-6 text-primary-foreground/90">
+      Gửi tin nhắn trực tiếp đến <span className="font-semibold">chủ tiệm </span> qua Zalo
+      để thanh toán hoặc được hỗ trợ nhanh nhất.
+    </p>
+    <a
+      href="https://zalo.me/0866523966"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <Button
+        size="lg"
+        variant="secondary"
+        className="bg-white text-primary hover:bg-white/90"
+      >
+        Chat Zalo ngay
+      </Button>
+    </a>
+  </div>
+</section>
+
       </main>
 
       <Footer />
