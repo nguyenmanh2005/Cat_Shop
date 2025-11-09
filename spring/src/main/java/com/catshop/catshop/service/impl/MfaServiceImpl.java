@@ -1,14 +1,22 @@
 package com.catshop.catshop.service.impl;
 
 import com.catshop.catshop.service.MfaService;
+import com.catshop.catshop.util.QrCodeGenerator;
 import com.warrenstrange.googleauth.GoogleAuthenticator;
 import com.warrenstrange.googleauth.GoogleAuthenticatorKey;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 @Service
+@RequiredArgsConstructor
 public class MfaServiceImpl implements MfaService {
 
     private final GoogleAuthenticator gAuth = new GoogleAuthenticator();
+    private final QrCodeGenerator qrCodeGenerator;
 
     @Override
     public String generateSecret() {
@@ -18,11 +26,24 @@ public class MfaServiceImpl implements MfaService {
 
     @Override
     public String generateQrUrl(String username, String secret) {
-        // issuer = tên app hiển thị trong Google Authenticator
         String issuer = "CatShop";
-        // label có thể là username hoặc email
-        return String.format("otpauth://totp/%s:%s?secret=%s&issuer=%s&algorithm=SHA1&digits=6&period=30",
-                issuer, username, secret, issuer);
+        String label = issuer + ":" + username; // Không encode dấu :
+        return String.format(
+                "otpauth://totp/%s?secret=%s&issuer=%s&algorithm=SHA1&digits=6&period=30",
+                label, secret, issuer
+        );
+    }
+
+
+
+    @Override
+    public String generateQrBase64(String username, String secret) {
+        try {
+            String otpauthUrl = generateQrUrl(username, secret);
+            return qrCodeGenerator.generateBase64QrCode(otpauthUrl, 250, 250);
+        } catch (IOException | com.google.zxing.WriterException e) {
+            throw new RuntimeException("Không tạo được QR code Base64", e);
+        }
     }
 
     @Override

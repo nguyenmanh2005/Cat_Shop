@@ -6,6 +6,8 @@ import com.catshop.catshop.dto.request.UserRequest;
 import com.catshop.catshop.dto.response.TokenResponse;
 import com.catshop.catshop.entity.User;
 
+import java.util.Map;
+
 public interface AuthService {
 
     // Bước 1: login gửi OTP
@@ -26,5 +28,6 @@ public interface AuthService {
     String generateAccessTokenForUser(User user);
     String generateRefreshTokenForUser(User user);
     void saveRefreshToken(String email, String refreshToken);
+
 
 }

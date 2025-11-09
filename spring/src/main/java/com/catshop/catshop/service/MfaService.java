@@ -4,4 +4,5 @@ public interface MfaService {
     String generateSecret();
     String generateQrUrl(String username, String secret);
     boolean verifyCode(String secret, int code);
+    String generateQrBase64(String username, String secret);
 }

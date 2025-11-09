@@ -15,7 +15,7 @@ public class JwtUtils {
     private final String jwtSecret = "mySuperUltraMegaSecretKey1234567890SuperLongSecretKey!!!";
 
     // Access Token: 15 phút, Refresh Token: 7 ngày
-    private final long accessTokenExpirationMs = 15 * 60 * 1000; // 15 phút
+    private final long accessTokenExpirationMs = 60 * 60 * 1000; // 15 phút
     private final long refreshTokenExpirationMs = 7 * 24 * 60 * 60 * 1000; // 7 ngày
 
     private Key getSigningKey() {

@@ -21,6 +21,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -54,6 +55,7 @@ public class AuthServiceImpl implements AuthService {
         return "Mã OTP đã được gửi đến email của bạn. Vui lòng nhập OTP để hoàn tất đăng nhập.";
     }
 
+
     // ------------------------- LOGIN STEP 2 (Xác thực OTP) -------------------------
     @Override
     public TokenResponse verifyOtp(OtpRequest request) {
@@ -83,7 +85,6 @@ public class AuthServiceImpl implements AuthService {
 
         return new TokenResponse(accessToken, refreshToken, false);
     }
-
 
     // ------------------------- REFRESH TOKEN -------------------------
     @Override

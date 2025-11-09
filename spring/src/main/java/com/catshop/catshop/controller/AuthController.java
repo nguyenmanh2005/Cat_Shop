@@ -26,7 +26,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserRepository userRepository;
-    MfaService mfaService;
+    private final MfaService mfaService;
 
     // ✅ Bước 1: Login (gửi OTP)
     @PostMapping("/login")
@@ -77,7 +77,7 @@ public class AuthController {
     }
 
     @PostMapping("/mfa/enable")
-    public ResponseEntity<ApiResponse<Object>> enableMfa(@RequestParam String email) {
+    public ResponseEntity<ApiResponse<Map<String, String>>> enableMfa(@RequestParam String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -86,14 +86,16 @@ public class AuthController {
         user.setMfaEnabled(true);
         userRepository.save(user);
 
-        String qrUrl = mfaService.generateQrUrl(user.getEmail(), secret);
+        // Tạo QR code Base64 chuẩn, đảm bảo quét được
+        String qrBase64 = mfaService.generateQrBase64(user.getEmail(), secret);
 
-        // Trả qrUrl và secret (secret optional)
         return ResponseEntity.ok(ApiResponse.success(
-                Map.of("qrUrl", qrUrl, "secret", secret),
-                "MFA enabled. Scan QR in Google Authenticator"
+                Map.of("secret", secret, "qrBase64", qrBase64),
+                "MFA enabled. Scan QR code in Google Authenticator"
         ));
     }
+
+
 
     // ✅ Đăng ký tài khoản mới
     @PostMapping("/register")
