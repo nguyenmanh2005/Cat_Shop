@@ -11,8 +11,7 @@ export const productService = {
 
   // Lấy sản phẩm theo ID
   async getProductById(id: number): Promise<Product> {
-    const url = buildUrl(API_CONFIG.ENDPOINTS.PRODUCTS.DETAIL, { id });
-    return apiService.get<Product>(url);
+    return apiService.get<Product>(`/customer/products/${id}`);
   },
 
   // Lấy sản phẩm theo loại

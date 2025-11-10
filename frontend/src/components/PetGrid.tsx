@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -13,6 +14,7 @@ import { Product, ProductType, Category } from "@/types/index";
 import { productService } from "@/services/productService"; // 🆕 import trực tiếp service
 
 const PetGrid = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [sortBy, setSortBy] = useState("default");
   const [selectedType, setSelectedType] = useState<string>("all");
@@ -192,7 +194,7 @@ const PetGrid = () => {
                 key={product.productId}
                 product={product}
                 onClick={() => {
-                  console.log("Clicked product:", product.productName);
+                  navigate(`/product/${product.productId}`);
                 }}
               />
             ))}

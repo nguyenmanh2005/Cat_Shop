@@ -13,6 +13,12 @@ const ProductCard = ({ product, onClick }: ProductCardProps) => {
     }).format(price);
   };
 
+  const getStockUnit = () => {
+    // typeId = 1: Mèo → "con"
+    // Các loại khác → "sản phẩm"
+    return product.typeId === 1 ? "con" : "sản phẩm";
+  };
+
   return (
     <div 
       className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group"
@@ -39,7 +45,7 @@ const ProductCard = ({ product, onClick }: ProductCardProps) => {
           <p className="text-sm text-muted-foreground mb-2">{product.categoryName}</p>
         )}
         
-        <p className="text-sm text-muted-foreground mt-1">Còn lại: {product.stockQuantity} sản phẩm</p>
+        <p className="text-sm text-muted-foreground mt-1">Còn lại: {product.stockQuantity} {getStockUnit()}</p>
         
         <p className="text-lg font-bold text-primary mt-2">{formatPrice(product.price)}</p>
       </div>

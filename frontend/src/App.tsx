@@ -12,6 +12,10 @@ import Admin from "./pages/Admin";
 import Profile from "./pages/Profile";
 import LoginTest from "./pages/LoginTest";
 import NotFound from "./pages/NotFound";
+import ProductDetail from "./pages/ProductDetail";
+import CatFood from "./pages/CatFood";
+import Cattail from "./pages/Cattail";
+import AdCate from "./pages/AdCate";
 
 const queryClient = new QueryClient();
 
@@ -27,8 +31,12 @@ const App = () => (
             <Route path="/about" element={<About />} />
             <Route path="/blog" element={<Blog />} />
             <Route path="/pets" element={<Pets />} />
+            <Route path="/product/:id" element={<ProductDetail />} />
+            <Route path="/cat-food" element={<CatFood />} />
+            <Route path="/cattail" element={<Cattail />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/categories" element={<AdCate />} />
             <Route path="/login-test" element={<LoginTest />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
