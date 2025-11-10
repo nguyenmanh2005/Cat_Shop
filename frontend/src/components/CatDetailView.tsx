@@ -241,7 +241,7 @@ const CatDetailView = () => {
       {/* Reviews Section */}
       <div className="container mx-auto px-4 mt-12">
         <h2 className="text-2xl font-bold mb-6">Đánh giá sản phẩm</h2>
-        <PublicReview />
+        {product && <PublicReview productId={product.productId} />}
       </div>
     </div>
   );

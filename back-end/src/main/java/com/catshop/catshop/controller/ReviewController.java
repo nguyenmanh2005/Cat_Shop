@@ -79,6 +79,13 @@ public class ReviewController {
         return ResponseEntity.ok(ApiResponse.success(count, "Tổng số đánh giá của sản phẩm"));
     }
 
+    // Lấy tất cả review (PUBLIC - không cần auth)
+    @GetMapping("/all")
+    public ResponseEntity<ApiResponse<List<ReviewResponse>>> getAllReviewsPublic() {
+        List<ReviewResponse> list = reviewService.getAllReviews();
+        return ResponseEntity.ok(ApiResponse.success(list, "Danh sách toàn bộ đánh giá"));
+    }
+
     // ================= ADMIN APIs =================
 
     // Xem toàn bộ review
