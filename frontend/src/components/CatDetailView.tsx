@@ -106,20 +106,8 @@ const CatDetailView = () => {
   const getStockUnit = () => {
     if (!product) return "sản phẩm";
     
-    switch (product.typeId) {
-      case 1: // Cat (Mèo cảnh)
-        return "con";
-      case 2: // Food (Thức ăn)
-        return "sản phẩm";
-      case 3: // Cleaning products
-        return "sản phẩm";
-      case 4: // Cage
-        return "cái";
-      case 5: // Toys & Accessories
-        return "sản phẩm";
-      default:
-        return "sản phẩm";
-    }
+    // Chỉ mèo (typeId = 1) là "con", tất cả loại khác là "sản phẩm"
+    return product.typeId === 1 ? "con" : "sản phẩm";
   };
 
   if (loading) {

@@ -13,11 +13,6 @@ import OrderManagementDB from "@/components/admin/OrderManagementDB";
 import Analytics from "@/components/admin/Analytics";
 import { DebugAuth } from "@/components/DebugAuth";
 import { AdminCredentials } from "@/components/AdminCredentials";
-import AdminProducts from "@/components/AdminProducts";
-import AdminCategories from "@/components/AdminCategories";
-import AdminReview from "@/components/AdminReview";
-import CatDetails from "@/components/CatDetails";
-import FoodDetailsAdmin from "@/components/FoodDetailsAdmin";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Admin = () => {
@@ -88,16 +83,11 @@ const Admin = () => {
           {activeTab === "users" && <UserManagement />}
           {activeTab === "users-db" && <UserManagementDB />}
           {activeTab === "products" && <ProductManagement />}
-          {activeTab === "admin-products" && <AdminProducts />}
           {activeTab === "categories" && <CategoryManagement />}
-          {activeTab === "admin-categories" && <AdminCategories />}
           {activeTab === "pets" && <PetManagement />}
           {activeTab === "orders" && <OrderManagement />}
           {activeTab === "orders-db" && <OrderManagementDB />}
           {activeTab === "analytics" && <Analytics />}
-          {activeTab === "admin-reviews" && <AdminReview />}
-          {activeTab === "cat-details" && <CatDetails />}
-          {activeTab === "food-details" && <FoodDetailsAdmin />}
           {activeTab === "debug" && <DebugAuth />}
           {activeTab === "credentials" && <AdminCredentials />}
           {activeTab === "notifications" && (

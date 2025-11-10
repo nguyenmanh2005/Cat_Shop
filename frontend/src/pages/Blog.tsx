@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,9 @@ import {
 } from "lucide-react";
 
 const Blog = () => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("tất cả");
+
   useEffect(() => {
     document.title = "Blog - Cham Pets";
   }, []);
@@ -132,6 +135,26 @@ const Blog = () => {
   const featuredPosts = blogPosts.filter(post => post.featured);
   const recentPosts = blogPosts.slice(0, 3);
 
+  // Filter blog posts based on search term and category
+  const filteredPosts = useMemo(() => {
+    return blogPosts.filter((post) => {
+      // Filter by search term (title, excerpt, content, tags)
+      const matchesSearch = 
+        searchTerm === "" ||
+        post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        post.excerpt.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        post.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        post.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      // Filter by category
+      const matchesCategory = 
+        selectedCategory === "tất cả" ||
+        post.category.toLowerCase() === selectedCategory.toLowerCase();
+
+      return matchesSearch && matchesCategory;
+    });
+  }, [searchTerm, selectedCategory, blogPosts]);
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN', {
       year: 'numeric',
@@ -166,10 +189,12 @@ const Blog = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {featuredPosts.map((post) => (
                 <Card key={post.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                  <div className="aspect-video bg-muted relative">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-muted-foreground">Hình ảnh bài viết</div>
-                    </div>
+                  <div className="aspect-video bg-muted relative overflow-hidden">
+                    <img 
+                      src={post.image || "/placeholder.svg"} 
+                      alt={post.title}
+                      className="w-full h-full object-cover"
+                    />
                     <Badge className="absolute top-4 left-4 bg-primary">
                       Nổi bật
                     </Badge>
@@ -209,27 +234,29 @@ const Blog = () => {
         <section className="py-8 bg-muted/30">
           <div className="max-w-7xl mx-auto px-6">
             <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Tìm kiếm bài viết..."
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-              <Select defaultValue="all">
-                <SelectTrigger className="w-full md:w-48">
-                  <SelectValue placeholder="Chọn danh mục" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category.toLowerCase()}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                             <div className="flex-1">
+                 <div className="relative">
+                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                   <Input
+                     placeholder="Tìm kiếm bài viết..."
+                     className="pl-10"
+                     value={searchTerm}
+                     onChange={(e) => setSearchTerm(e.target.value)}
+                   />
+                 </div>
+               </div>
+               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                 <SelectTrigger className="w-full md:w-48">
+                   <SelectValue placeholder="Chọn danh mục" />
+                 </SelectTrigger>
+                 <SelectContent>
+                   {categories.map((category) => (
+                     <SelectItem key={category} value={category.toLowerCase()}>
+                       {category}
+                     </SelectItem>
+                   ))}
+                 </SelectContent>
+               </Select>
             </div>
           </div>
         </section>
@@ -239,15 +266,29 @@ const Blog = () => {
           <div className="max-w-7xl mx-auto px-6">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Main Content */}
-              <div className="lg:col-span-2">
-                <h2 className="text-2xl font-bold text-foreground mb-6">Tất cả bài viết</h2>
-                <div className="space-y-6">
-                  {blogPosts.map((post) => (
+                             <div className="lg:col-span-2">
+                 <h2 className="text-2xl font-bold text-foreground mb-6">
+                   Tất cả bài viết {filteredPosts.length !== blogPosts.length && `(${filteredPosts.length})`}
+                 </h2>
+                 {filteredPosts.length === 0 ? (
+                   <div className="text-center py-12">
+                     <p className="text-muted-foreground text-lg">Không tìm thấy bài viết nào</p>
+                     <p className="text-sm text-muted-foreground mt-2">
+                       Thử tìm kiếm với từ khóa khác hoặc chọn danh mục khác
+                     </p>
+                   </div>
+                 ) : (
+                   <div className="space-y-6">
+                     {filteredPosts.map((post) => (
                     <Card key={post.id} className="hover:shadow-lg transition-shadow">
                       <CardContent className="p-6">
                         <div className="flex gap-6">
-                          <div className="w-32 h-24 bg-muted rounded-lg flex-shrink-0 flex items-center justify-center">
-                            <div className="text-muted-foreground text-xs">Hình ảnh</div>
+                          <div className="w-32 h-24 bg-muted rounded-lg flex-shrink-0 overflow-hidden">
+                            <img 
+                              src={post.image || "/placeholder.svg"} 
+                              alt={post.title}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
@@ -283,6 +324,7 @@ const Blog = () => {
                     </Card>
                   ))}
                 </div>
+                )}
               </div>
 
               {/* Sidebar */}

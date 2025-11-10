@@ -23,14 +23,13 @@ export const API_CONFIG = {
     
     // Products
     PRODUCTS: {
-      LIST: '/customer/products',
-      DETAIL: '/customer/products/:id',
+      LIST: '/products',
+      DETAIL: '/products/:id',
       CREATE: '/products',
       UPDATE: '/products/:id',
       DELETE: '/products/:id',
-      SEARCH: '/customer/products/search',
-      BY_CATEGORY: '/customer/products/category/:categoryId',
-      BY_TYPE: '/customer/products/type/:typeId',
+      SEARCH: '/products/search',
+      BY_CATEGORY: '/products/category/:categoryId',
       FEATURED: '/products/featured'
     },
     

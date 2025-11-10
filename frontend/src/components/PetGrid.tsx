@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -13,6 +14,7 @@ import { Product, ProductType, Category } from "@/types/index";
 import { productService } from "@/services/productService"; // 🆕 import trực tiếp service
 
 const PetGrid = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [sortBy, setSortBy] = useState("default");
   const [selectedType, setSelectedType] = useState<string>("all");
@@ -30,9 +32,11 @@ const PetGrid = () => {
       try {
         setLoading(true);
         const data = await productService.getAllProductsCustomer(); // 🆕 dùng API customer
-        setProducts(data);
+        console.log("✅ PetGrid: Nhận được sản phẩm từ API:", data?.length || 0);
+        setProducts(data || []);
       } catch (error) {
-        console.error("Lỗi tải sản phẩm:", error);
+        console.error("❌ PetGrid: Lỗi tải sản phẩm:", error);
+        setProducts([]); // Đảm bảo products luôn là array
       } finally {
         setLoading(false);
       }
@@ -48,7 +52,12 @@ const PetGrid = () => {
 
   // 🧠 Lọc & sắp xếp khi dữ liệu thay đổi
   useEffect(() => {
-    filterAndSortProducts();
+    try {
+      filterAndSortProducts();
+    } catch (error) {
+      console.error("Lỗi khi lọc sản phẩm:", error);
+      setFilteredProducts([]);
+    }
   }, [products, sortBy, selectedType, selectedCategory]);
 
   const filterAndSortProducts = () => {
@@ -123,31 +132,19 @@ const PetGrid = () => {
                 <SelectItem value="all">Tất cả loại</SelectItem>
                 {productTypes && productTypes.length > 0 ? (
                   productTypes.map((type) => (
-                    type && type.typeId ? (
-                      <SelectItem
-                        key={type.typeId}
-                        value={String(type.typeId)}
-                      >
-                        {type.typeName || 'Không có tên'}
-                      </SelectItem>
-                    ) : null
+                    <SelectItem
+                      key={type.typeId}
+                      value={String(type.typeId)}
+                    >
+                      {type.typeName || 'Không có tên'}
+                    </SelectItem>
                   ))
-                ) : (
-                  // Fallback: Lấy unique types từ products nếu API chưa có
-                  Array.from(new Set(products.map(p => p.typeId).filter(Boolean))).map((typeId) => {
-                    const product = products.find(p => p.typeId === typeId);
-                    return (
-                      <SelectItem key={typeId} value={String(typeId)}>
-                        {product?.typeName || `Loại ${typeId}`}
-                      </SelectItem>
-                    );
-                  })
-                )}
+                ) : null}
               </SelectContent>
             </Select>
 
-            {/* Lọc theo danh mục - Tạm thời ẩn */}
-            {/* <Select
+            {/* Lọc theo danh mục */}
+            <Select
               value={selectedCategory}
               onValueChange={setSelectedCategory}
             >
@@ -158,28 +155,16 @@ const PetGrid = () => {
                 <SelectItem value="all">Tất cả danh mục</SelectItem>
                 {categories && categories.length > 0 ? (
                   categories.map((category) => (
-                    category && category.categoryId ? (
-                      <SelectItem
-                        key={category.categoryId}
-                        value={String(category.categoryId)}
-                      >
-                        {category.categoryName || 'Không có tên'}
-                      </SelectItem>
-                    ) : null
+                    <SelectItem
+                      key={category.categoryId}
+                      value={String(category.categoryId)}
+                    >
+                      {category.categoryName || 'Không có tên'}
+                    </SelectItem>
                   ))
-                ) : (
-                  // Fallback: Lấy unique categories từ products
-                  Array.from(new Set(products.map(p => p.categoryId).filter(Boolean))).map((categoryId) => {
-                    const product = products.find(p => p.categoryId === categoryId);
-                    return (
-                      <SelectItem key={categoryId} value={String(categoryId)}>
-                        {product?.categoryName || `Danh mục ${categoryId}`}
-                      </SelectItem>
-                    );
-                  })
-                )}
+                ) : null}
               </SelectContent>
-            </Select> */}
+            </Select>
 
             {/* Sắp xếp */}
             <Select value={sortBy} onValueChange={setSortBy}>
@@ -202,20 +187,24 @@ const PetGrid = () => {
         </div>
 
         {/* Danh sách sản phẩm */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredProducts.map((product) => (
-            <ProductCard
-              key={product.productId}
-              product={product}
-            />
-          ))}
-        </div>
-
-        {products.length === 0 && (
+        {filteredProducts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredProducts.map((product) => (
+              <ProductCard
+                key={product.productId}
+                product={product}
+                onClick={() => {
+                  navigate(`/product/${product.productId}`);
+                }}
+              />
+            ))}
+          </div>
+        ) : (
           <div className="text-center py-12">
             <p className="text-muted-foreground text-lg">
               Không tìm thấy sản phẩm nào
             </p>
+            {loading && <p className="text-sm text-muted-foreground mt-2">Đang tải...</p>}
           </div>
         )}
       </div>

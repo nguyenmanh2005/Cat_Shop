@@ -1,5 +1,4 @@
 import { Product } from "@/types";
-import { useNavigate } from "react-router-dom";
 
 interface ProductCardProps {
   product: Product;
@@ -7,8 +6,6 @@ interface ProductCardProps {
 }
 
 const ProductCard = ({ product, onClick }: ProductCardProps) => {
-  const navigate = useNavigate();
-  
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
@@ -16,19 +13,16 @@ const ProductCard = ({ product, onClick }: ProductCardProps) => {
     }).format(price);
   };
 
-  const handleClick = () => {
-    if (onClick) {
-      onClick();
-    } else {
-      // Navigate to product detail page
-      navigate(`/product/${product.productId}`);
-    }
+  const getStockUnit = () => {
+    // typeId = 1: Mèo → "con"
+    // Các loại khác → "sản phẩm"
+    return product.typeId === 1 ? "con" : "sản phẩm";
   };
 
   return (
     <div 
       className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group"
-      onClick={handleClick}
+      onClick={onClick}
     >
       <div className="aspect-square overflow-hidden">
         <img 
@@ -51,7 +45,7 @@ const ProductCard = ({ product, onClick }: ProductCardProps) => {
           <p className="text-sm text-muted-foreground mb-2">{product.categoryName}</p>
         )}
         
-        <p className="text-sm text-muted-foreground mt-1">Còn lại: {product.stockQuantity} sản phẩm</p>
+        <p className="text-sm text-muted-foreground mt-1">Còn lại: {product.stockQuantity} {getStockUnit()}</p>
         
         <p className="text-lg font-bold text-primary mt-2">{formatPrice(product.price)}</p>
       </div>

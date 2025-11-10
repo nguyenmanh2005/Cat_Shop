@@ -15,9 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Bug,
-  Key,
-  Star,
-  Utensils
+  Key
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -56,22 +54,10 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
       badge: "25"
     },
     {
-      id: "admin-products",
-      label: "Products (CRUD)",
-      icon: PawPrint,
-      badge: "New"
-    },
-    {
       id: "categories",
       label: "Quản lý Danh mục",
       icon: FileText,
       badge: "8"
-    },
-    {
-      id: "admin-categories",
-      label: "Categories (CRUD)",
-      icon: FileText,
-      badge: "New"
     },
     {
       id: "orders",
@@ -90,24 +76,6 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
       label: "Phân tích",
       icon: BarChart3,
       badge: null
-    },
-    {
-      id: "admin-reviews",
-      label: "Quản lý Reviews",
-      icon: Star,
-      badge: "New"
-    },
-    {
-      id: "cat-details",
-      label: "Quản lý Cat Details",
-      icon: PawPrint,
-      badge: "New"
-    },
-    {
-      id: "food-details",
-      label: "Quản lý Food Details",
-      icon: Utensils,
-      badge: "New"
     },
     {
       id: "debug",
