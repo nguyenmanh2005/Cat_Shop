@@ -33,13 +33,13 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogOverlay className="bg-black/50" />
-      <DialogContent className="sm:max-w-md p-0 bg-transparent border-0 shadow-none">
+      <DialogContent className="max-w-7xl w-full p-0 bg-transparent border-0 shadow-none max-h-[90vh] overflow-y-auto">
         <div className="relative">
           <button
             onClick={handleClose}
-            className="absolute -top-2 -right-2 z-10 rounded-full bg-background border border-border p-1 hover:bg-muted transition-colors"
+            className="absolute top-4 right-4 z-20 rounded-full bg-white border border-border p-2 hover:bg-muted transition-colors shadow-lg"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
           
           {mode === "login" ? (
@@ -48,10 +48,12 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
               onClose={handleClose}
             />
           ) : mode === "register" ? (
-            <RegisterForm 
-              onSwitchToLogin={handleSwitchToLogin}
-              onClose={handleClose}
-            />
+            <div className="bg-white rounded-2xl shadow-xl p-8">
+              <RegisterForm 
+                onSwitchToLogin={handleSwitchToLogin}
+                onClose={handleClose}
+              />
+            </div>
           ) : null}
         </div>
       </DialogContent>

@@ -17,6 +17,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   login: (email: string, password: string) => Promise<boolean>;
+  loginWithOTP: (email: string, otp: string, sessionId?: string) => Promise<boolean>;
+  loginWithQR: (sessionId: string) => Promise<boolean>;
   register: (userData: {
     fullName: string;
     email: string;
@@ -115,6 +117,52 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  const loginWithOTP = async (email: string, otp: string, sessionId?: string): Promise<boolean> => {
+    try {
+      const response = await authService.verifyOTP(email, otp, sessionId);
+      
+      // Lấy thông tin user từ API
+      const userData = await authService.getProfile();
+      setUser({
+        id: userData.user_id,
+        fullName: userData.username,
+        email: userData.email,
+        phone: userData.phone,
+        role: userData.role_id === 1 ? 'admin' : 'user'
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("OTP login error:", error);
+      return false;
+    }
+  };
+
+  const loginWithQR = async (sessionId: string): Promise<boolean> => {
+    try {
+      const response = await authService.verifyQRCode(sessionId);
+      
+      if (response) {
+        // Lấy thông tin user từ API
+        const userData = await authService.getProfile();
+        setUser({
+          id: userData.user_id,
+          fullName: userData.username,
+          email: userData.email,
+          phone: userData.phone,
+          role: userData.role_id === 1 ? 'admin' : 'user'
+        });
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error("QR login error:", error);
+      return false;
+    }
+  };
+
   const logout = async () => {
     try {
       await authService.logout();
@@ -130,6 +178,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',
     login,
+    loginWithOTP,
+    loginWithQR,
     register,
     logout,
     isLoading,
