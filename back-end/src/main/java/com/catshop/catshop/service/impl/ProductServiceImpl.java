@@ -111,7 +111,14 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<ProductResponse> getAllProducts() {
-        return productMapper.toDtoList(productRepository.findAllAvailableProducts());
+        try {
+            return productMapper.toDtoList(productRepository.findAllAvailableProducts());
+        } catch (Exception e) {
+            // Log lỗi và trả về danh sách rỗng hoặc xử lý lỗi
+            System.err.println("Lỗi khi lấy danh sách sản phẩm: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Không thể lấy danh sách sản phẩm: " + e.getMessage(), e);
+        }
     }
 
     @Override

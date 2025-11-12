@@ -84,15 +84,22 @@ const Cart = () => {
       }
 
       // Ensure totalAmount is a valid number > 0
-      const totalAmount = parseFloat(totalPrice.toFixed(2));
+      // Backend expects BigDecimal, so we need to ensure proper precision
+      const totalAmount = Number(totalPrice.toFixed(2));
       if (isNaN(totalAmount) || totalAmount <= 0) {
         throw new Error(`Tổng tiền không hợp lệ: ${totalAmount}`);
       }
 
+      // Ensure userId is valid
+      const userId = Number(user.id);
+      if (isNaN(userId) || userId <= 0) {
+        throw new Error("User ID không hợp lệ");
+      }
+
       const orderData = {
-        userId: Number(user.id), // Ensure it's a number
+        userId: userId,
         status: "PENDING",
-        totalAmount: totalAmount, // Must be > 0
+        totalAmount: totalAmount, // Backend will convert to BigDecimal
       };
 
       console.log("Creating order with data:", orderData);
@@ -100,7 +107,8 @@ const Cart = () => {
       console.log("Total price:", totalPrice, "Total amount:", totalAmount);
 
       const order = await apiService.post("/orders", orderData);
-      const orderId = (order as any).order_id || (order as any).orderId;
+      console.log("Order response:", order);
+      const orderId = (order as any)?.orderId || (order as any)?.order_id;
 
       if (!orderId) {
         throw new Error("Order ID not found in response");
@@ -154,10 +162,24 @@ const Cart = () => {
       console.error("Checkout error:", error);
       console.error("Error response:", error.response);
       console.error("Error data:", error.response?.data);
+      console.error("Error config:", error.config);
+      console.error("Request data:", error.config?.data);
       
       let errorMessage = "Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.";
       
-      if (error.response?.data?.message) {
+      // Check for validation errors from Spring Boot
+      if (error.response?.data?.errors) {
+        const validationErrors = error.response.data.errors;
+        const errorList = Object.entries(validationErrors)
+          .map(([field, messages]: [string, any]) => {
+            const fieldName = field === 'userId' ? 'ID người dùng' : 
+                             field === 'totalAmount' ? 'Tổng tiền' : 
+                             field === 'status' ? 'Trạng thái' : field;
+            return `${fieldName}: ${Array.isArray(messages) ? messages.join(', ') : messages}`;
+          })
+          .join('\n');
+        errorMessage = `Lỗi dữ liệu:\n${errorList}`;
+      } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error.response?.data?.data?.message) {
         errorMessage = error.response.data.data.message;
@@ -165,19 +187,11 @@ const Cart = () => {
         errorMessage = error.message;
       }
       
-      // Check for validation errors
-      if (error.response?.data?.errors) {
-        const validationErrors = error.response.data.errors;
-        const errorList = Object.entries(validationErrors)
-          .map(([field, messages]: [string, any]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
-          .join('\n');
-        errorMessage = `Lỗi validation:\n${errorList}`;
-      }
-      
       toast({
-        title: "Lỗi",
+        title: "Lỗi đặt hàng",
         description: errorMessage,
         variant: "destructive",
+        duration: 5000,
       });
       setLoading(false);
     }
@@ -241,12 +255,21 @@ const Cart = () => {
                 <CardContent className="p-6">
                   <div className="flex gap-4">
                     {/* Product Image */}
-                    <div className="w-24 h-24 rounded-lg overflow-hidden border border-border flex-shrink-0">
-                      <img
-                        src={item.product.imageUrl || "/placeholder.svg"}
-                        alt={item.product.productName}
-                        className="w-full h-full object-cover"
-                      />
+                    <div className="w-24 h-24 rounded-lg overflow-hidden border border-border flex-shrink-0 bg-muted">
+                      {item.product.imageUrl ? (
+                        <img
+                          src={item.product.imageUrl}
+                          alt={item.product.productName}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "/placeholder.svg";
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                          <ShoppingBag className="h-8 w-8" />
+                        </div>
+                      )}
                     </div>
 
                     {/* Product Info */}
@@ -254,10 +277,10 @@ const Cart = () => {
                       <div className="flex justify-between items-start mb-2">
                         <div>
                           <h3 className="font-semibold text-lg">
-                            {item.product.productName}
+                            {item.product.productName || "Sản phẩm không tên"}
                           </h3>
                           <p className="text-sm text-muted-foreground">
-                            {item.product.categoryName || item.product.typeName}
+                            {item.product.categoryName || item.product.typeName || "Chưa phân loại"}
                           </p>
                         </div>
                         <Button
