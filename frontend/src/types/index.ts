@@ -16,6 +16,7 @@ export interface User {
 }
 
 export interface UserProfile {
+  userId?: number;
   username: string;
   email: string;
   phone?: string;

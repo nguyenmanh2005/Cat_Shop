@@ -45,10 +45,11 @@ interface AuthProviderProps {
 }
 
 const buildAuthUser = (profile: UserProfile | any, tokensInfo: { role?: string } | null): AuthUser => {
-  const rawId = (profile as any)?.user_id ?? (profile as any)?.userId;
+  // Ưu tiên userId từ profile, sau đó thử user_id (snake_case)
+  const rawId = profile?.userId ?? (profile as any)?.user_id;
   const roleName = tokensInfo?.role?.toLowerCase() === "admin" ? "admin" : "user";
   return {
-    id: typeof rawId === "number" ? rawId : undefined,
+    id: typeof rawId === "number" ? rawId : (typeof rawId === "string" ? parseInt(rawId) : undefined),
     fullName: profile?.username || profile?.fullName || profile?.email || "",
     email: profile?.email || "",
     phone: profile?.phone,
