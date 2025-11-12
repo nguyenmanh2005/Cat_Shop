@@ -40,20 +40,25 @@ public class AuthServiceImpl implements AuthService {
 
     // ------------------------- LOGIN STEP 1 (Gửi OTP) -------------------------
     @Override
-    public String login(LoginRequest loginRequest) {
+    public void validateCredentials(LoginRequest loginRequest) {
         User user = userRepository.findByEmail(loginRequest.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("Email " + loginRequest.getEmail() + " không tồn tại"));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Email " + loginRequest.getEmail() + " không tồn tại"));
 
         if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPasswordHash())) {
             throw new BadRequestException("Mật khẩu không chính xác");
         }
-
-        // ✅ Sinh OTP và gửi email
-        String otp = otpService.generateOtp(user.getEmail());
-        emailService.sendOtpEmail(user.getEmail(), otp);
-
-        return "Mã OTP đã được gửi đến email của bạn. Vui lòng nhập OTP để hoàn tất đăng nhập.";
     }
+
+    @Override
+    public void sendOtp(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Email " + email + " không tồn tại"));
+
+        String otp = otpService.generateOtp(email);
+        emailService.sendOtpEmail(email, otp);
+    }
+
 
 
     // ------------------------- LOGIN STEP 2 (Xác thực OTP) -------------------------

@@ -1,5 +1,6 @@
 package com.catshop.catshop.service.impl;
 
+import com.catshop.catshop.exception.BadRequestException;
 import com.catshop.catshop.service.MfaService;
 import com.catshop.catshop.util.QrCodeGenerator;
 import com.warrenstrange.googleauth.GoogleAuthenticator;
@@ -27,13 +28,16 @@ public class MfaServiceImpl implements MfaService {
     @Override
     public String generateQrUrl(String username, String secret) {
         String issuer = "CatShop";
-        String label = issuer + ":" + username; // Không encode dấu :
+
+        String label = issuer + ":" + username;
+        String encodedLabel = URLEncoder.encode(label, StandardCharsets.UTF_8);
+        String encodedIssuer = URLEncoder.encode(issuer, StandardCharsets.UTF_8);
+
         return String.format(
-                "otpauth://totp/%s?secret=%s&issuer=%s&algorithm=SHA1&digits=6&period=30",
-                label, secret, issuer
+                "otpauth://totp/%s?secret=%s&issuer=%s&digits=6&period=30",
+                encodedLabel, secret, encodedIssuer
         );
     }
-
 
 
     @Override
@@ -43,6 +47,16 @@ public class MfaServiceImpl implements MfaService {
             return qrCodeGenerator.generateBase64QrCode(otpauthUrl, 250, 250);
         } catch (IOException | com.google.zxing.WriterException e) {
             throw new RuntimeException("Không tạo được QR code Base64", e);
+        }
+    }
+
+    @Override
+    public byte[] generateQrBytes(String username, String secret) {
+        try {
+            String otpauthUrl = generateQrUrl(username, secret);
+            return qrCodeGenerator.generateQrCodeBytes(otpauthUrl, 250, 250);
+        } catch (IOException | com.google.zxing.WriterException e) {
+            throw new RuntimeException("Không tạo được QR code", e);
         }
     }
 

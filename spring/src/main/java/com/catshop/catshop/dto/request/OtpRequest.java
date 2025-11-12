@@ -17,4 +17,7 @@ public class OtpRequest {
     @NotBlank(message = "OTP không được để trống")
     @Pattern(regexp = "\\d{6}", message = "OTP phải gồm 6 chữ số")
     private String otp;
+
+    @NotBlank(message = "Thiết Bị ID không được để trống")
+    private String deviceId;
 }

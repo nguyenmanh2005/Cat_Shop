@@ -34,8 +34,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
+        String uri = request.getRequestURI();
+
+        // ✅ BỎ QUA HOÀN TOÀN CHO MFA & AUTH
+        if (uri.startsWith("/auth/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String authHeader = request.getHeader("Authorization");
 
+        // ✅ Không có token → cho request đi tiếp (route nào cần token thì SecurityConfig sẽ chặn sau)
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
@@ -44,7 +53,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = authHeader.substring(7);
 
         try {
-            if (!jwtUtils.validateToken(token)) {   
+            if (!jwtUtils.validateToken(token)) {
                 throw new JwtValidationException("Token không hợp lệ hoặc đã hết hạn!");
             }
 
@@ -57,12 +66,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
             User user = userOpt.get();
 
-            // ✅ Tạo Authentication object
             UsernamePasswordAuthenticationToken authToken =
                     new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
 
             authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
             SecurityContextHolder.getContext().setAuthentication(authToken);
 
             log.info("✅ Authenticated user: {}, role={}, method={}, uri={}",
@@ -70,13 +77,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         } catch (JwtValidationException e) {
             log.warn("❌ JWT Error: {}", e.getMessage());
-            // ném ra để AuthenticationEntryPoint xử lý JSON
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write(
-                    new ObjectMapper().writeValueAsString(
-                            ApiResponse.error(401, e.getMessage())
-                    )
+                    new ObjectMapper().writeValueAsString(ApiResponse.error(401, e.getMessage()))
             );
             return;
         }

@@ -11,7 +11,10 @@ import java.util.Map;
 public interface AuthService {
 
     // Bước 1: login gửi OTP
-    String login(LoginRequest loginRequest);
+//    String login(LoginRequest loginRequest);
+    void validateCredentials(LoginRequest loginRequest);
+    void sendOtp(String email);
+
 
     // Bước 2: xác thực OTP → trả về token
     TokenResponse verifyOtp(OtpRequest request);

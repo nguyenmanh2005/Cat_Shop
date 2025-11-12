@@ -1,6 +1,7 @@
 package com.catshop.catshop.controller;
 
 import com.catshop.catshop.dto.request.LoginRequest;
+import com.catshop.catshop.dto.request.MfaVerifyRequest;
 import com.catshop.catshop.dto.request.OtpRequest;
 import com.catshop.catshop.dto.request.UserRequest;
 import com.catshop.catshop.dto.response.ApiResponse;
@@ -9,8 +10,10 @@ import com.catshop.catshop.entity.User;
 import com.catshop.catshop.exception.BadRequestException;
 import com.catshop.catshop.repository.UserRepository;
 import com.catshop.catshop.service.AuthService;
+import com.catshop.catshop.service.DeviceService;
 import com.catshop.catshop.service.MfaService;
 import com.warrenstrange.googleauth.GoogleAuthenticator;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,54 +30,105 @@ public class AuthController {
     private final AuthService authService;
     private final UserRepository userRepository;
     private final MfaService mfaService;
+    private final DeviceService deviceService;
 
-    // ✅ Bước 1: Login (gửi OTP)
+    // ✅ Bước 1: Login (gửi OTP nếu thiết bị lạ)
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<String>> login(@Valid @RequestBody LoginRequest loginRequest) {
-        String message = authService.login(loginRequest);
-        return ResponseEntity.ok(ApiResponse.success(message, "Đăng nhập bước 1 (OTP)"));
+    public ResponseEntity<ApiResponse<?>> login(
+            @Valid @RequestBody LoginRequest loginRequest,
+            HttpServletRequest request) {
+
+        String email = loginRequest.getEmail();
+        String deviceId = loginRequest.getDeviceId();
+        String ip = request.getRemoteAddr();
+        String agent = request.getHeader("User-Agent");
+
+        // 1️⃣ Kiểm tra email + password
+        authService.validateCredentials(loginRequest);
+
+        // 2️⃣ Kiểm tra thiết bị tin cậy
+        boolean trusted = deviceService.isTrusted(email, deviceId);
+
+        if (!trusted) {
+            // 3️⃣ Gửi OTP vì thiết bị mới
+            authService.sendOtp(email);
+            return ResponseEntity.ok(ApiResponse.success(
+                    "",
+                    "Thiết bị mới phát hiện. Mã OTP đã được gửi đến email của bạn."));
+        }
+
+        // 4️⃣ Thiết bị đã tin cậy → cấp token luôn
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy người dùng"));
+
+        String accessToken = authService.generateAccessTokenForUser(user);
+        String refreshToken = authService.generateRefreshTokenForUser(user);
+        authService.saveRefreshToken(email, refreshToken);
+
+        TokenResponse tokens = new TokenResponse(accessToken, refreshToken, false);
+        return ResponseEntity.ok(ApiResponse.success(tokens, "Đăng nhập thành công (thiết bị quen thuộc)"));
     }
+
 
     // ✅ Bước 2: Xác thực OTP -> trả về Access & Refresh Token
     @PostMapping("/verify-otp")
-    public ResponseEntity<ApiResponse<TokenResponse>> verifyOtp(@Valid @RequestBody OtpRequest otpRequest) {
-        TokenResponse tokenResponse = authService.verifyOtp(otpRequest);
+    public ResponseEntity<ApiResponse<TokenResponse>> verifyOtp(
+            @Valid @RequestBody OtpRequest otpRequest,
+            HttpServletRequest request) {
 
-        if (tokenResponse.isMfaRequired()) {
-            // Trả status 206 (Partial Content) hoặc 200 kèm flag; mình dùng 200 nhưng kèm message rõ
-            return ResponseEntity.ok(ApiResponse.success(tokenResponse, "OTP hợp lệ. Vui lòng nhập mã Google Authenticator (MFA)"));
+        String email = otpRequest.getEmail();
+        String deviceId = otpRequest.getDeviceId();
+
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new BadRequestException("Thiết bị ID không được để trống");
         }
 
-        return ResponseEntity.ok(ApiResponse.success(tokenResponse, "OTP xác thực thành công, đăng nhập thành công"));
+        // ✅ Kiểm tra + xác thực OTP
+        TokenResponse tokenResponse = authService.verifyOtp(otpRequest);
+
+        // ✅ Nếu OTP đúng → đánh dấu thiết bị là trusted
+        String ip = request.getRemoteAddr();
+        String agent = request.getHeader("User-Agent");
+
+        deviceService.markTrusted(email, deviceId, ip, agent);
+
+        // ✅ Nếu user bật MFA → yêu cầu thêm bước 2FA
+        if (tokenResponse.isMfaRequired()) {
+            return ResponseEntity.ok(ApiResponse.success(tokenResponse,
+                    "OTP hợp lệ. Vui lòng nhập mã Google Authenticator (MFA)"));
+        }
+
+        // ✅ Hoàn tất login
+        return ResponseEntity.ok(ApiResponse.success(tokenResponse,
+                "OTP xác thực thành công. Thiết bị đã được đánh dấu là tin cậy."));
     }
 
     @PostMapping("/mfa/verify")
-    public ResponseEntity<ApiResponse<TokenResponse>> verifyMfa(@RequestParam String email,
-                                                                @RequestParam int code) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+    public ResponseEntity<ApiResponse<TokenResponse>> verifyMfa(
+            @RequestBody @Valid MfaVerifyRequest request) {
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy user với email: " + request.getEmail()));
 
         if (user.getMfaSecret() == null) {
             throw new BadRequestException("User chưa kích hoạt MFA");
         }
 
-        boolean ok = mfaService.verifyCode(user.getMfaSecret(), code);
+        boolean ok = mfaService.verifyCode(user.getMfaSecret(), request.getCode());
 
         if (!ok) {
             throw new BadRequestException("Mã MFA không hợp lệ");
         }
 
-        // MFA đúng -> cấp token
-        String accessToken = authService.generateAccessTokenForUser(user); // chúng ta sẽ thêm method helper vào AuthService
+        String accessToken = authService.generateAccessTokenForUser(user);
         String refreshToken = authService.generateRefreshTokenForUser(user);
         authService.saveRefreshToken(user.getEmail(), refreshToken);
-
-        // Lưu refresh token vào Redis (7 ngày)
-        // nếu bạn muốn reuse logic từ AuthServiceImpl, dễ nhất là add 2 method generate+save tokens vào AuthService/impl
 
         TokenResponse tokenResponse = new TokenResponse(accessToken, refreshToken, false);
         return ResponseEntity.ok(ApiResponse.success(tokenResponse, "Đăng nhập thành công (MFA)"));
     }
+
+
 
     @PostMapping("/mfa/enable")
     public ResponseEntity<ApiResponse<Map<String, String>>> enableMfa(@RequestParam String email) {
