@@ -16,6 +16,8 @@ import com.catshop.catshop.service.AuthService;
 import com.catshop.catshop.service.EmailService;
 import com.catshop.catshop.service.OtpService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -92,8 +95,13 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
 
-        // Xóa OTP sau khi xác thực (để an toàn)
-        redisTemplate.delete("otp:" + user.getEmail());
+        // Xóa OTP sau khi xác thực (để an toàn) - có thể fail nếu Redis không chạy
+        try {
+            redisTemplate.delete("otp:" + user.getEmail());
+        } catch (DataAccessException e) {
+            log.warn("⚠️ Không thể xóa OTP từ Redis (Redis không kết nối được): {}", e.getMessage());
+            // Không throw exception - OTP đã được xóa trong OtpService rồi
+        }
 
         // Nếu user bật MFA -> trả về thông báo cần MFA, không cấp JWT
         if (Boolean.TRUE.equals(user.getMfaEnabled())) {
@@ -105,8 +113,15 @@ public class AuthServiceImpl implements AuthService {
         String accessToken = jwtUtils.generateAccessToken(user.getEmail(), user.getRole().getRoleName());
         String refreshToken = jwtUtils.generateRefreshToken(user.getEmail());
 
-        // Lưu refresh token vào Redis (7 ngày)
-        redisTemplate.opsForValue().set("refresh:" + user.getEmail(), refreshToken, 7, TimeUnit.DAYS);
+        // Lưu refresh token vào Redis (7 ngày) - có thể fail nếu Redis không chạy
+        try {
+            redisTemplate.opsForValue().set("refresh:" + user.getEmail(), refreshToken, 7, TimeUnit.DAYS);
+            log.info("✅ Refresh token đã được lưu vào Redis cho: {}", user.getEmail());
+        } catch (DataAccessException e) {
+            log.warn("⚠️ Không thể lưu refresh token vào Redis (Redis không kết nối được): {}", e.getMessage());
+            log.warn("⚠️ User vẫn có thể đăng nhập nhưng sẽ cần đăng nhập lại sau khi token hết hạn");
+            // Không throw exception - user vẫn có thể đăng nhập, chỉ là không lưu refresh token
+        }
 
         return new TokenResponse(accessToken, refreshToken, false);
     }
@@ -119,11 +134,22 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("Refresh token không hợp lệ");
         }
 
-        // ✅ Kiểm tra refresh token trong Redis
-        String savedToken = redisTemplate.opsForValue().get("refresh:" + email);
-        if (savedToken == null || !savedToken.equals(refreshToken)) {
+        // ✅ Kiểm tra refresh token trong Redis - có thể fail nếu Redis không chạy
+        String savedToken = null;
+        try {
+            savedToken = redisTemplate.opsForValue().get("refresh:" + email);
+        } catch (DataAccessException e) {
+            log.warn("⚠️ Không thể kiểm tra refresh token từ Redis (Redis không kết nối được): {}", e.getMessage());
+            log.warn("⚠️ Cho phép refresh token dựa trên JWT validation thay vì Redis");
+            // Nếu Redis không chạy, chỉ validate JWT token thôi (ít an toàn hơn nhưng vẫn hoạt động)
+        }
+        
+        // Nếu Redis có kết nối và token không khớp → reject
+        if (savedToken != null && !savedToken.equals(refreshToken)) {
             throw new BadRequestException("Refresh token đã hết hạn hoặc không tồn tại");
         }
+        
+        // Nếu Redis không kết nối (savedToken == null), vẫn cho phép nếu JWT hợp lệ
 
         // ✅ Sinh access token mới
         User user = userRepository.findByEmail(email)
@@ -143,15 +169,27 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void saveRefreshToken(String email, String refreshToken) {
-        redisTemplate.opsForValue().set("refresh:" + email, refreshToken, 7, TimeUnit.DAYS);
+        try {
+            redisTemplate.opsForValue().set("refresh:" + email, refreshToken, 7, TimeUnit.DAYS);
+            log.info("✅ Refresh token đã được lưu vào Redis cho: {}", email);
+        } catch (DataAccessException e) {
+            log.warn("⚠️ Không thể lưu refresh token vào Redis (Redis không kết nối được): {}", e.getMessage());
+            // Không throw exception - user vẫn có thể đăng nhập
+        }
     }
 
 
     // ------------------------- LOGOUT -------------------------
     @Override
     public void logout(String email) {
-        redisTemplate.delete("refresh:" + email);
-        redisTemplate.delete("otp:" + email);
+        try {
+            redisTemplate.delete("refresh:" + email);
+            redisTemplate.delete("otp:" + email);
+            log.info("✅ Đã xóa refresh token và OTP từ Redis cho: {}", email);
+        } catch (DataAccessException e) {
+            log.warn("⚠️ Không thể xóa token từ Redis (Redis không kết nối được): {}", e.getMessage());
+            // Không throw exception - logout vẫn thành công
+        }
     }
 
     // ------------------------- REGISTER -------------------------

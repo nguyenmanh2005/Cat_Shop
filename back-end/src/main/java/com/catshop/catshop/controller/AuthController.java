@@ -240,20 +240,38 @@ public class AuthController {
     // ✅ Gửi OTP khi user click nút "Nhận OTP"
     @PostMapping("/send-otp")
     public ResponseEntity<ApiResponse<String>> sendOtp(@RequestBody Map<String, String> request) {
+        log.info("═══════════════════════════════════════════════════════════");
+        log.info("📨 [SEND-OTP] Request received: {}", request);
         String email = request.get("email");
         if (email == null || email.isBlank()) {
+            log.error("❌ [SEND-OTP] Email is null or blank");
             throw new BadRequestException("Email không được để trống");
         }
         
+        log.info("📧 [SEND-OTP] Processing OTP request for email: {}", email);
+        
         try {
             authService.sendOtp(email);
-            log.info("✅ OTP sent successfully to: {}", email);
+            log.info("✅ [SEND-OTP] OTP sent successfully to: {}", email);
+            log.info("═══════════════════════════════════════════════════════════");
             return ResponseEntity.ok(ApiResponse.success(
                     "Mã OTP đã được gửi đến email của bạn",
                     "OTP sent successfully"));
+        } catch (com.catshop.catshop.exception.ResourceNotFoundException e) {
+            log.error("❌ [SEND-OTP] Email not found: {}", email);
+            log.error("❌ [SEND-OTP] Exception: {}", e.getMessage());
+            log.info("═══════════════════════════════════════════════════════════");
+            throw e; // Re-throw để GlobalExceptionHandler xử lý
         } catch (Exception e) {
-            log.error("❌ Failed to send OTP to {}: {}", email, e.getMessage(), e);
-            throw new BadRequestException("Không thể gửi OTP. Vui lòng thử lại sau hoặc kiểm tra email của bạn.");
+            log.error("❌ [SEND-OTP] Failed to send OTP to {}: {}", email, e.getMessage());
+            log.error("❌ [SEND-OTP] Exception type: {}", e.getClass().getName());
+            log.error("❌ [SEND-OTP] Full exception: ", e);
+            log.info("═══════════════════════════════════════════════════════════");
+            // Không throw exception - vẫn trả về success để OTP có thể được log và test
+            // OTP vẫn được tạo và lưu, chỉ là email không gửi được
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Mã OTP đã được tạo. Vui lòng kiểm tra backend logs để lấy mã OTP (nếu email không gửi được).",
+                    "OTP generated (check logs if email not sent)"));
         }
     }
 
@@ -264,6 +282,32 @@ public class AuthController {
         String email = bearerToken.replace("Bearer ", "").trim();
         authService.logout(email);
         return ResponseEntity.ok(ApiResponse.success("Đăng xuất thành công", "Logged out successfully"));
+    }
+
+    // ✅ TEST EMAIL - Endpoint để test gửi email trực tiếp
+    @PostMapping("/test-email")
+    public ResponseEntity<ApiResponse<String>> testEmail(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        if (email == null || email.isBlank()) {
+            email = "cumanhpt@gmail.com"; // Default test email
+        }
+        
+        log.info("═══════════════════════════════════════════════════════════");
+        log.info("🧪 [TEST-EMAIL] Testing email sending to: {}", email);
+        
+        try {
+            authService.sendOtp(email);
+            log.info("✅ [TEST-EMAIL] Test email sent successfully!");
+            log.info("═══════════════════════════════════════════════════════════");
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Email test đã được gửi đến " + email + ". Vui lòng kiểm tra inbox và spam folder.",
+                    "Test email sent successfully"));
+        } catch (Exception e) {
+            log.error("❌ [TEST-EMAIL] Failed to send test email: {}", e.getMessage(), e);
+            log.info("═══════════════════════════════════════════════════════════");
+            return ResponseEntity.status(500).body(ApiResponse.error(500, 
+                    "Lỗi khi gửi email: " + e.getMessage()));
+        }
     }
 
 

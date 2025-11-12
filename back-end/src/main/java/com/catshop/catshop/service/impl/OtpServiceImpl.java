@@ -36,16 +36,56 @@ public class OtpServiceImpl implements OtpService {
             log.warn("OTP đang sử dụng bộ nhớ tạm vì không kết nối được Redis.");
         }
 
-        // Gửi email (nếu chưa cấu hình SMTP, sẽ throw – người dùng cần cấu hình)
+        // Gửi email (nếu chưa cấu hình SMTP, sẽ log warning nhưng vẫn trả về OTP để dev test)
+        log.info("📧 Attempting to send OTP email to: {}", email);
+        log.info("🔑 Generated OTP for {}: {}", email, otp); // Log OTP ngay để debug
         try {
             SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom("cumanhpt@gmail.com"); // Thêm from address
             message.setTo(email);
             message.setSubject("Cham Pets - Mã OTP đăng nhập");
             message.setText("Mã OTP của bạn là: " + otp + "\nCó hiệu lực trong 5 phút.");
+            
+            log.info("📧 Sending email with subject: {}", message.getSubject());
+            log.info("📧 From: {}, To: {}", message.getFrom(), message.getTo());
+            
             mailSender.send(message);
+            log.info("✅ OTP email sent successfully to: {}", email);
+            log.info("═══════════════════════════════════════════════════════════");
+            log.info("✅ [SUCCESS] Email đã được gửi thành công!");
+            log.info("✅ [SUCCESS] OTP cho {} = {}", email, otp);
+            log.info("═══════════════════════════════════════════════════════════");
+        } catch (org.springframework.mail.MailAuthenticationException e) {
+            log.error("❌ Mail authentication failed. Please check your email credentials (App Password) in application.properties.");
+            log.error("❌ Error details: {}", e.getMessage());
+            log.error("❌ Full exception: ", e);
+            // Log OTP để dev có thể test ngay cả khi email không gửi được
+            log.warn("═══════════════════════════════════════════════════════════");
+            log.warn("⚠️ [DEV MODE] Email không được gửi do lỗi xác thực!");
+            log.warn("⚠️ [DEV MODE] OTP cho {} = {}", email, otp);
+            log.warn("⚠️ [DEV MODE] Vui lòng kiểm tra App Password trong application.properties");
+            log.warn("═══════════════════════════════════════════════════════════");
+            // Không throw exception - cho phép dev test với OTP từ logs
+        } catch (org.springframework.mail.MailSendException e) {
+            log.error("❌ Failed to send email to {}. Please check SMTP configuration.", email);
+            log.error("❌ Error details: {}", e.getMessage());
+            log.error("❌ Full exception: ", e);
+            // Log OTP để dev có thể test ngay cả khi email không gửi được
+            log.warn("═══════════════════════════════════════════════════════════");
+            log.warn("⚠️ [DEV MODE] Email không được gửi do lỗi SMTP!");
+            log.warn("⚠️ [DEV MODE] OTP cho {} = {}", email, otp);
+            log.warn("⚠️ [DEV MODE] Vui lòng kiểm tra cấu hình SMTP");
+            log.warn("═══════════════════════════════════════════════════════════");
+            // Không throw exception - cho phép dev test với OTP từ logs
         } catch (Exception e) {
-            // Nếu chưa cấu hình SMTP, vẫn cho phép dev test bằng log
-            log.warn("[DEV ONLY] OTP của {} = {}", email, otp);
+            log.error("❌ Unexpected error sending email to {}.", email);
+            log.error("❌ Error details: {}", e.getMessage(), e);
+            // Log OTP để dev có thể test ngay cả khi email không gửi được
+            log.warn("═══════════════════════════════════════════════════════════");
+            log.warn("⚠️ [DEV MODE] Email không được gửi do lỗi không xác định!");
+            log.warn("⚠️ [DEV MODE] OTP cho {} = {}", email, otp);
+            log.warn("═══════════════════════════════════════════════════════════");
+            // Không throw exception - cho phép dev test với OTP từ logs
         }
 
         // sessionId có thể không cần; frontend hỗ trợ optional
