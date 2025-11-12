@@ -1,8 +1,10 @@
 package com.catshop.catshop.controller;
 
 import com.catshop.catshop.dto.request.PaymentRequest;
+import com.catshop.catshop.dto.request.VietQrRequest;
 import com.catshop.catshop.dto.response.ApiResponse;
 import com.catshop.catshop.dto.response.PaymentResponse;
+import com.catshop.catshop.dto.response.VietQrResponse;
 import com.catshop.catshop.service.PaymentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -105,5 +107,11 @@ public class PaymentController {
                                                                          @RequestParam LocalDateTime end) {
         return ApiResponse.success(paymentService.getUserPaymentsByDateRange(userId, start, end),
                 "Lấy payment của user theo khoảng thời gian");
+    }
+
+    // =================== VIETQR ===================
+    @PostMapping("/generate-vietqr")
+    public ApiResponse<VietQrResponse> generateVietQr(@Valid @RequestBody VietQrRequest request) {
+        return ApiResponse.success(paymentService.generateVietQr(request), "Tạo mã QR thanh toán thành công");
     }
 }

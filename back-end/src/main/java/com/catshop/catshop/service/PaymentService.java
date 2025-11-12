@@ -1,7 +1,9 @@
 package com.catshop.catshop.service;
 
 import com.catshop.catshop.dto.request.PaymentRequest;
+import com.catshop.catshop.dto.request.VietQrRequest;
 import com.catshop.catshop.dto.response.PaymentResponse;
+import com.catshop.catshop.dto.response.VietQrResponse;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -31,4 +33,7 @@ public interface PaymentService {
     List<PaymentResponse> getUserPayments(Long userId);
     List<PaymentResponse> getUserPaymentsByMethod(Long userId, String method);
     List<PaymentResponse> getUserPaymentsByDateRange(Long userId, LocalDateTime start, LocalDateTime end);
+
+    // VIETQR
+    VietQrResponse generateVietQr(VietQrRequest request);
 }

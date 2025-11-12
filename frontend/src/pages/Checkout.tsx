@@ -13,7 +13,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToast } from "@/hooks/use-toast";
 import { apiService } from "@/services/api";
 import { ArrowLeft, Loader2, QrCode } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
 
 interface ShippingInfo {
   fullName: string;
@@ -31,6 +30,7 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "qr">("cod");
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [qrData, setQrData] = useState("");
+  const [qrOrderId, setQrOrderId] = useState<number | null>(null);
   const [shippingInfo, setShippingInfo] = useState<ShippingInfo>({
     fullName: user?.fullName || "",
     phone: user?.phone || "",
@@ -71,10 +71,17 @@ const Checkout = () => {
 
   const handleCompleteOrder = async () => {
     try {
+      if (!qrOrderId) {
+        toast({
+          title: "Lỗi",
+          description: "Không tìm thấy thông tin đơn hàng",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Step 2: Create order details for each item
-      // Get order ID from QR data
-      const qrObj = JSON.parse(qrData);
-      const orderId = qrObj.orderId;
+      const orderId = qrOrderId;
 
       const orderDetailPromises = items.map((item) =>
         apiService.post("/order-details", {
@@ -144,18 +151,41 @@ const Checkout = () => {
       // If QR payment, generate QR code
       if (paymentMethod === "qr") {
         const orderId = (order as any).order_id || (order as any).orderId;
-        // Generate QR code data with order info
-        const qrContent = JSON.stringify({
-          orderId: orderId,
-          amount: getTotalPrice(),
-          merchant: "Cham Pets",
-          account: "1234567890", // Bank account number
-          content: `Thanh toan don hang #${orderId}`,
-        });
-        setQrData(qrContent);
-        setShowQRDialog(true);
-        setLoading(false);
-        return; // Don't complete order yet, wait for QR payment confirmation
+        
+        try {
+          // Call API to generate VietQR code
+          const qrResponse = await apiService.post<{
+            qrCodeBase64: string;
+            qrData: string;
+            orderId: number;
+            amount: number;
+            accountNo: string;
+            accountName: string;
+            content: string;
+            bankName: string;
+            message: string;
+          }>("/payments/generate-vietqr", {
+            orderId: orderId,
+            amount: getTotalPrice(),
+            content: `Thanh toan don hang #${orderId}`,
+          });
+
+          // Store QR code data and order ID
+          setQrData(qrResponse.qrCodeBase64);
+          setQrOrderId(qrResponse.orderId);
+          setShowQRDialog(true);
+          setLoading(false);
+          return; // Don't complete order yet, wait for QR payment confirmation
+        } catch (error: any) {
+          console.error("Error generating VietQR:", error);
+          toast({
+            title: "Lỗi",
+            description: error.response?.data?.message || "Không thể tạo mã QR thanh toán. Vui lòng thử lại.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
       }
 
       // Step 2: Create order details for each item
@@ -415,11 +445,10 @@ const Checkout = () => {
           <div className="flex flex-col items-center space-y-4 py-4">
             <div className="p-4 bg-white rounded-lg border-2 border-dashed border-gray-300">
               {qrData && (
-                <QRCodeSVG
-                  value={qrData}
-                  size={256}
-                  level="H"
-                  includeMargin={true}
+                <img
+                  src={`data:image/png;base64,${qrData}`}
+                  alt="VietQR Code"
+                  className="w-64 h-64"
                 />
               )}
             </div>
