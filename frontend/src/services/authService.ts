@@ -265,4 +265,32 @@ export const authService = {
       role: (payload.role as string) || undefined,
     };
   },
+
+  // QR Login methods
+  async generateQrCode(): Promise<{ sessionId: string; qrCodeBase64: string; expiresIn: number }> {
+    try {
+      const response = await apiService.post<{ sessionId: string; qrCodeBase64: string; expiresIn: number }>(
+        '/auth/qr/generate',
+        {}
+      );
+      return response;
+    } catch (error: any) {
+      console.error('Generate QR code error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Không thể tạo QR code';
+      throw new Error(errorMessage);
+    }
+  },
+
+  async checkQrStatus(sessionId: string): Promise<{ status: string; tokens?: TokenResponse; message: string }> {
+    try {
+      const response = await apiService.get<{ status: string; tokens?: TokenResponse; message: string }>(
+        `/auth/qr/status/${sessionId}`
+      );
+      return response;
+    } catch (error: any) {
+      console.error('Check QR status error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Không thể kiểm tra trạng thái';
+      throw new Error(errorMessage);
+    }
+  },
 };

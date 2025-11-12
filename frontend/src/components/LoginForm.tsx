@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,7 +29,11 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [qrCodeData, setQrCodeData] = useState<string>("");
+  const [qrSessionId, setQrSessionId] = useState<string>("");
   const [qrEmail, setQrEmail] = useState("");
+  const [qrStatus, setQrStatus] = useState<"pending" | "approved" | "expired">("pending");
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (pendingEmail) {
@@ -38,6 +42,34 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       setOtpSent(false); // Reset trạng thái khi chuyển sang tab OTP
     }
   }, [pendingEmail]);
+
+  // Cleanup polling khi component unmount hoặc chuyển tab
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
+        pollingTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  // Cleanup polling khi chuyển khỏi QR mode
+  useEffect(() => {
+    if (loginMode !== "qr") {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current);
+        pollingTimeoutRef.current = null;
+      }
+    }
+  }, [loginMode]);
 
   const resetOtpState = () => {
     setOtp("");
@@ -123,6 +155,132 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
 
   const handleResendOtp = async () => {
     await handleRequestOtp();
+  };
+
+  const handleGenerateQrCode = async () => {
+    // Clear any existing polling first
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    if (pollingTimeoutRef.current) {
+      clearTimeout(pollingTimeoutRef.current);
+      pollingTimeoutRef.current = null;
+    }
+
+    try {
+      setIsLoading(true);
+      const response = await authService.generateQrCode();
+      setQrCodeData(response.qrCodeBase64);
+      setQrSessionId(response.sessionId);
+      setQrStatus("pending");
+      
+      // Start polling for status
+      startQrStatusPolling(response.sessionId);
+      
+      toast({
+        title: "QR code đã được tạo",
+        description: "Vui lòng quét mã bằng ứng dụng di động",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Lỗi tạo QR Code",
+        description: error.message || "Không thể tạo mã QR",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startQrStatusPolling = (sessionId: string) => {
+    // Clear any existing polling first
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    if (pollingTimeoutRef.current) {
+      clearTimeout(pollingTimeoutRef.current);
+      pollingTimeoutRef.current = null;
+    }
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const statusResponse = await authService.checkQrStatus(sessionId);
+        
+        if (statusResponse.status === "APPROVED" && statusResponse.tokens) {
+          // Clear polling
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          if (pollingTimeoutRef.current) {
+            clearTimeout(pollingTimeoutRef.current);
+            pollingTimeoutRef.current = null;
+          }
+          
+          setQrStatus("approved");
+          
+          // Store tokens
+          if (statusResponse.tokens.accessToken && statusResponse.tokens.refreshToken) {
+            localStorage.setItem('access_token', statusResponse.tokens.accessToken);
+            localStorage.setItem('refresh_token', statusResponse.tokens.refreshToken);
+            if (qrEmail) {
+              localStorage.setItem('user_email', qrEmail);
+            }
+          }
+          
+          toast({
+            title: "Đăng nhập thành công!",
+            description: "Chào mừng bạn quay trở lại với Cham Pets",
+          });
+          
+          // Close modal and reload
+          setTimeout(() => {
+            onClose();
+            window.location.reload();
+          }, 1000);
+        } else if (statusResponse.status === "EXPIRED" || statusResponse.status === "REJECTED") {
+          // Clear polling
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          if (pollingTimeoutRef.current) {
+            clearTimeout(pollingTimeoutRef.current);
+            pollingTimeoutRef.current = null;
+          }
+          
+          setQrStatus("expired");
+          toast({
+            title: "QR code đã hết hạn",
+            description: "Vui lòng tạo mã QR mới",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Error checking QR status:", error);
+        // Continue polling on error
+      }
+    }, 5000); // Poll every 5 seconds (tối ưu để giảm request)
+
+    pollingIntervalRef.current = pollInterval;
+
+    // Stop polling after 5 minutes (QR code expiry)
+    const timeout = setTimeout(() => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      setQrStatus((prevStatus) => {
+        if (prevStatus === "pending") {
+          return "expired";
+        }
+        return prevStatus;
+      });
+    }, 5 * 60 * 1000);
+
+    pollingTimeoutRef.current = timeout;
   };
 
   const handleVerifyOtp = async () => {
@@ -390,50 +548,41 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
               {qrCodeData ? (
                 <div className="space-y-4">
                   <div className="flex justify-center p-4 bg-gray-50 rounded-lg">
-                    <QRCodeSVG
-                      value={qrCodeData}
-                      size={256}
-                      level="H"
-                      includeMargin={true}
+                    <img 
+                      src={`data:image/png;base64,${qrCodeData}`}
+                      alt="QR Code"
+                      className="w-64 h-64"
                     />
                   </div>
                   <p className="text-sm text-center text-muted-foreground">
-                    Quét mã QR bằng ứng dụng Google Authenticator để đăng nhập
+                    {qrStatus === "pending" 
+                      ? "Quét mã QR bằng ứng dụng di động để đăng nhập"
+                      : qrStatus === "approved"
+                      ? "✅ Đăng nhập thành công!"
+                      : "❌ QR code đã hết hạn. Vui lòng tạo mã mới."}
                   </p>
+                  {qrStatus === "pending" && (
+                    <p className="text-xs text-center text-muted-foreground">
+                      Đang chờ xác nhận từ ứng dụng di động...
+                    </p>
+                  )}
+                  {qrStatus === "expired" && (
+                    <Button
+                      type="button"
+                      onClick={handleGenerateQrCode}
+                      className="w-full"
+                      disabled={isLoading}
+                    >
+                      Tạo mã QR mới
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <Button
                   type="button"
-                  onClick={async () => {
-                    if (!qrEmail) {
-                      toast({
-                        title: "Email không hợp lệ",
-                        description: "Vui lòng nhập email của bạn",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                    try {
-                      setIsLoading(true);
-                      // TODO: Implement generate QR code API call
-                      // const response = await authService.generateQR(qrEmail);
-                      // setQrCodeData(response.qrData);
-                      toast({
-                        title: "Tính năng đang phát triển",
-                        description: "QR Code login sẽ sớm có sẵn",
-                      });
-                    } catch (error: any) {
-                      toast({
-                        title: "Lỗi tạo QR Code",
-                        description: error.message || "Không thể tạo mã QR",
-                        variant: "destructive",
-                      });
-                    } finally {
-                      setIsLoading(false);
-                    }
-                  }}
+                  onClick={handleGenerateQrCode}
                   className="w-full"
-                  disabled={isLoading || !qrEmail}
+                  disabled={isLoading}
                 >
                   {isLoading ? "Đang tạo..." : "Tạo mã QR"}
                 </Button>
@@ -444,8 +593,18 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   type="button"
                   className="text-primary underline"
                   onClick={() => {
+                    // Clear polling when switching away
+                    if (pollingIntervalRef.current) {
+                      clearInterval(pollingIntervalRef.current);
+                      pollingIntervalRef.current = null;
+                    }
+                    if (pollingTimeoutRef.current) {
+                      clearTimeout(pollingTimeoutRef.current);
+                      pollingTimeoutRef.current = null;
+                    }
                     setLoginMode("email");
                     setQrCodeData("");
+                    setQrStatus("pending");
                   }}
                 >
                   Quay lại đăng nhập bằng email

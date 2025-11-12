@@ -23,12 +23,18 @@ const createApiInstance = (): AxiosInstance => {
         '/auth/send-otp',
         '/auth/forgot-password',
         '/auth/reset-password',
+        '/auth/qr/generate',
+        '/auth/qr/confirm',
+        '/auth/qr/status',
         '/api/auth/login',
         '/api/auth/register',
         '/api/auth/verify-otp',
         '/api/auth/send-otp',
         '/api/auth/forgot-password',
         '/api/auth/reset-password',
+        '/api/auth/qr/generate',
+        '/api/auth/qr/confirm',
+        '/api/auth/qr/status',
       ];
       
       const isPublicEndpoint = config.url && publicEndpoints.some(endpoint => 

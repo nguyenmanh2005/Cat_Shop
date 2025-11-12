@@ -3,15 +3,20 @@ package com.catshop.catshop.controller;
 import com.catshop.catshop.dto.request.LoginRequest;
 import com.catshop.catshop.dto.request.MfaVerifyRequest;
 import com.catshop.catshop.dto.request.OtpRequest;
+import com.catshop.catshop.dto.request.QrLoginRequest;
 import com.catshop.catshop.dto.request.UserRequest;
 import com.catshop.catshop.dto.response.ApiResponse;
+import com.catshop.catshop.dto.response.QrLoginResponse;
+import com.catshop.catshop.dto.response.QrLoginStatusResponse;
 import com.catshop.catshop.dto.response.TokenResponse;
 import com.catshop.catshop.entity.User;
 import com.catshop.catshop.exception.BadRequestException;
+import com.catshop.catshop.exception.ResourceNotFoundException;
 import com.catshop.catshop.repository.UserRepository;
 import com.catshop.catshop.service.AuthService;
 import com.catshop.catshop.service.DeviceService;
 import com.catshop.catshop.service.MfaService;
+import com.catshop.catshop.service.QrLoginService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +37,7 @@ public class AuthController {
     private final UserRepository userRepository;
     private final MfaService mfaService;
     private final DeviceService deviceService;
+    private final QrLoginService qrLoginService;
 
     // ✅ Bước 1: Login (gửi OTP nếu thiết bị lạ)
     @PostMapping("/login")
@@ -310,7 +316,74 @@ public class AuthController {
         }
     }
 
+    // ==================== QR CODE LOGIN ====================
 
+    /**
+     * Tạo QR code cho đăng nhập
+     * Frontend sẽ hiển thị QR code này và polling để check status
+     */
+    @PostMapping("/qr/generate")
+    public ResponseEntity<ApiResponse<QrLoginResponse>> generateQrCode() {
+        log.info("📱 [QR-LOGIN] Generate QR code request received");
+        
+        try {
+            QrLoginResponse response = qrLoginService.generateQrCode();
+            log.info("✅ [QR-LOGIN] QR code generated successfully. Session: {}", response.getSessionId());
+            return ResponseEntity.ok(ApiResponse.success(response, "QR code đã được tạo thành công"));
+        } catch (Exception e) {
+            log.error("❌ [QR-LOGIN] Failed to generate QR code: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(ApiResponse.error(500, 
+                    "Không thể tạo QR code: " + e.getMessage()));
+        }
+    }
 
+    /**
+     * Mobile app gọi endpoint này sau khi scan QR code
+     * Gửi credentials để xác nhận đăng nhập
+     */
+    @PostMapping("/qr/confirm")
+    public ResponseEntity<ApiResponse<String>> confirmQrLogin(@Valid @RequestBody QrLoginRequest request) {
+        log.info("📱 [QR-LOGIN] Confirm request received. Session: {}, Email: {}", 
+                request.getSessionId(), request.getEmail());
+        
+        try {
+            boolean success = qrLoginService.confirmQrLogin(request);
+            if (success) {
+                log.info("✅ [QR-LOGIN] Login confirmed successfully");
+                return ResponseEntity.ok(ApiResponse.success(
+                        "Đăng nhập thành công. Vui lòng quay lại trình duyệt.",
+                        "Login confirmed successfully"));
+            } else {
+                return ResponseEntity.status(400).body(ApiResponse.error(400, 
+                        "Không thể xác nhận đăng nhập"));
+            }
+        } catch (BadRequestException | ResourceNotFoundException e) {
+            log.error("❌ [QR-LOGIN] Confirm failed: {}", e.getMessage());
+            throw e; // Re-throw để GlobalExceptionHandler xử lý
+        } catch (Exception e) {
+            log.error("❌ [QR-LOGIN] Unexpected error: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(ApiResponse.error(500, 
+                    "Lỗi khi xác nhận đăng nhập: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Frontend polling endpoint này để check status của QR login
+     * Khi status = APPROVED, sẽ trả về tokens
+     */
+    @GetMapping("/qr/status/{sessionId}")
+    public ResponseEntity<ApiResponse<QrLoginStatusResponse>> checkQrStatus(
+            @PathVariable String sessionId) {
+        log.debug("🔍 [QR-LOGIN] Status check request. Session: {}", sessionId);
+        
+        try {
+            QrLoginStatusResponse response = qrLoginService.checkStatus(sessionId);
+            return ResponseEntity.ok(ApiResponse.success(response, "Status retrieved successfully"));
+        } catch (Exception e) {
+            log.error("❌ [QR-LOGIN] Failed to check status: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(ApiResponse.error(500, 
+                    "Không thể kiểm tra trạng thái: " + e.getMessage()));
+        }
+    }
 
 }

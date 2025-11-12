@@ -19,6 +19,7 @@ import Cattail from "./pages/Cattail";
 import AdCate from "./pages/AdCate";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
+import QrLogin from "./pages/QrLogin";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
               <Route path="/admin" element={<Admin />} />
               <Route path="/admin/categories" element={<AdCate />} />
               <Route path="/login-test" element={<LoginTest />} />
+              <Route path="/qr-login" element={<QrLogin />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/checkout" element={<Checkout />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
