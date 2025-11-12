@@ -17,6 +17,10 @@ public class EmailService {
 
     public void sendOtpEmail(String toEmail, String otp) {
         try {
+            if (mailSender == null) {
+                throw new BadRequestException("Mail sender chưa được cấu hình. Vui lòng kiểm tra cấu hình SMTP.");
+            }
+            
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
@@ -36,6 +40,8 @@ public class EmailService {
             mailSender.send(message);
         } catch (MessagingException e) {
             throw new BadRequestException("Không thể gửi email: " + e.getMessage());
+        } catch (Exception e) {
+            throw new BadRequestException("Lỗi khi gửi email: " + e.getMessage());
         }
     }
 }

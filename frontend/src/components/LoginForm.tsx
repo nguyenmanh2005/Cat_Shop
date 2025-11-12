@@ -2,16 +2,18 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, Mail, Shield, Eye, EyeOff } from "lucide-react";
+import { Lock, Mail, Shield, Eye, EyeOff, QrCode } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { authService } from "@/services/authService";
+import { QRCodeSVG } from "qrcode.react";
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
   onClose: () => void;
 }
 
-type LoginMode = "email" | "otp";
+type LoginMode = "email" | "otp" | "qr";
 
 const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   const { login, loginWithOTP, pendingEmail } = useAuth();
@@ -25,16 +27,21 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   const [otpEmail, setOtpEmail] = useState("");
   const [lastCredentials, setLastCredentials] = useState<{ email: string; password: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [qrCodeData, setQrCodeData] = useState<string>("");
+  const [qrEmail, setQrEmail] = useState("");
 
   useEffect(() => {
     if (pendingEmail) {
       setOtpEmail(pendingEmail);
       setLoginMode("otp");
+      setOtpSent(false); // Reset trạng thái khi chuyển sang tab OTP
     }
   }, [pendingEmail]);
 
   const resetOtpState = () => {
     setOtp("");
+    setOtpSent(false);
   };
 
   const handleEmailPasswordLogin = async (e: React.FormEvent) => {
@@ -67,9 +74,10 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
         setOtpEmail(email);
         resetOtpState();
         setLoginMode("otp");
+        setOtpSent(false); // Reset trạng thái OTP chưa được gửi
         toast({
           title: "Yêu cầu OTP",
-          description: result.message || "Vui lòng kiểm tra email để lấy mã OTP",
+          description: result.message || "Vui lòng nhấn nút 'Nhận OTP' để nhận mã xác thực",
         });
       }
     } catch (error: any) {
@@ -84,10 +92,10 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     }
   };
 
-  const handleResendOtp = async () => {
-    if (!lastCredentials) {
+  const handleRequestOtp = async () => {
+    if (!otpEmail) {
       toast({
-        title: "Không thể gửi lại OTP",
+        title: "Email không hợp lệ",
         description: "Vui lòng đăng nhập lại bằng email và mật khẩu",
         variant: "destructive",
       });
@@ -96,28 +104,25 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
 
     try {
       setIsLoading(true);
-      const result = await login(lastCredentials.email, lastCredentials.password);
-      if (result.requiresOtp) {
-        toast({
-          title: "OTP đã được gửi lại",
-          description: result.message || "Vui lòng kiểm tra email của bạn",
-        });
-      } else if (result.success) {
-        toast({
-          title: "Đăng nhập thành công",
-          description: "Thiết bị đã được xác minh",
-        });
-        onClose();
-      }
+      await authService.sendOtp(otpEmail);
+      setOtpSent(true);
+      toast({
+        title: "OTP đã được gửi",
+        description: "Vui lòng kiểm tra email của bạn để lấy mã OTP",
+      });
     } catch (error: any) {
       toast({
-        title: "Lỗi gửi lại OTP",
-        description: error.message || "Không thể gửi lại mã OTP",
+        title: "Lỗi gửi OTP",
+        description: error.message || "Không thể gửi mã OTP",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleResendOtp = async () => {
+    await handleRequestOtp();
   };
 
   const handleVerifyOtp = async () => {
@@ -182,14 +187,33 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       </button>
       <button
         type="button"
-        onClick={() => setLoginMode("otp")}
+        onClick={() => {
+          setLoginMode("otp");
+          if (!otpEmail && email) {
+            setOtpEmail(email);
+          }
+        }}
         className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${
           loginMode === "otp" ? "text-primary border-b-2 border-primary" : "text-gray-500 hover:text-gray-700"
         }`}
-        disabled={!otpEmail}
       >
         <Lock className="h-4 w-4 inline mr-2" />
         OTP
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setLoginMode("qr");
+          if (!qrEmail && email) {
+            setQrEmail(email);
+          }
+        }}
+        className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${
+          loginMode === "qr" ? "text-primary border-b-2 border-primary" : "text-gray-500 hover:text-gray-700"
+        }`}
+      >
+        <QrCode className="h-4 w-4 inline mr-2" />
+        QR Code
       </button>
     </div>
   );
@@ -213,7 +237,11 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
           <div className="space-y-4">
             <h2 className="text-3xl font-bold">SECURE ACCESS</h2>
             <p className="text-blue-100 text-lg">
-              {loginMode === "email" ? "Đăng nhập bằng Email & Mật khẩu" : "Nhập mã OTP được gửi tới email của bạn"}
+              {loginMode === "email" 
+                ? "Đăng nhập bằng Email & Mật khẩu" 
+                : loginMode === "otp" 
+                ? "Nhập mã OTP được gửi tới email của bạn"
+                : "Quét mã QR để đăng nhập"}
             </p>
           </div>
         </div>
@@ -289,32 +317,47 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   type="email"
                   value={otpEmail}
                   onChange={(e) => setOtpEmail(e.target.value)}
-                  disabled
+                  placeholder="Nhập email của bạn"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="otp">Mã OTP</Label>
-                <Input
-                  id="otp"
-                  type="text"
-                  placeholder="Nhập mã 6 chữ số"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
-                  maxLength={6}
-                  className="text-center text-2xl tracking-[0.6rem]"
-                  disabled={isLoading}
-                />
-              </div>
+              {!otpSent && (
+                <Button 
+                  type="button" 
+                  onClick={handleRequestOtp} 
+                  className="w-full" 
+                  disabled={isLoading || !otpEmail}
+                >
+                  {isLoading ? "Đang gửi..." : "Nhận OTP"}
+                </Button>
+              )}
 
-              <div className="flex gap-2">
-                <Button onClick={handleVerifyOtp} className="flex-1" disabled={isLoading || otp.length !== 6}>
-                  {isLoading ? "Đang xác thực..." : "Xác thực OTP"}
-                </Button>
-                <Button type="button" variant="outline" onClick={handleResendOtp} disabled={isLoading}>
-                  Gửi lại OTP
-                </Button>
-              </div>
+              {otpSent && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="otp">Mã OTP</Label>
+                    <Input
+                      id="otp"
+                      type="text"
+                      placeholder="Nhập mã 6 chữ số"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                      maxLength={6}
+                      className="text-center text-2xl tracking-[0.6rem]"
+                      disabled={isLoading}
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button onClick={handleVerifyOtp} className="flex-1" disabled={isLoading || otp.length !== 6}>
+                      {isLoading ? "Đang xác thực..." : "Xác thực OTP"}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={handleResendOtp} disabled={isLoading}>
+                      Gửi lại OTP
+                    </Button>
+                  </div>
+                </>
+              )}
 
               <div className="text-sm text-muted-foreground">
                 <button
@@ -323,6 +366,86 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   onClick={() => {
                     setLoginMode("email");
                     resetOtpState();
+                  }}
+                >
+                  Quay lại đăng nhập bằng email
+                </button>
+              </div>
+            </div>
+          )}
+
+          {loginMode === "qr" && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="qr-email">Email</Label>
+                <Input
+                  id="qr-email"
+                  type="email"
+                  value={qrEmail}
+                  onChange={(e) => setQrEmail(e.target.value)}
+                  placeholder="Nhập email của bạn"
+                />
+              </div>
+
+              {qrCodeData ? (
+                <div className="space-y-4">
+                  <div className="flex justify-center p-4 bg-gray-50 rounded-lg">
+                    <QRCodeSVG
+                      value={qrCodeData}
+                      size={256}
+                      level="H"
+                      includeMargin={true}
+                    />
+                  </div>
+                  <p className="text-sm text-center text-muted-foreground">
+                    Quét mã QR bằng ứng dụng Google Authenticator để đăng nhập
+                  </p>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    if (!qrEmail) {
+                      toast({
+                        title: "Email không hợp lệ",
+                        description: "Vui lòng nhập email của bạn",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    try {
+                      setIsLoading(true);
+                      // TODO: Implement generate QR code API call
+                      // const response = await authService.generateQR(qrEmail);
+                      // setQrCodeData(response.qrData);
+                      toast({
+                        title: "Tính năng đang phát triển",
+                        description: "QR Code login sẽ sớm có sẵn",
+                      });
+                    } catch (error: any) {
+                      toast({
+                        title: "Lỗi tạo QR Code",
+                        description: error.message || "Không thể tạo mã QR",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                  className="w-full"
+                  disabled={isLoading || !qrEmail}
+                >
+                  {isLoading ? "Đang tạo..." : "Tạo mã QR"}
+                </Button>
+              )}
+
+              <div className="text-sm text-muted-foreground">
+                <button
+                  type="button"
+                  className="text-primary underline"
+                  onClick={() => {
+                    setLoginMode("email");
+                    setQrCodeData("");
                   }}
                 >
                   Quay lại đăng nhập bằng email

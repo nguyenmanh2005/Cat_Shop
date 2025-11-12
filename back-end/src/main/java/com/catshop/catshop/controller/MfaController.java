@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/auth/mfa")
+@RequestMapping("/api/auth/mfa")
 @RequiredArgsConstructor
 public class MfaController {
 

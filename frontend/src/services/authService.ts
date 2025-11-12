@@ -61,6 +61,9 @@ const clearTokens = () => {
 export const authService = {
   async login(credentials: LoginRequest): Promise<LoginResult> {
     try {
+      // Xóa token cũ trước khi đăng nhập để tránh xung đột
+      clearTokens();
+      
       const deviceId = getOrCreateDeviceId();
       const response = await api.post(API_CONFIG.ENDPOINTS.AUTH.LOGIN, {
         email: credentials.email,
@@ -88,7 +91,26 @@ export const authService = {
       };
     } catch (error: any) {
       console.error('Login error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Email hoặc mật khẩu không chính xác';
+      
+      // Lấy thông báo lỗi từ backend ApiResponse
+      let errorMessage = 'Email hoặc mật khẩu không chính xác';
+      
+      if (error.response?.data) {
+        // Backend trả về ApiResponse với cấu trúc: { status, code, message, data }
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Đảm bảo không có lỗi "token" khi đăng nhập
+      if (errorMessage.toLowerCase().includes('token')) {
+        errorMessage = 'Email hoặc mật khẩu không chính xác';
+      }
+      
       throw new Error(errorMessage);
     }
   },
@@ -104,7 +126,21 @@ export const authService = {
       });
     } catch (error: any) {
       console.error('Register error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Đăng ký thất bại';
+      
+      // Lấy thông báo lỗi từ backend ApiResponse
+      let errorMessage = 'Đăng ký thất bại. Vui lòng thử lại sau.';
+      
+      if (error.response?.data) {
+        // Backend trả về ApiResponse với cấu trúc: { status, code, message, data }
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       throw new Error(errorMessage);
     }
   },
@@ -189,6 +225,20 @@ export const authService = {
 
   getRefreshToken(): string | null {
     return localStorage.getItem(REFRESH_TOKEN_KEY);
+  },
+
+  async sendOtp(email: string): Promise<{ message: string }> {
+    try {
+      const response = await apiService.post<{ message: string }>(
+        API_CONFIG.ENDPOINTS.AUTH.SEND_OTP,
+        { email }
+      );
+      return response;
+    } catch (error: any) {
+      console.error('Send OTP error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Không thể gửi OTP';
+      throw new Error(errorMessage);
+    }
   },
 
   async verifyOTP(email: string, otp: string): Promise<TokenResponse> {

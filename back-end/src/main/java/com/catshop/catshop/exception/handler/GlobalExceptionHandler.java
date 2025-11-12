@@ -91,7 +91,30 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(401, ex.getMessage()));
     }
 
-
+    // Exception handler chung cho tất cả các exception chưa được handle
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
+        // Log chi tiết lỗi để debug
+        ex.printStackTrace();
+        
+        String message = ex.getMessage();
+        if (message == null || message.isEmpty()) {
+            message = "Đã xảy ra lỗi không xác định: " + ex.getClass().getSimpleName();
+        }
+        
+        // Kiểm tra các lỗi phổ biến
+        if (ex instanceof NullPointerException) {
+            message = "Lỗi: Thiếu dữ liệu cần thiết. Vui lòng kiểm tra lại cấu hình.";
+        } else if (ex.getMessage() != null && ex.getMessage().contains("mail")) {
+            message = "Lỗi gửi email. Vui lòng kiểm tra cấu hình SMTP hoặc thử lại sau.";
+        } else if (ex.getMessage() != null && ex.getMessage().contains("Redis")) {
+            message = "Lỗi kết nối Redis. Vui lòng kiểm tra cấu hình Redis.";
+        }
+        
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error(500, message));
+    }
 
 //    @ExceptionHandler(MethodArgumentNotValidException.class)
 //    public ResponseEntity<ApiResponse<Void>> handleValidationException(org.springframework.web.bind.MethodArgumentNotValidException ex){

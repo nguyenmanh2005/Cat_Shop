@@ -14,9 +14,37 @@ const createApiInstance = (): AxiosInstance => {
   // Request interceptor - thêm token và API key vào header
   instance.interceptors.request.use(
     (config) => {
-      const token = localStorage.getItem('access_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+      // Danh sách các endpoint không cần access token (public endpoints)
+      // Lưu ý: /auth/refresh cần refresh token nhưng được xử lý riêng trong authService
+      const publicEndpoints = [
+        '/auth/login',
+        '/auth/register',
+        '/auth/verify-otp',
+        '/auth/send-otp',
+        '/auth/forgot-password',
+        '/auth/reset-password',
+        '/api/auth/login',
+        '/api/auth/register',
+        '/api/auth/verify-otp',
+        '/api/auth/send-otp',
+        '/api/auth/forgot-password',
+        '/api/auth/reset-password',
+      ];
+      
+      const isPublicEndpoint = config.url && publicEndpoints.some(endpoint => 
+        config.url?.includes(endpoint)
+      );
+      
+      // Với public endpoints: XÓA Authorization header nếu có (tránh gửi token cũ)
+      if (isPublicEndpoint) {
+        // Xóa Authorization header để đảm bảo không gửi token cũ
+        delete config.headers.Authorization;
+      } else {
+        // Chỉ thêm token nếu không phải public endpoint
+        const token = localStorage.getItem('access_token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
       }
       
       // Thêm X-USER-EMAIL header cho các request cần authentication (backend yêu cầu)
@@ -28,7 +56,7 @@ const createApiInstance = (): AxiosInstance => {
         const isRegister = config.method?.toLowerCase() === 'post' && config.url === '/users';
         const isLogin = config.url?.includes('/users/email/');
         
-        if (!isRegister && !isLogin) {
+        if (!isRegister && !isLogin && !isPublicEndpoint) {
           // Các request GET/PUT/DELETE đến /api/users (trừ login) cần API key và email
           config.headers['X-API-KEY'] = 'secret123';
           if (userEmail) {
@@ -36,15 +64,16 @@ const createApiInstance = (): AxiosInstance => {
           }
         }
         // POST /api/users (đăng ký) và GET /api/users/email/{email} (login) không cần header này
-      } else if (userEmail) {
-        // Các request khác cần X-USER-EMAIL nếu user đã đăng nhập
+      } else if (userEmail && !isPublicEndpoint) {
+        // Các request khác cần X-USER-EMAIL nếu user đã đăng nhập (trừ public endpoints)
         config.headers['X-USER-EMAIL'] = userEmail;
       }
       
       console.log('Making API request:', {
         method: config.method?.toUpperCase(),
         url: config.url,
-        baseURL: config.baseURL
+        baseURL: config.baseURL,
+        isPublicEndpoint
       });
       
       return config;
@@ -67,29 +96,57 @@ const createApiInstance = (): AxiosInstance => {
     async (error) => {
       const originalRequest = error.config;
       
-      // Xử lý lỗi 401 (Unauthorized)
-      if (error.response?.status === 401 && !originalRequest._retry) {
+      // Danh sách các endpoint không nên thử refresh token khi bị 401
+      const publicEndpoints = [
+        '/auth/login',
+        '/auth/register',
+        '/auth/verify-otp',
+        '/auth/send-otp',
+        '/auth/forgot-password',
+        '/auth/reset-password',
+        '/api/auth/login',
+        '/api/auth/register',
+        '/api/auth/verify-otp',
+        '/api/auth/send-otp',
+        '/api/auth/forgot-password',
+        '/api/auth/reset-password',
+      ];
+      
+      const isPublicEndpoint = originalRequest.url && publicEndpoints.some(endpoint => 
+        originalRequest.url?.includes(endpoint)
+      );
+      
+      // Xử lý lỗi 401 (Unauthorized) - chỉ thử refresh token nếu không phải public endpoint
+      if (error.response?.status === 401 && !originalRequest._retry && !isPublicEndpoint) {
         originalRequest._retry = true;
         
         try {
           const refreshToken = localStorage.getItem('refresh_token');
           if (refreshToken) {
-            const response = await instance.post(API_CONFIG.ENDPOINTS.AUTH.REFRESH, {
-              refresh_token: refreshToken
+            const response = await instance.post(API_CONFIG.ENDPOINTS.AUTH.REFRESH, null, {
+              headers: {
+                Authorization: `Bearer ${refreshToken}`
+              }
             });
             
-            const { access_token } = response.data;
-            localStorage.setItem('access_token', access_token);
-            
-            // Thử lại request gốc
-            originalRequest.headers.Authorization = `Bearer ${access_token}`;
-            return instance(originalRequest);
+            const newAccessToken = response.data?.data;
+            if (newAccessToken) {
+              localStorage.setItem('access_token', newAccessToken);
+              
+              // Thử lại request gốc với token mới
+              originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+              return instance(originalRequest);
+            }
           }
         } catch (refreshError) {
-          // Refresh token thất bại, redirect về login
+          // Refresh token thất bại, xóa tokens và redirect về login
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
-          window.location.href = '/login';
+          localStorage.removeItem('user_email');
+          // Không redirect nếu đang ở trang login
+          if (!window.location.pathname.includes('/login')) {
+            window.location.href = '/login';
+          }
         }
       }
       

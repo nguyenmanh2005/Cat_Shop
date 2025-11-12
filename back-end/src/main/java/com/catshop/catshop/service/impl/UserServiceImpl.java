@@ -14,6 +14,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -25,6 +26,7 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
 
     @Override
@@ -72,7 +74,20 @@ public class UserServiceImpl implements UserService {
                         "Không tìm thấy tài khoản với Id là: " + userId));
 
         user.setUsername(request.getUsername());
-        user.setPasswordHash(request.getPassword());
+        
+        // Hash password trước khi lưu (chỉ hash nếu password được cung cấp)
+        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            String password = request.getPassword();
+            // Kiểm tra xem password đã được hash chưa (BCrypt hash bắt đầu bằng $2a$ hoặc $2b$)
+            if (!password.startsWith("$2a$") && !password.startsWith("$2b$")) {
+                // Password chưa được hash - hash nó
+                user.setPasswordHash(passwordEncoder.encode(password));
+            }
+            // Nếu password đã được hash (bắt đầu bằng $2a$ hoặc $2b$), giữ nguyên
+            // (Trường hợp này hiếm khi xảy ra vì frontend không nên gửi hash)
+        }
+        // Nếu password null hoặc blank, giữ nguyên password hiện tại trong database
+        
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
         user.setAddress(request.getAddress());

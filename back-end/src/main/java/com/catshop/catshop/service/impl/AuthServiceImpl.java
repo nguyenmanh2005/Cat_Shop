@@ -21,7 +21,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -41,22 +40,43 @@ public class AuthServiceImpl implements AuthService {
     // ------------------------- LOGIN STEP 1 (Gửi OTP) -------------------------
     @Override
     public void validateCredentials(LoginRequest loginRequest) {
-        User user = userRepository.findByEmail(loginRequest.getEmail())
+        String email = loginRequest.getEmail();
+        String rawPassword = loginRequest.getPassword();
+        
+        // Kiểm tra email có tồn tại trong database
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Email " + loginRequest.getEmail() + " không tồn tại"));
+                        "Email " + email + " không tồn tại trong hệ thống"));
 
-        if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPasswordHash())) {
+        String storedPasswordHash = user.getPasswordHash();
+        
+        // Kiểm tra password có khớp với password hash trong database
+        boolean passwordMatches = passwordEncoder.matches(rawPassword, storedPasswordHash);
+        
+        if (!passwordMatches) {
+            // Kiểm tra xem có phải password được lưu dạng plain text không (cho backward compatibility)
+            if (storedPasswordHash != null && storedPasswordHash.equals(rawPassword)) {
+                // Password được lưu dạng plain text - cần hash lại
+                System.out.println("⚠️ [WARN] Password stored as plain text for user: " + email + ". Re-hashing...");
+                user.setPasswordHash(passwordEncoder.encode(rawPassword));
+                userRepository.save(user);
+                System.out.println("✅ [INFO] Password re-hashed successfully for: " + email);
+                return; // Password đúng, đã hash lại
+            }
             throw new BadRequestException("Mật khẩu không chính xác");
         }
+        
+        // Nếu cả email và password đều đúng → không throw exception
     }
 
     @Override
     public void sendOtp(String email) {
-        User user = userRepository.findByEmail(email)
+        // Kiểm tra email có tồn tại trong database
+        userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Email " + email + " không tồn tại"));
 
-        String otp = otpService.generateOtp(email);
-        emailService.sendOtpEmail(email, otp);
+        // OtpService.generateAndSendOtp() đã tự động gửi email rồi
+        otpService.generateAndSendOtp(email);
     }
 
 
@@ -137,21 +157,32 @@ public class AuthServiceImpl implements AuthService {
     // ------------------------- REGISTER -------------------------
     @Override
     public boolean register(UserRequest userRequest) {
-        if (userRepository.findByEmail(userRequest.getEmail()).isPresent()) {
-            throw new BadRequestException("Email đã tồn tại");
+        String email = userRequest.getEmail();
+        String phone = userRequest.getPhone();
+        
+        // Kiểm tra email đã tồn tại chưa
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new BadRequestException("Email " + email + " đã được sử dụng. Vui lòng sử dụng email khác.");
         }
 
-        if (userRepository.findByPhoneNumber(userRequest.getPhone()).isPresent()) {
-            throw new BadRequestException("Số điện thoại đã tồn tại");
+        // Kiểm tra số điện thoại đã tồn tại chưa (nếu có)
+        if (phone != null && !phone.isBlank() && 
+            userRepository.findByPhoneNumber(phone).isPresent()) {
+            throw new BadRequestException("Số điện thoại " + phone + " đã được sử dụng. Vui lòng sử dụng số điện thoại khác.");
         }
 
+        // Lấy role mặc định (USER - role ID = 1)
         Role role = roleRepository.findById(1L)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Role ID: 1"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Role mặc định (ID: 1)"));
 
+        // Map từ UserRequest sang User entity
         User user = userMapper.FromUserRequestToUser(userRequest);
         user.setRole(role);
+        
+        // Mã hóa password trước khi lưu vào database
         user.setPasswordHash(passwordEncoder.encode(userRequest.getPassword()));
 
+        // Lưu user vào database
         userRepository.save(user);
         return true;
     }

@@ -5,7 +5,7 @@ import com.catshop.catshop.security.JwtAuthEntryPoint;
 import com.catshop.catshop.security.JwtAuthFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -22,7 +22,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
-@Log4j2
+@Slf4j
 @RequiredArgsConstructor
 @Configuration
 public class SecurityConfig {
@@ -56,7 +56,17 @@ public class SecurityConfig {
 
                 // Exception handling 401 và 403
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(jwtAuthEntryPoint) // 401 Unauthorized
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            // Custom entry point: bỏ qua cho các endpoint auth
+                            String uri = request.getRequestURI();
+                            if (uri != null && (uri.contains("/api/auth/") || uri.contains("/auth/"))) {
+                                // Cho phép request đi tiếp đến controller
+                                // Không set response để request có thể đi tiếp
+                                return;
+                            }
+                            // Gọi entry point mặc định cho các endpoint khác
+                            jwtAuthEntryPoint.commence(request, response, authException);
+                        })
                         .accessDeniedHandler((request, response, accessDeniedException) -> { // 403 Forbidden
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                             response.setContentType("application/json;charset=UTF-8");
@@ -66,7 +76,11 @@ public class SecurityConfig {
 
                 // Quy định quyền truy cập
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**", "/public/**").permitAll() // public
+                        // ✅ Cho phép tất cả các endpoint auth và public (ưu tiên cao nhất)
+                        .requestMatchers("/auth/**", "/api/auth/**", "/public/**", "/oauth2/**").permitAll()
+                        // ✅ Cho phép GET categories cho customer (không cần auth)
+                        .requestMatchers(HttpMethod.GET, "/api/categories/customer").permitAll()
+                        // ✅ Admin endpoints
                         .requestMatchers(
                                 "/api/users/**",
                                 "/api/categories/admin/**",
@@ -82,8 +96,10 @@ public class SecurityConfig {
                                 "/api/admin/cat-details/**",
                                 "/api/admin/cage-details/**"
                         ).hasRole("ADMIN")
+                        // ✅ PUT và DELETE yêu cầu ADMIN
                         .requestMatchers(HttpMethod.PUT, "/api/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
+                        // ✅ Các request khác cần authentication
                         .anyRequest().authenticated()
                 )
 
@@ -94,7 +110,7 @@ public class SecurityConfig {
                 // Stateless session
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                // Thêm filter JWT
+                // Thêm filter JWT (JwtAuthFilter đã tự động bỏ qua các endpoint /api/auth/)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

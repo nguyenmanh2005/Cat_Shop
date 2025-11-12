@@ -39,7 +39,23 @@ interface CartProviderProps {
 export const CartProvider = ({ children }: CartProviderProps) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const { toast } = useToast();
-  const { user, isAuthenticated } = useAuth();
+  
+  // Sử dụng useAuth một cách an toàn
+  // Lấy user và isAuthenticated từ AuthContext nếu có, nếu không thì dùng giá trị mặc định
+  let user = null;
+  let isAuthenticated = false;
+  
+  try {
+    const authContext = useAuth();
+    if (authContext) {
+      user = authContext.user;
+      isAuthenticated = authContext.isAuthenticated;
+    }
+  } catch (error) {
+    // Nếu chưa có AuthProvider hoặc lỗi, sử dụng giá trị mặc định
+    // Kiểm tra localStorage để lấy email nếu có
+    isAuthenticated = !!localStorage.getItem('access_token');
+  }
 
   // Load cart from localStorage on mount
   useEffect(() => {
