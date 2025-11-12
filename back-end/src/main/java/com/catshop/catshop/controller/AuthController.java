@@ -339,15 +339,48 @@ public class AuthController {
 
     /**
      * Mobile app gọi endpoint này sau khi scan QR code
-     * Gửi credentials để xác nhận đăng nhập
+     * Có thể xác nhận bằng token (nếu đã đăng nhập) hoặc email/password
      */
     @PostMapping("/qr/confirm")
-    public ResponseEntity<ApiResponse<String>> confirmQrLogin(@Valid @RequestBody QrLoginRequest request) {
-        log.info("📱 [QR-LOGIN] Confirm request received. Session: {}, Email: {}", 
-                request.getSessionId(), request.getEmail());
+    public ResponseEntity<ApiResponse<String>> confirmQrLogin(@RequestBody Map<String, String> request) {
+        String sessionId = request.get("sessionId");
+        String accessToken = request.get("accessToken");
+        String email = request.get("email");
+        String password = request.get("password");
+        String deviceId = request.get("deviceId");
+
+        log.info("📱 [QR-LOGIN] Confirm request received. Session: {}, HasToken: {}", 
+                sessionId, accessToken != null);
         
         try {
-            boolean success = qrLoginService.confirmQrLogin(request);
+            boolean success = false;
+
+            // Nếu có token, dùng token để xác nhận (giống Zalo - không cần nhập lại)
+            if (accessToken != null && !accessToken.isBlank()) {
+                if (deviceId == null || deviceId.isBlank()) {
+                    throw new BadRequestException("Thiết bị ID không được để trống");
+                }
+                success = qrLoginService.confirmQrLoginWithToken(sessionId, accessToken, deviceId);
+            } 
+            // Nếu không có token, dùng email/password (cách cũ)
+            else {
+                if (email == null || email.isBlank()) {
+                    throw new BadRequestException("Email không được để trống");
+                }
+                if (password == null || password.isBlank()) {
+                    throw new BadRequestException("Mật khẩu không được để trống");
+                }
+                if (deviceId == null || deviceId.isBlank()) {
+                    throw new BadRequestException("Thiết bị ID không được để trống");
+                }
+                QrLoginRequest qrRequest = new QrLoginRequest();
+                qrRequest.setSessionId(sessionId);
+                qrRequest.setEmail(email);
+                qrRequest.setPassword(password);
+                qrRequest.setDeviceId(deviceId);
+                success = qrLoginService.confirmQrLogin(qrRequest);
+            }
+
             if (success) {
                 log.info("✅ [QR-LOGIN] Login confirmed successfully");
                 return ResponseEntity.ok(ApiResponse.success(

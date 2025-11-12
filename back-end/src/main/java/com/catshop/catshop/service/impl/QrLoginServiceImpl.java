@@ -132,6 +132,58 @@ public class QrLoginServiceImpl implements QrLoginService {
     }
 
     @Override
+    public boolean confirmQrLoginWithToken(String sessionId, String accessToken, String deviceId) {
+        log.info("📱 [QR-LOGIN] Confirm with token. Session: {}", sessionId);
+
+        // Validate token
+        if (!jwtUtils.validateToken(accessToken)) {
+            log.error("❌ [QR-LOGIN] Invalid token");
+            throw new BadRequestException("Token không hợp lệ");
+        }
+
+        // Lấy email từ token
+        String email = jwtUtils.getEmailFromToken(accessToken);
+        if (email == null) {
+            throw new BadRequestException("Token không chứa thông tin email");
+        }
+
+        // Kiểm tra session
+        String currentStatus = getSessionStatus(sessionId);
+        if (currentStatus == null) {
+            log.error("❌ [QR-LOGIN] Session not found or expired: {}", sessionId);
+            throw new BadRequestException("QR code đã hết hạn hoặc không hợp lệ");
+        }
+
+        if (!"PENDING".equals(currentStatus)) {
+            log.error("❌ [QR-LOGIN] Session already processed. Status: {}", currentStatus);
+            throw new BadRequestException("QR code đã được sử dụng");
+        }
+
+        // Lấy user từ email
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Email không tồn tại"));
+
+        // Generate tokens mới cho desktop
+        String newAccessToken = jwtUtils.generateAccessToken(user.getEmail(), user.getRole().getRoleName());
+        String refreshToken = jwtUtils.generateRefreshToken(user.getEmail());
+
+        // Lưu refresh token vào Redis
+        try {
+            redisTemplate.opsForValue().set("refresh:" + user.getEmail(), refreshToken, 7, TimeUnit.DAYS);
+        } catch (DataAccessException e) {
+            log.warn("⚠️ [QR-LOGIN] Cannot save refresh token to Redis: {}", e.getMessage());
+        }
+
+        // Lưu tokens vào session status
+        TokenResponse tokens = new TokenResponse(newAccessToken, refreshToken, false);
+        saveSessionStatus(sessionId, "APPROVED", tokens);
+
+        log.info("✅ [QR-LOGIN] Login confirmed with token successfully. Session: {}, Email: {}", sessionId, email);
+
+        return true;
+    }
+
+    @Override
     public QrLoginStatusResponse checkStatus(String sessionId) {
         log.info("🔍 [QR-LOGIN] Checking status for session: {}", sessionId);
 

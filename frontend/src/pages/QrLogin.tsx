@@ -2,8 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/authService";
@@ -19,19 +17,31 @@ const QrLogin = () => {
     searchParams.get("sessionId")
   );
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [status, setStatus] = useState<"scanning" | "login" | "success" | "error">(
-    searchParams.get("sessionId") ? "login" : "scanning"
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // Kiểm tra xem đã đăng nhập trên mobile chưa
+  const [status, setStatus] = useState<"scanning" | "confirm" | "not-logged-in" | "success" | "error">(
+    searchParams.get("sessionId") ? "confirm" : "scanning"
   );
 
-  // Nếu có sessionId từ URL, chuyển thẳng sang form login
+  // Kiểm tra xem user đã đăng nhập trên mobile chưa
+  useEffect(() => {
+    const accessToken = localStorage.getItem('access_token');
+    const userEmail = localStorage.getItem('user_email');
+    
+    if (accessToken && userEmail) {
+      setIsLoggedIn(true);
+      setEmail(userEmail);
+    }
+  }, []);
+
+  // Nếu có sessionId từ URL, chuyển thẳng sang confirm hoặc yêu cầu đăng nhập
   useEffect(() => {
     if (scannedSessionId) {
-      setStatus("login");
+      // Nếu đã đăng nhập, chuyển sang confirm (chỉ cần click)
+      // Nếu chưa đăng nhập, yêu cầu đăng nhập trước
+      setStatus(isLoggedIn ? "confirm" : "not-logged-in");
     }
-  }, [scannedSessionId]);
+  }, [scannedSessionId, isLoggedIn]);
 
   // Cleanup scanner khi component unmount
   useEffect(() => {
@@ -125,12 +135,16 @@ const QrLogin = () => {
       }
 
       setScannedSessionId(sessionId);
-      setStatus("login");
+      // Nếu đã đăng nhập, chuyển sang confirm (chỉ cần click)
+      // Nếu chưa đăng nhập, yêu cầu đăng nhập trước
+      setStatus(isLoggedIn ? "confirm" : "not-logged-in");
       
-      toast({
-        title: "Quét QR thành công!",
-        description: "Vui lòng nhập thông tin đăng nhập",
-      });
+      if (isLoggedIn) {
+        toast({
+          title: "Quét QR thành công!",
+          description: "Nhấn xác nhận để đăng nhập",
+        });
+      }
     } catch (error: any) {
       console.error("Error parsing QR:", error);
       toast({
@@ -145,9 +159,8 @@ const QrLogin = () => {
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  // Xác nhận đăng nhập bằng token (nếu đã đăng nhập trên mobile)
+  const handleConfirmWithToken = async () => {
     if (!scannedSessionId) {
       toast({
         title: "Lỗi",
@@ -157,12 +170,10 @@ const QrLogin = () => {
       return;
     }
 
-    if (!email || !password) {
-      toast({
-        title: "Thông tin không đầy đủ",
-        description: "Vui lòng nhập email và mật khẩu",
-        variant: "destructive",
-      });
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      // Nếu không có token, chuyển sang form nhập email/password
+      setStatus("login");
       return;
     }
 
@@ -182,13 +193,12 @@ const QrLogin = () => {
 
       const deviceId = getOrCreateDeviceId();
 
-      // Call confirm endpoint
+      // Call confirm endpoint với token
       const response = await apiService.post<{ message: string }>(
         '/auth/qr/confirm',
         {
           sessionId: scannedSessionId,
-          email,
-          password,
+          accessToken,
           deviceId,
         }
       );
@@ -196,31 +206,40 @@ const QrLogin = () => {
       setStatus("success");
       toast({
         title: "Đăng nhập thành công!",
-        description: "Bạn có thể quay lại trình duyệt trên máy tính",
+        description: "Máy tính sẽ tự động đăng nhập. Bạn có thể đóng trang này.",
       });
 
-      // Show success message for 3 seconds then redirect
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 3000);
+      // Không redirect - để user thấy thông báo thành công
+      // Máy tính sẽ tự động đăng nhập nhờ polling trong LoginForm
+      console.log("✅ QR Login confirmed successfully. Desktop will auto-login via polling.");
+      console.log("📱 Mobile device should NOT redirect - staying on QR login page.");
     } catch (error: any) {
-      console.error("Login error:", error);
+      console.error("Confirm error:", error);
       setStatus("error");
-      const errorMessage = error.response?.data?.message || error.message || "Đăng nhập thất bại";
+      const errorMessage = error.response?.data?.message || error.message || "Xác nhận thất bại";
       toast({
-        title: "Đăng nhập thất bại",
+        title: "Xác nhận thất bại",
         description: errorMessage,
         variant: "destructive",
       });
+      // Nếu token không hợp lệ, yêu cầu đăng nhập lại
+      if (errorMessage.includes("token") || errorMessage.includes("Token")) {
+        setIsLoggedIn(false);
+        setStatus("not-logged-in");
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleCancel = () => {
+    setScannedSessionId(null);
+    setStatus("scanning");
+    startScanning();
+  };
+
   const handleReset = () => {
     setScannedSessionId(null);
-    setEmail("");
-    setPassword("");
     setStatus("scanning");
     startScanning();
   };
@@ -235,7 +254,8 @@ const QrLogin = () => {
           <CardTitle className="text-2xl">Đăng nhập bằng QR Code</CardTitle>
           <CardDescription>
             {status === "scanning" && "Quét mã QR từ máy tính để đăng nhập"}
-            {status === "login" && "Nhập thông tin đăng nhập của bạn"}
+            {status === "confirm" && "Bạn có muốn đăng nhập trên máy tính không?"}
+            {status === "not-logged-in" && "Vui lòng đăng nhập trên mobile trước"}
             {status === "success" && "Đăng nhập thành công!"}
             {status === "error" && "Đăng nhập thất bại"}
           </CardDescription>
@@ -257,62 +277,72 @@ const QrLogin = () => {
             </div>
           )}
 
-          {status === "login" && (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Nhập email của bạn"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
-                    required
-                    disabled={isSubmitting}
-                    autoComplete="email"
-                  />
+          {status === "confirm" && (
+            <div className="space-y-4">
+              <div className="text-center space-y-4">
+                <div className="mx-auto w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
+                  <QrCode className="h-10 w-10 text-blue-600" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Tài khoản:
+                  </p>
+                  <p className="font-semibold text-xl">{email}</p>
+                  <p className="text-sm text-muted-foreground mt-4">
+                    Bạn có muốn đăng nhập trên máy tính không?
+                  </p>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Mật khẩu</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Nhập mật khẩu"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10"
-                    required
-                    disabled={isSubmitting}
-                    autoComplete="current-password"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? "Ẩn" : "Hiện"}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button type="submit" className="flex-1" disabled={isSubmitting}>
-                  {isSubmitting ? "Đang xử lý..." : "Xác nhận đăng nhập"}
+              
+              <div className="flex gap-3">
+                <Button 
+                  onClick={handleCancel} 
+                  variant="outline" 
+                  className="flex-1" 
+                  size="lg"
+                  disabled={isSubmitting}
+                >
+                  Không
                 </Button>
-                <Button type="button" variant="outline" onClick={handleReset} disabled={isSubmitting}>
+                <Button 
+                  onClick={handleConfirmWithToken} 
+                  className="flex-1" 
+                  size="lg"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Đang xử lý..." : "Có"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {status === "not-logged-in" && (
+            <div className="space-y-4 text-center">
+              <div className="mx-auto w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center">
+                <Lock className="h-10 w-10 text-yellow-600" />
+              </div>
+              <div className="space-y-2">
+                <p className="font-semibold text-lg">Bạn chưa đăng nhập</p>
+                <p className="text-sm text-muted-foreground">
+                  Vui lòng đăng nhập trên mobile trước khi quét QR code
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Button 
+                  onClick={handleReset} 
+                  variant="outline" 
+                  className="flex-1"
+                >
                   Quét lại
                 </Button>
+                <Button 
+                  onClick={() => window.location.href = "/"} 
+                  className="flex-1"
+                >
+                  Đăng nhập ngay
+                </Button>
               </div>
-            </form>
+            </div>
           )}
 
           {status === "success" && (
@@ -322,7 +352,10 @@ const QrLogin = () => {
               </div>
               <p className="text-lg font-semibold text-green-600">Đăng nhập thành công!</p>
               <p className="text-sm text-muted-foreground">
-                Bạn có thể quay lại trình duyệt trên máy tính
+                Máy tính sẽ tự động đăng nhập
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Bạn có thể đóng trang này và quay lại máy tính
               </p>
             </div>
           )}

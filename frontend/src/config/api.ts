@@ -1,11 +1,37 @@
+// Helper function để detect base URL
+const getBaseUrl = (): string => {
+  // Nếu có environment variable, dùng nó
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+
+  // Production mode: dùng absolute URL
+  if (import.meta.env.PROD) {
+    return 'http://localhost:8080/api'; // Hoặc production URL
+  }
+
+  // Development mode: kiểm tra xem có đang truy cập từ network không
+  if (import.meta.env.DEV) {
+    const hostname = window.location.hostname;
+    
+    // Nếu không phải localhost (tức là truy cập từ IP/network), dùng IP của backend
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      // Lấy IP từ hostname hiện tại (frontend) và thay port thành 8080 (backend)
+      return `http://${hostname}:8080/api`;
+    }
+    
+    // Nếu là localhost, dùng proxy của Vite
+    return '/api';
+  }
+
+  return '/api';
+};
+
 // Cấu hình API
 export const API_CONFIG = {
   // URL của backend API Java Spring Boot
-  // Development: dùng relative path để đi qua Vite proxy (tránh CORS)
-  // Production: dùng absolute URL từ environment variable
-  BASE_URL: import.meta.env.DEV
-    ? '/api'  // Dev mode: dùng proxy của Vite
-    : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'), // Production: dùng absolute URL
+  // Tự động detect: localhost dùng proxy, network dùng direct IP
+  BASE_URL: getBaseUrl(),
   TIMEOUT: parseInt(import.meta.env.VITE_API_TIMEOUT || '10000'),
   
   // Endpoints - Spring Boot REST API

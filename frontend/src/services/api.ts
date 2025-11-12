@@ -149,8 +149,9 @@ const createApiInstance = (): AxiosInstance => {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
           localStorage.removeItem('user_email');
-          // Không redirect nếu đang ở trang login
-          if (!window.location.pathname.includes('/login')) {
+          // Không redirect nếu đang ở trang login hoặc QR login
+          if (!window.location.pathname.includes('/login') && 
+              !window.location.pathname.includes('/qr-login')) {
             window.location.href = '/login';
           }
         }

@@ -97,7 +97,7 @@ public class AuthServiceImpl implements AuthService {
 
         // Xóa OTP sau khi xác thực (để an toàn) - có thể fail nếu Redis không chạy
         try {
-            redisTemplate.delete("otp:" + user.getEmail());
+        redisTemplate.delete("otp:" + user.getEmail());
         } catch (DataAccessException e) {
             log.warn("⚠️ Không thể xóa OTP từ Redis (Redis không kết nối được): {}", e.getMessage());
             // Không throw exception - OTP đã được xóa trong OtpService rồi
@@ -115,7 +115,7 @@ public class AuthServiceImpl implements AuthService {
 
         // Lưu refresh token vào Redis (7 ngày) - có thể fail nếu Redis không chạy
         try {
-            redisTemplate.opsForValue().set("refresh:" + user.getEmail(), refreshToken, 7, TimeUnit.DAYS);
+        redisTemplate.opsForValue().set("refresh:" + user.getEmail(), refreshToken, 7, TimeUnit.DAYS);
             log.info("✅ Refresh token đã được lưu vào Redis cho: {}", user.getEmail());
         } catch (DataAccessException e) {
             log.warn("⚠️ Không thể lưu refresh token vào Redis (Redis không kết nối được): {}", e.getMessage());
@@ -170,7 +170,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void saveRefreshToken(String email, String refreshToken) {
         try {
-            redisTemplate.opsForValue().set("refresh:" + email, refreshToken, 7, TimeUnit.DAYS);
+        redisTemplate.opsForValue().set("refresh:" + email, refreshToken, 7, TimeUnit.DAYS);
             log.info("✅ Refresh token đã được lưu vào Redis cho: {}", email);
         } catch (DataAccessException e) {
             log.warn("⚠️ Không thể lưu refresh token vào Redis (Redis không kết nối được): {}", e.getMessage());
@@ -183,8 +183,8 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void logout(String email) {
         try {
-            redisTemplate.delete("refresh:" + email);
-            redisTemplate.delete("otp:" + email);
+        redisTemplate.delete("refresh:" + email);
+        redisTemplate.delete("otp:" + email);
             log.info("✅ Đã xóa refresh token và OTP từ Redis cho: {}", email);
         } catch (DataAccessException e) {
             log.warn("⚠️ Không thể xóa token từ Redis (Redis không kết nối được): {}", e.getMessage());

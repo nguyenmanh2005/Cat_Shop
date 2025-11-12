@@ -6,8 +6,9 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
+    host: "0.0.0.0", // Cho phép truy cập từ mọi network interface (localhost, LAN, etc.)
     port: 5173, // Đổi port về 5173 để tránh conflict với Spring Boot
+    strictPort: false, // Tự động tìm port khác nếu 5173 bị chiếm
     // Proxy để tránh CORS khi phát triển
     proxy: {
       '/api': {
