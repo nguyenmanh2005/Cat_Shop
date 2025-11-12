@@ -49,31 +49,24 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
     setIsLoading(true);
     
     try {
-      const success = await register({
+      await register({
         fullName: formData.fullName,
         email: formData.email,
         phone: formData.phone,
         password: formData.password,
       });
       
-      if (success) {
-        toast({
-          title: "Đăng ký thành công!",
-          description: "Vui lòng đăng nhập để tiếp tục",
-        });
-        // Chuyển sang form đăng nhập thay vì đóng modal
-        onSwitchToLogin();
-      } else {
-        toast({
-          title: "Đăng ký thất bại",
-          description: "Email này đã được sử dụng",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
       toast({
-        title: "Lỗi đăng ký",
-        description: "Đã xảy ra lỗi, vui lòng thử lại",
+        title: "Đăng ký thành công!",
+        description: "Tài khoản của bạn đã được tạo thành công",
+      });
+      // Chuyển sang form đăng nhập hoặc đóng modal nếu đã tự động đăng nhập
+      onSwitchToLogin();
+    } catch (error: any) {
+      const errorMessage = error.message || "Đã xảy ra lỗi, vui lòng thử lại";
+      toast({
+        title: "Đăng ký thất bại",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

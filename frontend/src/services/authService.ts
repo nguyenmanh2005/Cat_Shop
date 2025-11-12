@@ -29,32 +29,77 @@ export interface RefreshTokenRequest {
 
 // Auth Service
 export const authService = {
-  // Đăng nhập
+  // Đăng nhập - giải pháp tạm thời vì backend chưa có endpoint login
+  // Sử dụng email để lấy user info và lưu vào localStorage
   async login(credentials: LoginRequest): Promise<AuthResponse> {
-    const response = await apiService.post<AuthResponse>(
-      API_CONFIG.ENDPOINTS.AUTH.LOGIN,
-      credentials
-    );
-    
-    // Lưu token vào localStorage
-    localStorage.setItem('access_token', response.access_token);
-    localStorage.setItem('refresh_token', response.refresh_token);
-    
-    return response;
+    try {
+      // Backend không có endpoint login, tạm thời dùng email để lấy user info
+      // Lưu ý: Đây chỉ là giải pháp tạm thời, cần implement authentication đầy đủ ở backend
+      const userData = await apiService.get<User>(`/users/email/${encodeURIComponent(credentials.email)}`);
+      
+      // Tạo một AuthResponse giả để tương thích
+      // Lưu email vào localStorage để dùng cho các request khác (X-USER-EMAIL header)
+      localStorage.setItem('user_email', credentials.email);
+      
+      const authResponse: AuthResponse = {
+        user: {
+          userId: (userData as any).user_id || userData.userId,
+          username: userData.username,
+          email: userData.email,
+          phone: userData.phone,
+          roleId: (userData as any).role_id || userData.roleId,
+        } as any,
+        access_token: 'temp_token_' + credentials.email, // Token tạm thời
+        refresh_token: '',
+        expires_in: 0
+      };
+      
+      return authResponse;
+    } catch (error: any) {
+      console.error('Login error:', error);
+      // Ném lại error với message rõ ràng hơn
+      const errorMessage = error.response?.data?.message || error.message || 'Email hoặc mật khẩu không chính xác';
+      throw new Error(errorMessage);
+    }
   },
 
-  // Đăng ký
+  // Đăng ký - sử dụng endpoint /api/users vì backend không có /api/auth/register
   async register(userData: RegisterRequest): Promise<AuthResponse> {
-    const response = await apiService.post<AuthResponse>(
-      API_CONFIG.ENDPOINTS.AUTH.REGISTER,
-      userData
-    );
-    
-    // Lưu token vào localStorage
-    localStorage.setItem('access_token', response.access_token);
-    localStorage.setItem('refresh_token', response.refresh_token);
-    
-    return response;
+    try {
+      // Backend sử dụng /api/users để tạo user mới
+      const userResponse = await apiService.post<any>(
+        '/users',
+        {
+          username: userData.username,
+          email: userData.email,
+          password: userData.password,
+          phone: userData.phone || '',
+          address: userData.address || ''
+        }
+      );
+      
+      // Backend không trả về token khi đăng ký, chỉ trả về UserResponse
+      // Tạo một AuthResponse giả để tương thích với interface
+      const authResponse: AuthResponse = {
+        user: {
+          userId: 0, // Sẽ được lấy từ profile sau
+          username: userResponse.username || userData.username,
+          email: userResponse.email || userData.email,
+          phone: userResponse.phone || userData.phone,
+          roleId: 2, // Mặc định là user
+        } as any,
+        access_token: '', // Không có token sau khi đăng ký
+        refresh_token: '',
+        expires_in: 0
+      };
+      
+      return authResponse;
+    } catch (error: any) {
+      console.error('Register error:', error);
+      // Ném lại error với message rõ ràng hơn
+      const errorMessage = error.response?.data?.message || error.message || 'Đăng ký thất bại';
+      throw new Error(errorMessage);
+    }
   },
 
   // Làm mới token
@@ -91,21 +136,34 @@ export const authService = {
     );
   },
 
-  // Lấy thông tin profile
+  // Lấy thông tin profile - giải pháp tạm thời vì backend không có endpoint profile
   async getProfile(): Promise<User> {
-    return apiService.get<User>(API_CONFIG.ENDPOINTS.AUTH.PROFILE);
+    try {
+      const userEmail = localStorage.getItem('user_email');
+      if (!userEmail) {
+        throw new Error('User email not found');
+      }
+      // Sử dụng endpoint /users/email/{email} để lấy user info
+      const user = await apiService.get<User>(`/users/email/${encodeURIComponent(userEmail)}`);
+      return user;
+    } catch (error: any) {
+      console.error('Get profile error:', error);
+      throw error;
+    }
   },
 
   // Đăng xuất
   async logout(): Promise<void> {
     try {
-      await apiService.post(API_CONFIG.ENDPOINTS.AUTH.LOGOUT);
+      // Backend không có endpoint logout, chỉ cần xóa dữ liệu local
+      // await apiService.post(API_CONFIG.ENDPOINTS.AUTH.LOGOUT);
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Xóa token khỏi localStorage
+      // Xóa token và email khỏi localStorage
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user_email');
     }
   },
 

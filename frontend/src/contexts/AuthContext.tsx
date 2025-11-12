@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { authService } from "@/services/authService";
+import { apiService } from "@/services/api";
 import type { LoginRequest, RegisterRequest } from "@/services/authService";
 import { User } from "@/types";
 
@@ -51,16 +52,36 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     // Kiểm tra thông tin đăng nhập từ token khi component mount
     const checkAuthStatus = async () => {
       try {
-        if (authService.isAuthenticated()) {
-          // Nếu có token, lấy thông tin user từ API
-          const userData = await authService.getProfile();
-          setUser({
-            id: userData.user_id,
-            fullName: userData.username, // Sử dụng username làm fullName
-            email: userData.email,
-            phone: userData.phone,
-            role: userData.role_id === 1 ? 'admin' : 'user' // Giả sử role_id = 1 là admin
-          });
+        const userEmail = localStorage.getItem('user_email');
+        if (authService.isAuthenticated() && userEmail) {
+          // Nếu có token và email, lấy thông tin user từ API
+          try {
+            const userData = await authService.getProfile();
+            // Xử lý cả snake_case và camelCase
+            const userId = (userData as any).user_id || userData.userId;
+            const roleId = (userData as any).role_id || userData.roleId;
+            
+            setUser({
+              id: userId,
+              fullName: userData.username || '',
+              email: userData.email || '',
+              phone: userData.phone || '',
+              role: roleId === 1 ? 'admin' : 'user'
+            });
+          } catch (error) {
+            // Nếu getProfile fail, thử lấy từ email
+            const userData = await apiService.get<User>(`/users/email/${encodeURIComponent(userEmail)}`);
+            const userId = (userData as any).user_id || userData.userId;
+            const roleId = (userData as any).role_id || userData.roleId;
+            
+            setUser({
+              id: userId,
+              fullName: userData.username || '',
+              email: userData.email || '',
+              phone: userData.phone || '',
+              role: roleId === 1 ? 'admin' : 'user'
+            });
+          }
         }
       } catch (error) {
         console.error("Error checking auth status:", error);
@@ -78,19 +99,37 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const response = await authService.login({ email, password });
       
+      // Lấy thông tin user từ response hoặc từ profile API
+      let userData: User;
+      if (response.user) {
+        userData = response.user;
+      } else {
+        // Nếu response không có user, lấy từ profile API
+        userData = await authService.getProfile();
+      }
+      
+      // Xử lý cả snake_case và camelCase
+      const userId = (userData as any).user_id || userData.userId;
+      const username = userData.username || '';
+      const userEmail = userData.email || '';
+      const userPhone = userData.phone || '';
+      const roleId = (userData as any).role_id || userData.roleId;
+      
       // Cập nhật user state
       setUser({
-        id: response.user.user_id,
-        fullName: response.user.username,
-        email: response.user.email,
-        phone: response.user.phone,
-        role: response.user.role_id === 1 ? 'admin' : 'user'
+        id: userId,
+        fullName: username,
+        email: userEmail,
+        phone: userPhone,
+        role: roleId === 1 ? 'admin' : 'user'
       });
       
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
-      return false;
+      // Xóa token nếu có lỗi
+      authService.logout();
+      throw error; // Ném lại để component có thể xử lý
     }
   };
 
@@ -109,11 +148,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         address: '' // Có thể thêm field này vào form
       });
       
-      // Không tự động đăng nhập sau khi đăng ký
+      // Backend không tự động đăng nhập sau khi đăng ký
+      // User cần đăng nhập thủ công
+      // Không cần set user state ở đây
+      
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Register error:", error);
-      return false;
+      throw error; // Ném lại để component có thể xử lý
     }
   };
 
@@ -123,12 +165,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       // Lấy thông tin user từ API
       const userData = await authService.getProfile();
+      const userId = (userData as any).user_id || userData.userId;
+      const roleId = (userData as any).role_id || userData.roleId;
+      
       setUser({
-        id: userData.user_id,
-        fullName: userData.username,
-        email: userData.email,
-        phone: userData.phone,
-        role: userData.role_id === 1 ? 'admin' : 'user'
+        id: userId,
+        fullName: userData.username || '',
+        email: userData.email || '',
+        phone: userData.phone || '',
+        role: roleId === 1 ? 'admin' : 'user'
       });
       
       return true;

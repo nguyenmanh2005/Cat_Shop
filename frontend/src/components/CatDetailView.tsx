@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Product } from "@/types";
 import { productService } from "@/services/productService";
+import { apiService } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useCart } from "@/contexts/CartContext";
 import { ArrowLeft, ShoppingCart, Heart } from "lucide-react";
-import axios from "axios";
 import PublicReview from "./PublicReview";
 
 interface CatDetail {
@@ -21,6 +22,7 @@ const CatDetailView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { addItem } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
   const [catDetail, setCatDetail] = useState<CatDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,9 +48,9 @@ const CatDetailView = () => {
         if (productData.typeId === 1) {
           try {
             console.log("Loading cat details for ID:", id);
-            const response = await axios.get(`http://localhost:8080/api/cat-details/${id}`);
-            console.log("Cat details received:", response.data);
-            setCatDetail(response.data);
+            const response = await apiService.get(`/cat-details/${id}`);
+            console.log("Cat details received:", response);
+            setCatDetail(response);
           } catch (error) {
             console.error("Error loading cat details:", error);
           }
@@ -75,24 +77,23 @@ const CatDetailView = () => {
     }
   };
 
-  const handleAddToCart = async () => {
-    try {
-      await axios.post("http://localhost:8080/api/cart/add", {
-        productId: product?.productId,
-        quantity: quantity,
-      });
+  const handleAddToCart = () => {
+    if (!product) return;
 
-      toast({
-        title: "Thành công",
-        description: `Đã thêm ${quantity} ${product?.productName} vào giỏ hàng`,
-      });
-    } catch (error) {
+    if (quantity > product.stockQuantity) {
       toast({
         title: "Lỗi",
-        description: "Không thể thêm vào giỏ hàng",
+        description: `Số lượng vượt quá tồn kho. Chỉ còn ${product.stockQuantity} ${getStockUnit()}`,
         variant: "destructive",
       });
+      return;
     }
+
+    addItem(product, quantity);
+    toast({
+      title: "Thành công",
+      description: `Đã thêm ${quantity} ${product.productName} vào giỏ hàng`,
+    });
   };
 
   const formatPrice = (price: number) => {

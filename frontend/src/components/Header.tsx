@@ -1,4 +1,4 @@
-import { Search, Phone, Facebook, Instagram, Twitter, Youtube, Mail, User, ChevronDown } from "lucide-react";
+import { Search, Phone, Facebook, Instagram, Twitter, Youtube, Mail, User, ChevronDown, ShoppingCart } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,10 +7,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import logo from "@/assets/logo.png";
 import AuthModal from "./AuthModal";
 import ProfileMenu from "./ProfileMenu";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useCategories } from "@/hooks/useApi";
@@ -18,6 +20,7 @@ import { getCategoryDisplayName } from "@/utils/categoryMapping"; // 🔧 Import
 
 const Header = () => {
   const { isAuthenticated, isAdmin } = useAuth();
+  const { getTotalItems } = useCart();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const { categories, loading: categoriesLoading } = useCategories();
@@ -96,8 +99,27 @@ const Header = () => {
             </div>
           </div>
 
-          {/* Auth buttons or Profile menu */}
+          {/* Cart and Auth buttons or Profile menu */}
           <div className="flex items-center gap-2">
+            {/* Cart Icon */}
+            <Link to="/cart">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="relative"
+              >
+                <ShoppingCart className="h-5 w-5" />
+                {getTotalItems() > 0 && (
+                  <Badge
+                    variant="destructive"
+                    className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                  >
+                    {getTotalItems()}
+                  </Badge>
+                )}
+              </Button>
+            </Link>
+
             {isAuthenticated ? (
               <>
                 {isAdmin && (
@@ -172,16 +194,16 @@ const Header = () => {
                 ) : categories.length === 0 ? (
                   <div className="p-4 text-sm text-muted-foreground">Không có danh mục</div>
                 ) : (
-                        categories.map((category) => (
-                          <DropdownMenuItem key={category.categoryId} asChild>
-                            <Link
-                              to={`/pets?category=${category.categoryId}`}
-                              className="cursor-pointer px-4 py-2 hover:bg-accent hover:text-accent-foreground transition-colors"
-                            >
-                              {getCategoryDisplayName(category.categoryName)}
-                            </Link>
-                          </DropdownMenuItem>
-                        ))
+                  categories.map((category) => (
+                    <DropdownMenuItem key={`category-item-${category.categoryId}`} asChild>
+                      <Link
+                        to={`/pets?category=${category.categoryId}`}
+                        className="cursor-pointer px-4 py-2 hover:bg-accent hover:text-accent-foreground transition-colors block w-full"
+                      >
+                        {getCategoryDisplayName(category.categoryName)}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))
                 )}
               </DropdownMenuContent>
             </DropdownMenu>

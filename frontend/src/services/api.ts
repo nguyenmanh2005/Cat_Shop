@@ -11,12 +11,34 @@ const createApiInstance = (): AxiosInstance => {
     },
   });
 
-  // Request interceptor - thêm token vào header
+  // Request interceptor - thêm token và API key vào header
   instance.interceptors.request.use(
     (config) => {
       const token = localStorage.getItem('access_token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+      }
+      
+      // Thêm X-USER-EMAIL header cho các request cần authentication (backend yêu cầu)
+      const userEmail = localStorage.getItem('user_email');
+      
+      // Thêm API key và X-USER-EMAIL cho các request đến /api/users
+      if (config.url?.includes('/users')) {
+        // Loại trừ POST /api/users (đăng ký) và GET /api/users/email/{email} (login)
+        const isRegister = config.method?.toLowerCase() === 'post' && config.url === '/users';
+        const isLogin = config.url?.includes('/users/email/');
+        
+        if (!isRegister && !isLogin) {
+          // Các request GET/PUT/DELETE đến /api/users (trừ login) cần API key và email
+          config.headers['X-API-KEY'] = 'secret123';
+          if (userEmail) {
+            config.headers['X-USER-EMAIL'] = userEmail;
+          }
+        }
+        // POST /api/users (đăng ký) và GET /api/users/email/{email} (login) không cần header này
+      } else if (userEmail) {
+        // Các request khác cần X-USER-EMAIL nếu user đã đăng nhập
+        config.headers['X-USER-EMAIL'] = userEmail;
       }
       
       console.log('Making API request:', {

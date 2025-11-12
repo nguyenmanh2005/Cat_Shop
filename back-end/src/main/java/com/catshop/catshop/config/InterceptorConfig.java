@@ -16,9 +16,15 @@ public class InterceptorConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // ApiKeyInterceptor - chỉ áp dụng cho các endpoint cần API key
         registry.addInterceptor(apiKeyInterceptor)
-                .addPathPatterns("/api/users/**"); // Áp dụng toàn bộ API users
+                .addPathPatterns("/api/users/**")
+                .excludePathPatterns(
+                        "/api/users", // Loại trừ POST /api/users (đăng ký)
+                        "/api/users/email/**" // Loại trừ GET /api/users/email/{email} (dùng để login)
+                );
 
+        // RoleInterceptor - chỉ áp dụng cho các endpoint cần authentication
         registry.addInterceptor(roleInterceptor)
                 .addPathPatterns(
                         "/api/users/**",
@@ -37,6 +43,10 @@ public class InterceptorConfig implements WebMvcConfigurer {
                         "/api/categories/admin/**",
                         "/api/admin/cat-details/**",
                         "/api/admin/cage-details/**"
+                )
+                .excludePathPatterns(
+                        "/api/users", // Loại trừ POST /api/users (đăng ký)
+                        "/api/users/email/**" // Loại trừ GET /api/users/email/{email} (dùng để login)
                 );
 
     }

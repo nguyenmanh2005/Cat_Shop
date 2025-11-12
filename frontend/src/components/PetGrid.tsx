@@ -130,11 +130,11 @@ const PetGrid = () => {
                 <SelectValue placeholder="Chọn loại sản phẩm" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tất cả loại</SelectItem>
+                <SelectItem key="all-types" value="all">Tất cả loại</SelectItem>
                 {productTypes && productTypes.length > 0 ? (
                   productTypes.map((type) => (
                     <SelectItem
-                      key={type.typeId}
+                      key={`type-${type.typeId}`}
                       value={String(type.typeId)}
                     >
                       {type.typeName || 'Không có tên'}
@@ -153,16 +153,18 @@ const PetGrid = () => {
                 <SelectValue placeholder="Chọn danh mục" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tất cả danh mục</SelectItem>
+                <SelectItem key="all-categories" value="all">Tất cả danh mục</SelectItem>
                 {categories && categories.length > 0 ? (
-                  categories.map((category) => (
-                    <SelectItem
-                      key={category.categoryId}
-                      value={String(category.categoryId)}
-                    >
-                      {getCategoryDisplayName(category.categoryName || 'Không có tên')}
-                    </SelectItem>
-                  ))
+                  categories
+                    .filter((category) => category.categoryId != null) // Filter out undefined categoryId
+                    .map((category) => (
+                      <SelectItem
+                        key={`category-${category.categoryId}`}
+                        value={String(category.categoryId)}
+                      >
+                        {getCategoryDisplayName(category.categoryName || 'Không có tên')}
+                      </SelectItem>
+                    ))
                 ) : null}
               </SelectContent>
             </Select>
@@ -173,15 +175,15 @@ const PetGrid = () => {
                 <SelectValue placeholder="Sắp xếp" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="default">Mặc định</SelectItem>
-                <SelectItem value="price-low-high">
+                <SelectItem key="sort-default" value="default">Mặc định</SelectItem>
+                <SelectItem key="sort-price-low" value="price-low-high">
                   Giá: Thấp đến cao
                 </SelectItem>
-                <SelectItem value="price-high-low">
+                <SelectItem key="sort-price-high" value="price-high-low">
                   Giá: Cao đến thấp
                 </SelectItem>
-                <SelectItem value="name-a-z">Tên: A đến Z</SelectItem>
-                <SelectItem value="name-z-a">Tên: Z đến A</SelectItem>
+                <SelectItem key="sort-name-az" value="name-a-z">Tên: A đến Z</SelectItem>
+                <SelectItem key="sort-name-za" value="name-z-a">Tên: Z đến A</SelectItem>
               </SelectContent>
             </Select>
           </div>

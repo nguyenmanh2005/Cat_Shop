@@ -169,25 +169,18 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
 
     try {
       setIsLoading(true);
-      const success = await login(email, password);
+      await login(email, password);
       
-      if (success) {
-        toast({
-          title: "Đăng nhập thành công!",
-          description: "Chào mừng bạn quay trở lại với Cham Pets",
-        });
-        onClose();
-      } else {
-        toast({
-          title: "Đăng nhập thất bại",
-          description: "Email hoặc mật khẩu không chính xác",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
       toast({
-        title: "Lỗi đăng nhập",
-        description: "Đã xảy ra lỗi, vui lòng thử lại",
+        title: "Đăng nhập thành công!",
+        description: "Chào mừng bạn quay trở lại với Cham Pets",
+      });
+      onClose();
+    } catch (error: any) {
+      const errorMessage = error.message || "Email hoặc mật khẩu không chính xác";
+      toast({
+        title: "Đăng nhập thất bại",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

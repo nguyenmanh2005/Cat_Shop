@@ -54,7 +54,13 @@ export const productService = {
 
   // Lấy tất cả sản phẩm cho customer (public API)
   async getAllProductsCustomer(): Promise<Product[]> {
-    return apiService.get<Product[]>("/customer/products");
+    try {
+      return await apiService.get<Product[]>("/customer/products");
+    } catch (error: any) {
+      console.error("Error fetching products:", error);
+      // Trả về mảng rỗng nếu có lỗi để tránh crash
+      return [];
+    }
   }
 };
 

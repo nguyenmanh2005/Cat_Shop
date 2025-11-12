@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogOverlay, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { X } from "lucide-react";
 import LoginForm from "./LoginForm";
 import RegisterForm from "./RegisterForm";
@@ -34,10 +34,17 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogOverlay className="bg-black/50" />
       <DialogContent className="max-w-7xl w-full p-0 bg-transparent border-0 shadow-none max-h-[90vh] overflow-y-auto">
+        <DialogTitle className="sr-only">
+          {mode === "login" ? "Đăng nhập" : "Đăng ký"}
+        </DialogTitle>
+        <DialogDescription className="sr-only">
+          {mode === "login" ? "Đăng nhập vào tài khoản của bạn" : "Tạo tài khoản mới"}
+        </DialogDescription>
         <div className="relative">
           <button
             onClick={handleClose}
             className="absolute top-4 right-4 z-20 rounded-full bg-white border border-border p-2 hover:bg-muted transition-colors shadow-lg"
+            aria-label="Đóng"
           >
             <X className="h-5 w-5" />
           </button>

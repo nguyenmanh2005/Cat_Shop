@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Product } from '../types';
 import { useToast } from '../hooks/use-toast';
+import { useCart } from '../contexts/CartContext';
 import axios from 'axios';
 import { productService } from '../services/productService';
 
@@ -22,6 +23,7 @@ interface PaginatedResponse {
 
 const FoodDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const { addItem } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -136,24 +138,23 @@ const FoodDetails: React.FC = () => {
     }
   };
 
-  const handleAddToCart = async () => {
-    try {
-      await axios.post('/api/cart/add', {
-        productId: product?.productId,
-        quantity: quantity
-      });
-      
+  const handleAddToCart = () => {
+    if (!product) return;
+
+    if (quantity > product.stockQuantity) {
       toast({
-        title: "Success",
-        description: `Added ${quantity} ${product?.productName} to cart`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to add item to cart",
+        title: "Lỗi",
+        description: `Số lượng vượt quá tồn kho. Chỉ còn ${product.stockQuantity} sản phẩm`,
         variant: "destructive",
       });
+      return;
     }
+
+    addItem(product, quantity);
+    toast({
+      title: "Thành công",
+      description: `Đã thêm ${quantity} ${product.productName} vào giỏ hàng`,
+    });
   };
 
   if (loading) return (
