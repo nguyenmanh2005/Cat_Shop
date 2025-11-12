@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Product } from "@/types";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface CartItem {
   product: Product;
@@ -19,7 +20,9 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-const CART_STORAGE_KEY = "cat_shop_cart";
+const CART_KEY_PREFIX = "cat_shop_cart";
+const getCartStorageKey = (email?: string | null) =>
+  email ? `${CART_KEY_PREFIX}:${email}` : `${CART_KEY_PREFIX}:guest`;
 
 export const useCart = () => {
   const context = useContext(CartContext);
@@ -36,27 +39,31 @@ interface CartProviderProps {
 export const CartProvider = ({ children }: CartProviderProps) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
 
   // Load cart from localStorage on mount
   useEffect(() => {
     try {
-      const savedCart = localStorage.getItem(CART_STORAGE_KEY);
-      if (savedCart) {
-        setItems(JSON.parse(savedCart));
-      }
+      const email = isAuthenticated ? (user?.email ?? localStorage.getItem("user_email")) : null;
+      const key = getCartStorageKey(email);
+      const savedCart = localStorage.getItem(key);
+      setItems(savedCart ? JSON.parse(savedCart) : []);
     } catch (error) {
       console.error("Error loading cart from localStorage:", error);
+      setItems([]);
     }
-  }, []);
+  }, [isAuthenticated, user?.email]);
 
   // Save cart to localStorage whenever items change
   useEffect(() => {
     try {
-      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+      const email = isAuthenticated ? (user?.email ?? localStorage.getItem("user_email")) : null;
+      const key = getCartStorageKey(email);
+      localStorage.setItem(key, JSON.stringify(items));
     } catch (error) {
       console.error("Error saving cart to localStorage:", error);
     }
-  }, [items]);
+  }, [items, isAuthenticated, user?.email]);
 
   const addItem = (product: Product, quantity: number) => {
     setItems((prevItems) => {

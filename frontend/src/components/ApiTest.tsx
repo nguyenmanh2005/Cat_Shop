@@ -97,14 +97,14 @@ export const ApiTest: React.FC = () => {
 
     try {
       // Thử đăng nhập với tài khoản admin mặc định
-      const response = await authService.login({
+      const result = await authService.login({
         email: 'admin@catshop.com',
         password: 'admin123'
       });
       
       updateResult(results.length, {
         status: 'success',
-        message: `Đăng nhập thành công: ${response.user.username}`
+        message: result.success ? 'Đăng nhập thành công (thiết bị tin cậy)' : (result.requiresOtp ? (result.message || 'Thiết bị mới. OTP đã được gửi tới email.') : 'Đăng nhập thất bại')
       });
     } catch (error) {
       updateResult(results.length, {

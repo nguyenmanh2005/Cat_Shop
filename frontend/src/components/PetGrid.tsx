@@ -13,9 +13,11 @@ import { useProductTypes, useCategories } from "@/hooks/useApi";
 import { Product, ProductType, Category } from "@/types/index";
 import { productService } from "@/services/productService"; // 🆕 import trực tiếp service
 import { getCategoryDisplayName } from "@/utils/categoryMapping"; // 🔧 Import mapping utility
+import { useAuth } from "@/contexts/AuthContext";
 
 const PetGrid = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [sortBy, setSortBy] = useState("default");
   const [selectedType, setSelectedType] = useState<string>("all");
@@ -32,7 +34,11 @@ const PetGrid = () => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const data = await productService.getAllProductsCustomer(); // 🆕 dùng API customer
+        if (!isAuthenticated) {
+          setProducts([]);
+          return;
+        }
+        const data = await productService.getAllProductsCustomer();
         console.log("✅ PetGrid: Nhận được sản phẩm từ API:", data?.length || 0);
         setProducts(data || []);
       } catch (error) {
@@ -44,7 +50,7 @@ const PetGrid = () => {
     };
 
     fetchProducts();
-  }, []);
+  }, [isAuthenticated]);
 
   const breadcrumbItems = [
     { label: "TRANG CHỦ", href: "/" },
@@ -110,6 +116,18 @@ const PetGrid = () => {
           <div className="flex justify-center items-center h-64">
             <div className="text-lg">Đang tải...</div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex-1 p-6">
+        <div className="max-w-7xl mx-auto text-center py-12">
+          <p className="text-muted-foreground text-lg">
+            Vui lòng đăng nhập để xem sản phẩm.
+          </p>
         </div>
       </div>
     );

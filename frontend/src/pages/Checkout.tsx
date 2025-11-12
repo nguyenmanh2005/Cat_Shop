@@ -135,8 +135,8 @@ const Checkout = () => {
       // Step 1: Create order
       const orderData = {
         userId: user.id,
-        status: "PENDING", // PENDING, CONFIRMED, SHIPPING, DELIVERED, CANCELLED
-        totalAmount: Number(getTotalPrice().toFixed(2)), // Convert to number for backend
+        status: "PENDING",
+        totalAmount: Number(getTotalPrice().toFixed(2)),
       };
 
       const order = await apiService.post("/orders", orderData);

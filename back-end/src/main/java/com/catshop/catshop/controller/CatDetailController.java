@@ -16,7 +16,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin("*")
 @Validated
 @AllArgsConstructor
 public class CatDetailController {

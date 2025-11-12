@@ -35,13 +35,19 @@ const LoginTest = () => {
     setError('');
 
     try {
-      const success = await login(formData.email, formData.password);
-      
-      if (success) {
+      const result = await login(formData.email, formData.password);
+
+      if (result.success) {
         navigate('/admin');
-      } else {
-        setError('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+        return;
       }
+
+      if (result.requiresOtp) {
+        setError(result.message || 'Thiết bị mới. Vui lòng kiểm tra email để lấy mã OTP.');
+        return;
+      }
+
+      setError('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
     } catch (error) {
       setError('Có lỗi xảy ra khi đăng nhập.');
       console.error('Login error:', error);

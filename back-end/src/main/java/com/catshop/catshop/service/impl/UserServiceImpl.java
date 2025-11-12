@@ -12,6 +12,8 @@ import com.catshop.catshop.repository.UserRepository;
 import com.catshop.catshop.service.UserService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -24,6 +26,12 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final RoleRepository roleRepository;
 
+
+    @Override
+    public Page<UserResponse> getAllUser(Pageable pageable) {
+        Page<User> userPage = userRepository.findAll(pageable);
+        return userPage.map(userMapper::FromUserToUserResponse);
+    }
 
     @Override
     public User getUserEntityByEmail(String email) {
@@ -54,27 +62,6 @@ public class UserServiceImpl implements UserService {
                         .orElseThrow(() -> new BadRequestException(
                                 "Không tìm thấy tài khoản với email là: " + email))
         );
-    }
-
-    @Override
-    @Transactional
-    public UserResponse insertUser(UserRequest userRequest) {
-        if (userRepository.findByEmail(userRequest.getEmail()).isPresent()) {
-            throw new ResourceNotFoundException("Email đã tồn tại: " + userRequest.getEmail());
-        }
-
-        if (userRepository.findByPhoneNumber(userRequest.getPhone()).isPresent()) {
-            throw new ResourceNotFoundException("Số điện thoại đã tồn tại: " + userRequest.getPhone());
-        }
-
-        Role role = roleRepository.findById(1L)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Role với id: " + 1L));
-
-        User user = userMapper.FromUserRequestToUser(userRequest);
-        user.setRole(role);
-
-        User savedUser = userRepository.save(user);
-        return userMapper.FromUserToUserResponse(savedUser);
     }
 
     @Override

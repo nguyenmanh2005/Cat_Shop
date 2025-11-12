@@ -2,13 +2,15 @@ package com.catshop.catshop.service;
 
 import com.catshop.catshop.dto.request.ProductRequest;
 import com.catshop.catshop.dto.response.ProductResponse;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
 
 public interface ProductService {
 
     // ADMIN
-    ProductResponse createProduct(ProductRequest request);
-    ProductResponse updateProduct(Long id, ProductRequest request);
+    ProductResponse createProductWithFile(ProductRequest request, MultipartFile file);
+    ProductResponse updateProduct(Long id, ProductRequest request, MultipartFile file);
     void deleteProduct(Long id);
 
     // CUSTOMER & ADMIN

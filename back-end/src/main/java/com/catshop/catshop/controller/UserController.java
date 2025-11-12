@@ -3,7 +3,8 @@ package com.catshop.catshop.controller;
 import com.catshop.catshop.dto.request.UserRequest;
 import com.catshop.catshop.dto.response.ApiResponse;
 import com.catshop.catshop.dto.response.UserResponse;
-import com.catshop.catshop.service.impl.UserServiceImpl;
+import com.catshop.catshop.service.AuthService;
+import com.catshop.catshop.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -17,7 +18,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserController {
 
-    private final UserServiceImpl userServiceImpl;
+    private final UserService userServiceImpl;
+    private final AuthService authService;
 
     // Get All User from database checked
     @GetMapping("/getAll")
@@ -44,13 +46,6 @@ public class UserController {
         return ResponseEntity.ok(
                 ApiResponse.success(userResponse,"User found successfully")
         );
-    }
-
-    // Tạo user mới  checked
-    @PostMapping
-    public ResponseEntity<ApiResponse<UserResponse>> insertUser(@Valid @RequestBody UserRequest request) {
-        UserResponse userResponse = userServiceImpl.insertUser(request);
-        return ResponseEntity.ok(ApiResponse.success(userResponse,"User created successfully"));
     }
 
     // Update user theo id

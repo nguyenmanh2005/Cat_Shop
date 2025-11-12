@@ -17,8 +17,10 @@ import {
 import { Link } from "react-router-dom";
 import { productService } from "@/services/productService";
 import { Product } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
+  const { isAuthenticated } = useAuth();
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -41,13 +43,17 @@ const Index = () => {
       ogDescription.setAttribute('content', 'Cham Pets - Chuyên cung cấp mèo cảnh chất lượng cao, dịch vụ chăm sóc và yêu thương mèo tận tâm.');
     }
 
-    // Load featured products
+    // Load featured products theo trạng thái đăng nhập
     loadFeaturedProducts();
-  }, []);
+  }, [isAuthenticated]);
 
   const loadFeaturedProducts = async () => {
     try {
       setLoading(true);
+      if (!isAuthenticated) {
+        setFeaturedProducts([]);
+        return;
+      }
       const products = await productService.getAllProductsCustomer();
       // Lấy 8 sản phẩm đầu tiên để hiển thị
       setFeaturedProducts(products.slice(0, 8));
@@ -176,6 +182,10 @@ const Index = () => {
             {loading ? (
               <div className="flex justify-center items-center h-64">
                 <div className="text-lg text-muted-foreground">Đang tải sản phẩm...</div>
+              </div>
+            ) : !isAuthenticated ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="text-lg text-muted-foreground">Vui lòng đăng nhập để xem sản phẩm</div>
               </div>
             ) : featuredProducts.length > 0 ? (
               <>

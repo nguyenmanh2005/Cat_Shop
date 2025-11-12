@@ -3,14 +3,18 @@ package com.catshop.catshop.service.impl;
 import com.catshop.catshop.dto.request.ProductRequest;
 import com.catshop.catshop.dto.response.ProductResponse;
 import com.catshop.catshop.entity.*;
+import com.catshop.catshop.exception.BadRequestException;
 import com.catshop.catshop.exception.ResourceNotFoundException;
 import com.catshop.catshop.mapper.ProductMapper;
 import com.catshop.catshop.repository.*;
+import com.catshop.catshop.service.FileStorageService;
 import com.catshop.catshop.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -23,38 +27,47 @@ public class ProductServiceImpl implements ProductService {
     private final ProductTypeRepository productTypeRepository;
     private final CategoryRepository categoryRepository;
     private final ProductMapper productMapper;
+    private final FileStorageService fileStorageService;
 
     // ====================== ADMIN ======================
+
     @Override
-    public ProductResponse createProduct(ProductRequest request) {
+    public ProductResponse createProductWithFile(ProductRequest request, MultipartFile file) {
         ProductType type = productTypeRepository.findById(request.getTypeId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy loại sản phẩm (typeId=" + request.getTypeId() + ")"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy loại sản phẩm"));
 
         Category category = null;
         if (request.getCategoryId() != null) {
             category = categoryRepository.findById(request.getCategoryId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục (categoryId=" + request.getCategoryId() + ")"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục"));
         }
 
         Product product = productMapper.toEntity(request);
         product.setProductType(type);
         product.setCategory(category);
 
+        try {
+            String imageUrl = fileStorageService.saveFile(file,product.getProductName());
+            product.setImageUrl(imageUrl);
+        } catch (IOException e) {
+            throw new BadRequestException("Lưu file thất bại: " + e.getMessage());
+        }
+
         return productMapper.toDto(productRepository.save(product));
     }
 
     @Override
-    public ProductResponse updateProduct(Long id, ProductRequest request) {
+    public ProductResponse updateProduct(Long id, ProductRequest request, MultipartFile file) {
         Product existing = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm (id=" + id + ")"));
 
         ProductType type = productTypeRepository.findById(request.getTypeId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy loại sản phẩm (typeId=" + request.getTypeId() + ")"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy loại sản phẩm"));
 
         Category category = null;
         if (request.getCategoryId() != null) {
             category = categoryRepository.findById(request.getCategoryId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục (categoryId=" + request.getCategoryId() + ")"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục"));
         }
 
         existing.setProductName(request.getProductName());
@@ -63,7 +76,20 @@ public class ProductServiceImpl implements ProductService {
         existing.setPrice(request.getPrice());
         existing.setStockQuantity(request.getStockQuantity());
         existing.setDescription(request.getDescription());
-        existing.setImageUrl(request.getImageUrl());
+
+        if (file != null && !file.isEmpty()) {
+            try {
+                // Xóa file cũ nếu có
+                if (existing.getImageUrl() != null) {
+                    fileStorageService.deleteFile(existing.getImageUrl());
+                }
+                // Lưu file mới
+                String imageUrl = fileStorageService.saveFile(file,existing.getProductName());
+                existing.setImageUrl(imageUrl);
+            } catch (IOException e) {
+                throw new BadRequestException("Lưu file thất bại: " + e.getMessage());
+            }
+        }
 
         return productMapper.toDto(productRepository.save(existing));
     }
@@ -72,10 +98,17 @@ public class ProductServiceImpl implements ProductService {
     public void deleteProduct(Long id) {
         Product existing = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm (id=" + id + ")"));
+
+        // Xóa file ảnh khỏi local
+        if (existing.getImageUrl() != null) {
+            fileStorageService.deleteFile(existing.getImageUrl());
+        }
+
         productRepository.delete(existing);
     }
 
     // ====================== CUSTOMER ======================
+
     @Override
     public List<ProductResponse> getAllProducts() {
         return productMapper.toDtoList(productRepository.findAllAvailableProducts());

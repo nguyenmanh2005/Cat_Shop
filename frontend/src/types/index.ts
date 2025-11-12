@@ -15,6 +15,13 @@ export interface User {
   role?: Role;
 }
 
+export interface UserProfile {
+  username: string;
+  email: string;
+  phone?: string;
+  address?: string;
+}
+
 export interface ProductType {
   typeId: number;
   typeName: string;
