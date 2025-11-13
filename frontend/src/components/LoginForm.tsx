@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/authService";
 import { QRCodeSVG } from "qrcode.react";
+import ForgotPasswordForm from "./ForgotPasswordForm";
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
@@ -20,6 +21,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   const { toast } = useToast();
 
   const [loginMode, setLoginMode] = useState<LoginMode>("email");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -34,6 +36,12 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   const [qrStatus, setQrStatus] = useState<"pending" | "approved" | "expired">("pending");
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Mở popup đăng nhập Google thông qua OAuth2 backend
+  const handleGoogleLogin = () => {
+    const googleOAuthUrl = "http://localhost:8080/oauth2/authorization/google";
+    window.open(googleOAuthUrl, "google-oauth", "width=500,height=600,status=1");
+  };
 
   useEffect(() => {
     if (pendingEmail) {
@@ -376,6 +384,16 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     </div>
   );
 
+  // Hiển thị form quên mật khẩu
+  if (showForgotPassword) {
+    return (
+      <ForgotPasswordForm
+        onBack={() => setShowForgotPassword(false)}
+        onClose={onClose}
+      />
+    );
+  }
+
   return (
     <div className="bg-white rounded-2xl shadow-xl overflow-hidden grid grid-cols-1 lg:grid-cols-2">
       <div className="bg-gradient-to-br from-blue-600 to-blue-800 p-8 lg:p-12 flex flex-col justify-between text-white relative overflow-hidden">
@@ -416,54 +434,89 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
           {renderTabs()}
 
           {loginMode === "email" && (
-            <form onSubmit={handleEmailPasswordLogin} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Nhập email của bạn"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
-                    required
-                    disabled={isLoading}
-                  />
+            <div className="space-y-6">
+              <form onSubmit={handleEmailPasswordLogin} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="Nhập email của bạn"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10"
+                      required
+                      disabled={isLoading}
+                    />
+                  </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Mật khẩu</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Nhập mật khẩu"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-10 pr-10"
+                      required
+                      disabled={isLoading}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
+                </Button>
+              </form>
+
+              <div className="flex items-center gap-3 text-xs font-medium uppercase text-muted-foreground">
+                <span className="h-px w-full bg-muted"></span>
+                <span>Hoặc</span>
+                <span className="h-px w-full bg-muted"></span>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Mật khẩu</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Nhập mật khẩu"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10"
-                    required
-                    disabled={isLoading}
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:shadow-md"
+              >
+                <svg aria-hidden="true" focusable="false" className="h-5 w-5" viewBox="0 0 24 24">
+                  <path
+                    fill="#EA4335"
+                    d="M12 10.2v3.6h5.1c-.2 1.2-.9 2.3-1.9 3l3.1 2.4c1.8-1.6 2.8-3.9 2.8-6.6 0-.6-.1-1.2-.2-1.8H12z"
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-                  </Button>
-                </div>
-              </div>
-
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
-              </Button>
-            </form>
+                  <path
+                    fill="#34A853"
+                    d="M6.6 14.3l-.9.7-2.5 1.9C5.1 19.7 8.3 21.6 12 21.6c3 0 5.5-1 7.3-2.7l-3.1-2.4c-.9.6-2 .9-3.2.9-2.4 0-4.4-1.6-5.1-3.8z"
+                  />
+                  <path
+                    fill="#4A90E2"
+                    d="M3.2 6.9 5.7 8.8c.7-2.2 2.7-3.7 5.1-3.7 1.5 0 2.8.5 3.8 1.4l2.8-2.8C15.9 2 14 1.2 12 1.2 8.3 1.2 5.1 3 3.2 6.9z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M12 3.6c-2.4 0-4.4 1.5-5.1 3.7l-2.5-1.9C5.1 3 8.3 1.2 12 1.2c2 0 3.9.8 5.3 2.3l-2.8 2.8c-1-.9-2.3-1.4-3.8-1.4z"
+                  />
+                  <path fill="none" d="M1 1h22v22H1z" />
+                </svg>
+                <span>Đăng nhập bằng Google</span>
+              </button>
+            </div>
           )}
 
           {loginMode === "otp" && (
@@ -614,7 +667,12 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
           )}
 
           <div className="flex items-center justify-between pt-4 border-t">
-            <Button variant="link" className="p-0 h-auto text-sm">
+            <Button 
+              variant="link" 
+              className="p-0 h-auto text-sm"
+              onClick={() => setShowForgotPassword(true)}
+              type="button"
+            >
               Quên mật khẩu?
             </Button>
             <Button variant="link" className="p-0 h-auto text-sm font-medium" onClick={onSwitchToRegister}>
