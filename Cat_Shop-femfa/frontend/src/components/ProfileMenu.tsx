@@ -1,4 +1,4 @@
-import { User, LogOut, Settings, Heart } from "lucide-react";
+import { User, LogOut, Settings, Heart, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -68,6 +68,10 @@ const ProfileMenu = () => {
         <DropdownMenuItem>
           <Settings className="mr-2 h-4 w-4" />
           <span>Cài đặt</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/security")}>
+          <Shield className="mr-2 h-4 w-4" />
+          <span>Bảo mật</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} className="text-red-600">

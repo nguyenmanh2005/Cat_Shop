@@ -9,6 +9,7 @@ import VerificationMethodSelection from "./components/VerificationMethodSelectio
 import EmailOtpVerificationForm from "./components/EmailOtpVerificationForm";
 import QrCodeVerificationForm from "./components/QrCodeVerificationForm";
 import GoogleAuthenticatorVerificationForm from "./components/GoogleAuthenticatorVerificationForm";
+import BackupCodeVerificationForm from "./components/BackupCodeVerificationForm";
 import ProfilePage from "./components/ProfilePage";
 import { tokenStorage } from "./api/authService";
 
@@ -100,6 +101,11 @@ const AuthFlowApp = () => {
       <Route
         path="/verify/google-authenticator"
         element={<GoogleAuthenticatorVerificationForm />}
+      />
+
+      <Route
+        path="/verify/backup-code"
+        element={<BackupCodeVerificationForm />}
       />
 
       <Route

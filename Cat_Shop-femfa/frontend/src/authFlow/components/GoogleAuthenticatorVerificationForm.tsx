@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { authService } from "../api/authService";
 import ErrorAlert from "./ErrorAlert";
 
@@ -10,6 +10,7 @@ type GoogleAuthenticatorFormValues = {
 
 const GoogleAuthenticatorVerificationForm = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     register,
     handleSubmit,
@@ -19,6 +20,8 @@ const GoogleAuthenticatorVerificationForm = () => {
   const [email, setEmail] = useState<string | null>(null);
   const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
   const [checkingMfa, setCheckingMfa] = useState(false);
+  // Tự động chọn tab backup code nếu điều hướng từ link "Dùng Backup Code"
+  const [codeType, setCodeType] = useState<"google-auth" | "backup-code">("google-auth");
 
   useEffect(() => {
     const storedEmail = sessionStorage.getItem("authFlow.pendingEmail");
@@ -28,7 +31,12 @@ const GoogleAuthenticatorVerificationForm = () => {
     }
     setEmail(storedEmail);
     checkMfaStatus();
-  }, [navigate]);
+    
+    // Nếu có state useBackupCode, tự động chọn tab backup code
+    if ((location.state as { useBackupCode?: boolean })?.useBackupCode) {
+      setCodeType("backup-code");
+    }
+  }, [navigate, location.state]);
 
   // Kiểm tra trạng thái MFA
   const checkMfaStatus = async () => {
@@ -85,9 +93,37 @@ const GoogleAuthenticatorVerificationForm = () => {
             </button>
             <h2 className="text-2xl font-semibold text-white mb-2">Xác minh bằng Google Authenticator</h2>
             <p className="text-slate-300 text-sm">
-              Nhập mã từ ứng dụng Google Authenticator để xác minh tài khoản
+              Chọn phương thức xác minh: mã từ ứng dụng Google Authenticator hoặc Backup Code
             </p>
           </div>
+
+          {/* Tabs để chọn loại mã */}
+          {mfaEnabled && (
+            <div className="flex gap-2 rounded-lg bg-slate-700 p-1">
+              <button
+                type="button"
+                onClick={() => setCodeType("google-auth")}
+                className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition ${
+                  codeType === "google-auth"
+                    ? "bg-purple-600 text-white"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                Google Authenticator
+              </button>
+              <button
+                type="button"
+                onClick={() => setCodeType("backup-code")}
+                className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition ${
+                  codeType === "backup-code"
+                    ? "bg-purple-600 text-white"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                Backup Code
+              </button>
+            </div>
+          )}
 
           {checkingMfa ? (
             <div className="text-center py-12">
@@ -127,18 +163,71 @@ const GoogleAuthenticatorVerificationForm = () => {
           ) : (
             <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-300">Mã Google Authenticator</label>
-                <input
-                  type="text"
-                  className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-sm uppercase tracking-[0.3em] text-white placeholder-slate-400 focus:border-purple-500 focus:outline-none"
-                  placeholder="123456"
-                  {...register("code", {
-                    required: "Vui lòng nhập mã xác thực",
-                    minLength: { value: 6, message: "Mã gồm 6 ký tự" },
-                    maxLength: { value: 6, message: "Mã gồm 6 ký tự" },
-                  })}
-                />
-                {errors.code && <p className="mt-1 text-xs text-red-400">{errors.code.message}</p>}
+                <label className="mb-1 block text-sm font-medium text-slate-300">
+                  {codeType === "google-auth" ? "Mã Google Authenticator" : "Backup Code"}
+                </label>
+                
+                {codeType === "google-auth" ? (
+                  <>
+                    <input
+                      type="text"
+                      className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-center text-2xl tracking-[0.6em] text-white placeholder-slate-400 focus:border-purple-500 focus:outline-none"
+                      placeholder="123456"
+                      maxLength={6}
+                      {...register("code", {
+                        required: "Vui lòng nhập mã Google Authenticator",
+                        pattern: {
+                          value: /^\d{6}$/,
+                          message: "Mã phải là 6 chữ số",
+                        },
+                      })}
+                      onChange={(e) => {
+                        // Chỉ cho phép số
+                        e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 6);
+                        register("code").onChange(e);
+                      }}
+                    />
+                    {errors.code && <p className="mt-1 text-xs text-red-400">{errors.code.message}</p>}
+                    <p className="mt-2 text-xs text-slate-400">
+                      Mở ứng dụng Google Authenticator và nhập mã 6 chữ số hiện tại
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-center text-lg font-mono uppercase tracking-[0.3em] text-white placeholder-slate-400 focus:border-purple-500 focus:outline-none"
+                      placeholder="XXXX-XXXX"
+                      maxLength={9}
+                      {...register("code", {
+                        required: "Vui lòng nhập Backup Code",
+                        pattern: {
+                          value: /^[A-Z0-9]{4}-[A-Z0-9]{4}$/,
+                          message: "Backup Code phải có format XXXX-XXXX",
+                        },
+                      })}
+                      onChange={(e) => {
+                        // Tự động format backup code
+                        let value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+                        // Thêm dấu gạch ngang sau 4 ký tự
+                        if (value.length > 4 && !value.includes('-')) {
+                          value = value.slice(0, 4) + '-' + value.slice(4, 8);
+                        }
+                        e.target.value = value;
+                        register("code").onChange(e);
+                      }}
+                    />
+                    {errors.code && <p className="mt-1 text-xs text-red-400">{errors.code.message}</p>}
+                    <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                      <p className="text-xs text-amber-300 mb-1">
+                        <strong>💡 Lưu ý:</strong> Backup Code là mã dự phòng bạn đã lưu khi bật MFA
+                      </p>
+                      <p className="text-xs text-amber-400">
+                        Mỗi mã chỉ dùng được 1 lần. Nếu bạn chưa có backup code, hãy sử dụng mã Google Authenticator.
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
 
               <button

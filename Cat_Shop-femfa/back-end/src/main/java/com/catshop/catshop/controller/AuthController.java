@@ -25,6 +25,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @Slf4j
@@ -38,6 +39,7 @@ public class AuthController {
     private final MfaService mfaService;
     private final DeviceService deviceService;
     private final QrLoginService qrLoginService;
+    private final com.catshop.catshop.service.BackupCodeService backupCodeService;
 
     // ✅ Bước 1: Login (gửi OTP nếu thiết bị lạ)
     @PostMapping("/login")
@@ -164,10 +166,28 @@ public class AuthController {
             throw new BadRequestException("User chưa kích hoạt MFA");
         }
 
-        boolean ok = mfaService.verifyCode(user.getMfaSecret(), request.getCode());
+        String code = request.getCode();
+        boolean ok = false;
+        String verificationMethod = "";
+
+        // Kiểm tra xem code có phải là backup code không (format: XXXX-XXXX)
+        if (code != null && code.matches("^[A-Z0-9]{4}-[A-Z0-9]{4}$")) {
+            // Thử verify bằng backup code
+            ok = backupCodeService.verifyBackupCode(user, code);
+            verificationMethod = "backup code";
+        } else {
+            // Thử verify bằng Google Authenticator code (6 số)
+            try {
+                int mfaCode = Integer.parseInt(code);
+                ok = mfaService.verifyCode(user.getMfaSecret(), mfaCode);
+                verificationMethod = "Google Authenticator";
+            } catch (NumberFormatException e) {
+                ok = false;
+            }
+        }
 
         if (!ok) {
-            throw new BadRequestException("Mã MFA không hợp lệ");
+            throw new BadRequestException("Mã xác thực không hợp lệ. Vui lòng kiểm tra lại mã Google Authenticator hoặc backup code.");
         }
 
         String accessToken = authService.generateAccessTokenForUser(user);
@@ -175,13 +195,17 @@ public class AuthController {
         authService.saveRefreshToken(user.getEmail(), refreshToken);
 
         TokenResponse tokenResponse = new TokenResponse(accessToken, refreshToken, false);
-        return ResponseEntity.ok(ApiResponse.success(tokenResponse, "Đăng nhập thành công (MFA)"));
+        String message = verificationMethod.equals("backup code") 
+            ? "Đăng nhập thành công (Backup Code). Mã này đã được sử dụng và không thể dùng lại."
+            : "Đăng nhập thành công (MFA)";
+        
+        return ResponseEntity.ok(ApiResponse.success(tokenResponse, message));
     }
 
 
 
     @PostMapping("/mfa/enable")
-    public ResponseEntity<ApiResponse<Map<String, String>>> enableMfa(@RequestParam String email) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> enableMfa(@RequestParam String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -193,9 +217,18 @@ public class AuthController {
         // Tạo QR code Base64 chuẩn, đảm bảo quét được
         String qrBase64 = mfaService.generateQrBase64(user.getEmail(), secret);
 
+        // Tự động tạo backup codes khi bật MFA
+        java.util.List<String> backupCodes = backupCodeService.generateBackupCodes(user, 10);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("secret", secret);
+        response.put("qrBase64", qrBase64);
+        response.put("backupCodes", backupCodes);
+        response.put("backupCodesCount", backupCodes.size());
+
         return ResponseEntity.ok(ApiResponse.success(
-                Map.of("secret", secret, "qrBase64", qrBase64),
-                "MFA enabled. Scan QR code in Google Authenticator"
+                response,
+                "MFA enabled. Scan QR code in Google Authenticator. Lưu backup codes ở nơi an toàn."
         ));
     }
 

@@ -7,7 +7,7 @@ import lombok.Setter;
 @Setter
 public class MfaVerifyRequest {
     private String email;
-    private int code;
+    private String code; // Có thể là Google Authenticator code (6 số) hoặc Backup code (XXXX-XXXX)
 
 }
 

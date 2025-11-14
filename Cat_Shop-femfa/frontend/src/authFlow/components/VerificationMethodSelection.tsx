@@ -1,11 +1,33 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { authService } from "../api/authService";
 
-type VerificationMethod = "email-otp" | "qr-code" | "google-authenticator" | null;
+type VerificationMethod = "email-otp" | "qr-code" | "google-authenticator" | "backup-code" | null;
 
 const VerificationMethodSelection = () => {
   const navigate = useNavigate();
   const [selectedMethod, setSelectedMethod] = useState<VerificationMethod>(null);
+  const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
+  const [checkingMfa, setCheckingMfa] = useState(false);
+
+  // Kiểm tra trạng thái MFA khi component mount
+  useEffect(() => {
+    const checkMfaStatus = async () => {
+      const email = sessionStorage.getItem("authFlow.pendingEmail");
+      if (!email) return;
+      try {
+        setCheckingMfa(true);
+        const status = await authService.checkMfaStatus(email);
+        setMfaEnabled(status.mfaEnabled);
+      } catch (err) {
+        console.error("Không thể kiểm tra trạng thái MFA:", err);
+        setMfaEnabled(false);
+      } finally {
+        setCheckingMfa(false);
+      }
+    };
+    checkMfaStatus();
+  }, []);
 
   const handleMethodSelect = (method: VerificationMethod) => {
     setSelectedMethod(method);
@@ -29,6 +51,9 @@ const VerificationMethodSelection = () => {
         break;
       case "google-authenticator":
         navigate("/auth-flow/verify/google-authenticator", { replace: true });
+        break;
+      case "backup-code":
+        navigate("/auth-flow/verify/backup-code", { replace: true });
         break;
     }
   };
@@ -83,7 +108,7 @@ const VerificationMethodSelection = () => {
               </button>
             </div>
 
-            {/* Verification Methods */}
+            {/* Verification Methods - 4 options */}
             <div className="space-y-3">
               {/* Email OTP */}
               <button
@@ -141,6 +166,46 @@ const VerificationMethodSelection = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
+
+              {/* Backup Code - Hiển thị khi MFA đã được bật hoặc đang kiểm tra */}
+              {(mfaEnabled === true || checkingMfa || mfaEnabled === null) && (
+                <button
+                  onClick={() => handleMethodSelect("backup-code")}
+                  className="w-full bg-slate-700 hover:bg-slate-600 rounded-lg p-4 flex items-center gap-4 transition-colors border border-slate-600 hover:border-amber-500"
+                >
+                  <div className="h-12 w-12 rounded-lg bg-amber-500/20 border border-amber-500/50 flex items-center justify-center flex-shrink-0">
+                    <svg className="h-6 w-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-white font-semibold mb-1">Xác minh bằng Backup Code</h3>
+                    <p className="text-slate-400 text-sm">
+                      {mfaEnabled === true 
+                        ? "Nhập mã backup code đã lưu khi bật MFA" 
+                        : "Nhập mã backup code đã lưu"}
+                    </p>
+                  </div>
+                  <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              )}
+              
+              {/* Thông báo nếu MFA chưa được bật nhưng vẫn cho phép thử */}
+              {mfaEnabled === false && !checkingMfa && (
+                <div className="w-full bg-slate-700/50 rounded-lg p-4 flex items-center gap-4 border border-slate-600/50 opacity-75">
+                  <div className="h-12 w-12 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+                    <svg className="h-6 w-6 text-amber-400/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-slate-400 font-semibold mb-1">Xác minh bằng Backup Code</h3>
+                    <p className="text-slate-500 text-sm">Cần bật MFA trước để sử dụng backup code</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Back to login button */}

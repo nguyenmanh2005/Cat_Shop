@@ -11,6 +11,7 @@ import Blog from "./pages/Blog";
 import Pets from "./pages/Pets";
 import Admin from "./pages/Admin";
 import Profile from "./pages/Profile";
+import Security from "./pages/Security";
 import LoginTest from "./pages/LoginTest";
 import NotFound from "./pages/NotFound";
 import ProductDetail from "./pages/ProductDetail";
@@ -42,6 +43,7 @@ const App = () => (
               <Route path="/cat-food" element={<CatFood />} />
               <Route path="/cattail" element={<Cattail />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/security" element={<Security />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/admin/categories" element={<AdCate />} />
               <Route path="/login-test" element={<LoginTest />} />

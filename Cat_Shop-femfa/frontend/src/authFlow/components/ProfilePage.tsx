@@ -8,6 +8,10 @@ type GoogleAuthenticatorFormValues = {
   code: string;
 };
 
+type BackupCodeFormValues = {
+  backupCode: string;
+};
+
 const ProfilePage = () => {
   const navigate = useNavigate();
   const [qrBase64, setQrBase64] = useState<string | null>(null);
@@ -16,6 +20,11 @@ const ProfilePage = () => {
   const [mfaEnabled, setMfaEnabled] = useState<boolean | null>(null);
   const [checkingMfa, setCheckingMfa] = useState(false);
   const [verifyingCode, setVerifyingCode] = useState(false);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [showBackupCodes, setShowBackupCodes] = useState(false);
+  const [remainingBackupCodes, setRemainingBackupCodes] = useState<number>(0);
+  const [regeneratingCodes, setRegeneratingCodes] = useState(false);
+  const [showBackupCodeForm, setShowBackupCodeForm] = useState(false);
 
   const {
     register,
@@ -23,6 +32,13 @@ const ProfilePage = () => {
     formState: { errors },
     reset,
   } = useForm<GoogleAuthenticatorFormValues>();
+
+  const {
+    register: registerBackupCode,
+    handleSubmit: handleSubmitBackupCode,
+    formState: { errors: errorsBackupCode },
+    reset: resetBackupCode,
+  } = useForm<BackupCodeFormValues>();
 
   const accessToken = tokenStorage.getAccessToken();
   const refreshToken = tokenStorage.getRefreshToken();
@@ -46,6 +62,9 @@ const ProfilePage = () => {
         setCheckingMfa(true);
         const status = await authService.checkMfaStatus(email);
         setMfaEnabled(status.mfaEnabled);
+        if (status.remainingBackupCodes !== undefined) {
+          setRemainingBackupCodes(status.remainingBackupCodes);
+        }
       } catch (err) {
         console.error("Không thể kiểm tra trạng thái MFA:", err);
         setMfaEnabled(false);
@@ -76,6 +95,12 @@ const ProfilePage = () => {
       setQrBase64(null);
       const data = await authService.enableMfa(email);
       setQrBase64(data.qrBase64);
+      // Lưu backup codes nếu có
+      if (data.backupCodes && Array.isArray(data.backupCodes)) {
+        setBackupCodes(data.backupCodes);
+        setShowBackupCodes(true);
+        setRemainingBackupCodes(data.backupCodes.length);
+      }
       // Cập nhật trạng thái MFA sau khi bật thành công
       setMfaEnabled(true);
     } catch (err) {
@@ -86,6 +111,33 @@ const ProfilePage = () => {
       setError("Không thể bật MFA. Vui lòng thử lại.");
     } finally {
       setLoadingQr(false);
+    }
+  };
+
+  // Tạo lại backup codes
+  const handleRegenerateBackupCodes = async () => {
+    if (!email || email === "Chưa xác định") {
+      setError("Không tìm thấy email. Vui lòng đăng nhập lại.");
+      return;
+    }
+    if (!window.confirm("Bạn có chắc muốn tạo lại backup codes? Các mã cũ sẽ bị vô hiệu hóa.")) {
+      return;
+    }
+    try {
+      setError(undefined);
+      setRegeneratingCodes(true);
+      const data = await authService.regenerateBackupCodes(email);
+      setBackupCodes(data.backupCodes);
+      setShowBackupCodes(true);
+      setRemainingBackupCodes(data.backupCodes.length);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+        return;
+      }
+      setError("Không thể tạo lại backup codes. Vui lòng thử lại.");
+    } finally {
+      setRegeneratingCodes(false);
     }
   };
 
@@ -101,6 +153,7 @@ const ProfilePage = () => {
       await authService.verifyMfa({ email, code });
       reset();
       setError(undefined);
+      setShowBackupCodeForm(false);
       // Có thể hiển thị thông báo thành công hoặc refresh trang
       alert("Xác minh Google Authenticator thành công!");
     } catch (err) {
@@ -112,6 +165,45 @@ const ProfilePage = () => {
     } finally {
       setVerifyingCode(false);
     }
+  };
+
+  // Xác minh Backup Code
+  const onVerifyBackupCode = async ({ backupCode }: BackupCodeFormValues) => {
+    if (!email || email === "Chưa xác định") {
+      setError("Không tìm thấy email. Vui lòng đăng nhập lại.");
+      return;
+    }
+    try {
+      setError(undefined);
+      setVerifyingCode(true);
+      await authService.verifyMfa({ email, code: backupCode });
+      resetBackupCode();
+      setError(undefined);
+      setShowBackupCodeForm(false);
+      // Cập nhật số lượng backup codes còn lại
+      const status = await authService.checkMfaStatus(email);
+      if (status.remainingBackupCodes !== undefined) {
+        setRemainingBackupCodes(status.remainingBackupCodes);
+      }
+      alert("Xác minh Backup Code thành công!");
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+        return;
+      }
+      setError("Backup Code không chính xác hoặc đã được sử dụng, vui lòng thử lại.");
+    } finally {
+      setVerifyingCode(false);
+    }
+  };
+
+  // Format backup code input (XXXX-XXXX)
+  const formatBackupCode = (value: string) => {
+    const cleaned = value.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+    if (cleaned.length <= 4) {
+      return cleaned;
+    }
+    return `${cleaned.slice(0, 4)}-${cleaned.slice(4, 8)}`;
   };
 
   // Gọi API logout và dọn dẹp token phía client
@@ -188,6 +280,133 @@ const ProfilePage = () => {
               </p>
             </div>
           )}
+
+          {/* Hiển thị Backup Codes */}
+          {showBackupCodes && backupCodes.length > 0 && (
+            <div className="mt-4 rounded-lg border-2 border-amber-400 bg-amber-50 p-4 shadow-lg">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <h3 className="text-sm font-bold text-amber-900">Backup Codes (Recovery Codes)</h3>
+                </div>
+                <button
+                  onClick={() => setShowBackupCodes(false)}
+                  className="text-xs text-amber-700 hover:text-amber-900 font-medium"
+                >
+                  Ẩn
+                </button>
+              </div>
+              
+              <div className="mb-3 rounded-lg bg-amber-100 p-3 border border-amber-300">
+                <p className="text-xs font-semibold text-amber-900 mb-1">
+                  ⚠️ <strong>QUAN TRỌNG: Lưu các mã này ngay bây giờ!</strong>
+                </p>
+                <p className="text-xs text-amber-800">
+                  • Mỗi mã chỉ dùng được <strong>1 lần</strong><br/>
+                  • Dùng khi <strong>không thể truy cập Google Authenticator</strong><br/>
+                  • Lưu ở nơi an toàn (ghi ra giấy, lưu file, password manager)
+                </p>
+              </div>
+
+              <div className="mb-3 rounded-lg bg-white p-4 border-2 border-amber-300">
+                <div className="grid grid-cols-2 gap-2">
+                  {backupCodes.map((code, index) => (
+                    <div
+                      key={index}
+                      className="rounded border-2 border-amber-400 bg-amber-50 px-3 py-2 text-center font-mono text-sm font-bold text-amber-900 select-all"
+                    >
+                      {code}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-amber-800">
+                  Còn lại: <span className="text-amber-900 text-base">{remainingBackupCodes}</span> mã
+                </p>
+                <button
+                  onClick={() => {
+                    // Tạo file text để download
+                    const content = `BACKUP CODES - CatShop\n\n` +
+                      `Lưu các mã này ở nơi an toàn. Mỗi mã chỉ dùng được 1 lần.\n\n` +
+                      backupCodes.map((code, i) => `${i + 1}. ${code}`).join('\n') +
+                      `\n\nNgày tạo: ${new Date().toLocaleString('vi-VN')}\n` +
+                      `Email: ${email}`;
+                    const blob = new Blob([content], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `catshop-backup-codes-${new Date().getTime()}.txt`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="flex items-center gap-1 rounded-lg border border-amber-600 bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-900 transition hover:bg-amber-200"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Tải xuống
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Quản lý Backup Codes */}
+          {mfaEnabled && (
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <svg className="h-4 w-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>
+                <h3 className="text-sm font-semibold text-slate-700">Quản lý Backup Codes</h3>
+              </div>
+              
+              <div className="mb-3 rounded-lg bg-white p-3 border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-600">Backup codes còn lại</p>
+                    <p className="text-lg font-bold text-slate-900">{remainingBackupCodes} / 10</p>
+                  </div>
+                  {remainingBackupCodes < 3 && remainingBackupCodes > 0 && (
+                    <div className="rounded-lg bg-amber-100 px-2 py-1">
+                      <p className="text-xs font-semibold text-amber-800">⚠️ Sắp hết!</p>
+                    </div>
+                  )}
+                  {remainingBackupCodes === 0 && (
+                    <div className="rounded-lg bg-red-100 px-2 py-1">
+                      <p className="text-xs font-semibold text-red-800">⚠️ Đã hết!</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {backupCodes.length > 0 && !showBackupCodes && (
+                  <button
+                    onClick={() => setShowBackupCodes(true)}
+                    className="w-full rounded-lg border-2 border-blue-500 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
+                  >
+                    👁️ Hiển thị Backup Codes
+                  </button>
+                )}
+                <button
+                  onClick={handleRegenerateBackupCodes}
+                  disabled={regeneratingCodes}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {regeneratingCodes ? "⏳ Đang tạo..." : "🔄 Tạo lại Backup Codes"}
+                </button>
+                <p className="text-xs text-slate-500 mt-1">
+                  ⚠️ Lưu ý: Tạo lại sẽ vô hiệu hóa tất cả các mã cũ
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -195,7 +414,7 @@ const ProfilePage = () => {
       <div className="mt-6 rounded-lg border border-slate-100 p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Xác minh tài khoản</h2>
         <p className="mt-2 text-sm text-slate-600">
-          Sử dụng Google Authenticator để xác minh tài khoản của bạn.
+          Chọn phương thức xác minh: Google Authenticator hoặc Backup Code.
         </p>
 
         {checkingMfa ? (
@@ -225,30 +444,105 @@ const ProfilePage = () => {
             </div>
           </div>
         ) : (
-          <form className="mt-4 space-y-4" onSubmit={handleSubmit(onVerifyGoogleAuthenticator)}>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Mã Google Authenticator</label>
-              <input
-                type="text"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm uppercase tracking-[0.3em] focus:border-blue-500 focus:outline-none"
-                placeholder="123456"
-                {...register("code", {
-                  required: "Vui lòng nhập mã xác thực",
-                  minLength: { value: 6, message: "Mã gồm 6 ký tự" },
-                  maxLength: { value: 6, message: "Mã gồm 6 ký tự" },
-                })}
-              />
-              {errors.code && <p className="mt-1 text-xs text-red-600">{errors.code.message}</p>}
+          <>
+            {/* Radio buttons để chọn phương thức xác minh */}
+            <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center gap-4">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="radio"
+                    name="verificationMethod"
+                    value="googleAuth"
+                    checked={!showBackupCodeForm}
+                    onChange={() => {
+                      setShowBackupCodeForm(false);
+                      resetBackupCode();
+                    }}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-slate-700">Google Authenticator</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="radio"
+                    name="verificationMethod"
+                    value="backupCode"
+                    checked={showBackupCodeForm}
+                    onChange={() => {
+                      setShowBackupCodeForm(true);
+                      reset();
+                    }}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-slate-700">Backup Code</span>
+                </label>
+              </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={verifyingCode}
-              className="inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              {verifyingCode ? "Đang xác minh..." : "Xác minh"}
-            </button>
-          </form>
+            {/* Form Google Authenticator */}
+            {!showBackupCodeForm && (
+              <form className="mt-4 space-y-4" onSubmit={handleSubmit(onVerifyGoogleAuthenticator)}>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Mã Google Authenticator</label>
+                  <input
+                    type="text"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm uppercase tracking-[0.3em] focus:border-blue-500 focus:outline-none"
+                    placeholder="123456"
+                    {...register("code", {
+                      required: "Vui lòng nhập mã xác thực",
+                      minLength: { value: 6, message: "Mã gồm 6 ký tự" },
+                      maxLength: { value: 6, message: "Mã gồm 6 ký tự" },
+                    })}
+                  />
+                  {errors.code && <p className="mt-1 text-xs text-red-600">{errors.code.message}</p>}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={verifyingCode}
+                  className="inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {verifyingCode ? "Đang xác minh..." : "Xác minh"}
+                </button>
+              </form>
+            )}
+
+            {/* Form Backup Code */}
+            {showBackupCodeForm && (
+              <form className="mt-4 space-y-4" onSubmit={handleSubmitBackupCode(onVerifyBackupCode)}>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Backup Code</label>
+                  <input
+                    type="text"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm uppercase tracking-[0.2em] font-mono focus:border-blue-500 focus:outline-none"
+                    placeholder="XXXX-XXXX"
+                    {...registerBackupCode("backupCode", {
+                      required: "Vui lòng nhập backup code",
+                      pattern: {
+                        value: /^[A-Z0-9]{4}-[A-Z0-9]{4}$/,
+                        message: "Định dạng: XXXX-XXXX (chữ và số)",
+                      },
+                      onChange: (e) => {
+                        e.target.value = formatBackupCode(e.target.value);
+                      },
+                    })}
+                    maxLength={9}
+                  />
+                  {errorsBackupCode.backupCode && (
+                    <p className="mt-1 text-xs text-red-600">{errorsBackupCode.backupCode.message}</p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={verifyingCode}
+                  className="inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {verifyingCode ? "Đang xác minh..." : "Xác minh"}
+                </button>
+              </form>
+            )}
+          </>
         )}
       </div>
 

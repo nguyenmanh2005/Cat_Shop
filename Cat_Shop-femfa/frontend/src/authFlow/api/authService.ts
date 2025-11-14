@@ -27,6 +27,8 @@ export type VerifyMfaPayload = {
 
 export type EnableMfaResponse = {
   qrBase64: string;
+  backupCodes?: string[];
+  backupCodesCount?: number;
 };
 
 export type AuthTokens = {
@@ -93,13 +95,35 @@ export const authService = {
     return data;
   },
   checkMfaStatus: async (email: string) => {
-    const { data } = await axiosInstance.get<{ mfaEnabled: boolean }>("/auth/mfa/status", {
+    const { data } = await axiosInstance.get<{ mfaEnabled: boolean; remainingBackupCodes?: number }>("/auth/mfa/status", {
       params: { email },
     });
     return data;
   },
   sendOtp: async (email: string) => {
     const { data } = await axiosInstance.post("/auth/send-otp", { email });
+    return data;
+  },
+  generateBackupCodes: async (email: string) => {
+    const { data } = await axiosInstance.post<{ backupCodes: string[]; count: number; message: string }>(
+      "/auth/mfa/backup-codes/generate",
+      null,
+      { params: { email } }
+    );
+    return data;
+  },
+  regenerateBackupCodes: async (email: string) => {
+    const { data } = await axiosInstance.post<{ backupCodes: string[]; count: number; message: string }>(
+      "/auth/mfa/backup-codes/regenerate",
+      null,
+      { params: { email } }
+    );
+    return data;
+  },
+  getBackupCodesCount: async (email: string) => {
+    const { data } = await axiosInstance.get<{ remainingCount: number }>("/auth/mfa/backup-codes/count", {
+      params: { email },
+    });
     return data;
   },
   logout: async () => {
