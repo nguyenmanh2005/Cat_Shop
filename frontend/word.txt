@@ -1,0 +1,192 @@
+FE ( TỰ TÌM HIỂU phần này)
+Ý tưởng cho FE gửi deviceId khi login với React + TailwindCSS như sau:
+1.	Tạo deviceId duy nhất: Khi người dùng mở lần đầu, FE tạo một UUID và lưu vào localStorage (hoặc cookie). Lần sau mở lại, lấy deviceId từ localStorage.
+2.	Gửi cùng login request: Khi user submit form login, kèm deviceId trong body JSON tới backend cùng email và password.
+3.	Backend xác định thiết bị: Nếu thiết bị chưa tin cậy, backend gửi OTP; nếu đã tin cậy, cấp token luôn.
+4.	Xử lý MFA: Nếu user bật MFA, FE hiển thị input nhập mã Google Authenticator; backend sẽ dùng deviceId để đánh dấu thiết bị sau khi MFA thành công.
+5.	Lưu deviceId lâu dài: Không xóa khi logout, giúp nhận diện thiết bị quen thuộc lần sau; có thể reset nếu user muốn.
+Nói ngắn gọn: FE tạo + lưu deviceId → gửi kèm login → backend quyết định OTP hay token → MFA nếu cần → đánh dấu thiết bị trusted.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+🧩 1️⃣ Đăng ký tài khoản (Register)
+Endpoint:
+POST http://localhost:8080/auth/register
+Body
+{
+  "email": "tauhaitac3k5@gmail.com",
+  "password": "123456",
+  "fullName": "Luffy Monkey",
+  "phone": "0987654321"
+}
+Response:
+{
+  "status": 200,
+  "message": "User created successfully",
+  "data": "Tạo tài khoản thành công"
+}
+________________________________________
+🧩 2️⃣ Đăng nhập — FE có 2 lựa chọn
+🔸 Lựa chọn 1: Đăng nhập qua Google (OAuth2)
+Frontend flow:
+•	FE gọi link:
+•	http://localhost:8080/oauth2/authorization/google
+•	Trình duyệt sẽ mở popup đăng nhập Google.
+•	Sau khi xác thực thành công, server sẽ:
+o	Lấy email + name từ Google.
+o	Nếu chưa tồn tại user → tạo mới.
+o	Sinh accessToken + refreshToken.
+o	Tự động bật MFA (nếu chưa có) → generate secret và QR, gửi kèm URL cho FE.
+o	Redirect về FE tại URL sau:
+•	http://localhost:3000/oauth2/success
+Kèm query params:
+?accessToken=<JWT_ACCESS_TOKEN>
+&refreshToken=<JWT_REFRESH_TOKEN>
+&mfaEnabled=true
+&qrBase64=<BASE64_IMAGE_IF_NEW>
+FE xử lý:
+•	Nếu có qrBase64 → hiển thị QR code cho người dùng quét vào Google Authenticator.
+•	Nếu không có (user đã bật MFA trước đó) → bỏ qua.
+________________________________________
+🔸 Lựa chọn 2: Đăng nhập bằng Email + Password (với OTP mail)
+Endpoint:
+POST http://localhost:8080/auth/login
+Body
+{
+  "email": "tauhaitac3k5@gmail.com",
+  "password": "123456",
+  "deviceId": "DEVICE-ABC123"
+}
+Response:
+1.	Nếu thiết bị mới → yêu cầu xác thực OTP:
+{
+  "status": 200,
+  "message": "Thiết bị mới phát hiện. Mã OTP đã được gửi đến email của bạn.",
+  "data": ""
+}
+2.	Nếu thiết bị đã tin cậy → trả token:
+{
+  "status": 200,
+  "message": "Đăng nhập thành công (thiết bị quen thuộc)",
+  "data": {
+    "accessToken": "<JWT_ACCESS_TOKEN>",
+    "refreshToken": "<JWT_REFRESH_TOKEN>",
+    "mfaRequired": false
+  }
+}
+________________________________________
+🧩 3️⃣ Xác thực OTP (nếu login qua mail)
+Endpoint:
+POST http://localhost:8080/auth/verify-otp
+Body
+{
+  "email": "tauhaitac3k5@gmail.com",
+  "otp": "123456",
+  "deviceId": "DEVICE-ABC123"
+}
+Response:
+1️⃣ Nếu user chưa bật MFA
+→ Trả token luôn, thiết bị được đánh dấu tin cậy.
+{
+  "status": 200,
+  "message": "OTP xác thực thành công. Thiết bị đã được đánh dấu là tin cậy.",
+  "data": {
+    "accessToken": "<JWT_ACCESS_TOKEN>",
+    "refreshToken": "<JWT_REFRESH_TOKEN>",
+    "mfaRequired": false
+  }
+}
+2️⃣ Nếu user đã bật MFA
+→ FE hiển thị form nhập mã Google Authenticator (code 6 số).
+{
+  "status": 200,
+  "message": "OTP hợp lệ. Vui lòng nhập mã Google Authenticator (MFA)",
+  "data": {
+    "accessToken": null,
+    "refreshToken": null,
+    "mfaRequired": true
+  }
+}
+________________________________________
+🧩 4️⃣ Xác thực mã Google Authenticator (MFA)
+Endpoint:
+POST http://localhost:8080/auth/mfa/verify
+Body
+{
+  "email": "tauhaitac3k5@gmail.com",
+  "code": 123456
+}
+Response:
+{
+  "status": 200,
+  "message": "Đăng nhập thành công (MFA)",
+  "data": {
+    "accessToken": "<JWT_ACCESS_TOKEN>",
+    "refreshToken": "<JWT_REFRESH_TOKEN>",
+    "mfaRequired": false
+  }
+}
+________________________________________
+🧩 5️⃣ (Tự động) Bật MFA khi đăng nhập Google lần đầu
+hoặc người dùng có thể bật thủ công nếu muốn.
+Endpoint:
+POST http://localhost:8080/auth/mfa/enable?email=<email>
+Response:
+{
+  "status": 200,
+  "message": "MFA enabled. Scan QR code in Google Authenticator",
+  "data": {
+    "secret": "K26SNOR55B3IEFXJN4WEYTNIP7A6V3SL",
+    "qrBase64": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg..."
+  }
+}
+FE xử lý:
+•	Copy phần qrBase64 → render <img src={qrBase64} />
+•	Người dùng quét QR trên ứng dụng Google Authenticator để nhận mã 6 số.
+________________________________________
+🧩 6️⃣ Làm mới Access Token bằng Refresh Token
+Endpoint:
+POST http://localhost:8080/auth/refresh
+Header:
+Authorization: Bearer <refresh_token>
+Response:
+{
+  "status": 200,
+  "message": "Access token refreshed successfully",
+  "data": "<new_access_token>"
+}
+________________________________________
+🧩 7️⃣ Logout
+Endpoint:
+POST http://localhost:8080/auth/logout
+Header:
+Authorization: Bearer tauhaitac3k5@gmail.com
+Response:
+{
+  "status": 200,
+  "message": "Logged out successfully",
+  "data": "Đăng xuất thành công"
+}
+________________________________________
+⚙️ TÓM TẮT DÀNH CHO FRONTEND
+Bước	API	Mục đích	FE cần làm gì
+1	/auth/register	Đăng ký tài khoản mới	Gửi form đăng ký
+2	/auth/login	Đăng nhập thường (email + password + deviceId)	Gửi credentials; nếu trả “gửi OTP” thì chuyển sang bước 3
+3	/auth/verify-otp	Xác thực OTP từ mail	Gửi OTP + deviceId; nếu mfaRequired=true thì sang bước 4
+4	/auth/mfa/verify	Xác thực code từ Google Authenticator	Gửi code 6 số
+5	/auth/mfa/enable	(Tuỳ chọn) Bật MFA cho user	Hiển thị QR code để user quét
+6	/oauth2/authorization/google	Đăng nhập qua Google (OAuth2)	FE redirect user qua URL này, backend sẽ trả về accessToken, refreshToken, và qrBase64 nếu cần
+7	/auth/refresh	Làm mới access token	Gửi refresh token
+8	/auth/logout	Đăng xuất	Gửi email hoặc token hiện tại
+
