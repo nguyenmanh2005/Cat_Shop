@@ -75,6 +75,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const storedEmail = tokenInfo?.email || localStorage.getItem("user_email");
         if (authService.isAuthenticated() && storedEmail) {
           await hydrateUser(storedEmail);
+        } else if (!authService.isAuthenticated()) {
+          // Nếu không có token, clear user
+          setUser(null);
         }
       } catch (error) {
         console.error("Error checking auth status:", error);
@@ -86,7 +89,35 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
 
     checkAuthStatus();
-  }, []);
+
+    // Listen for storage changes (khi tokens được lưu từ OAuth)
+    const handleStorageChange = async () => {
+      // Check lại auth status khi có storage event
+      try {
+        const tokenInfo = authService.parseAccessToken();
+        const storedEmail = tokenInfo?.email || localStorage.getItem("user_email");
+        if (authService.isAuthenticated() && storedEmail) {
+          // Hydrate user khi có tokens mới
+          await hydrateUser(storedEmail);
+        } else if (!authService.isAuthenticated()) {
+          // Nếu không còn token, clear user
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Error handling storage change:", error);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom event (trigger từ LoginSuccess)
+    window.addEventListener('auth-tokens-updated', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('auth-tokens-updated', handleStorageChange);
+    };
+  }, []); // Empty dependency - chỉ chạy một lần khi mount
 
   const login = async (email: string, password: string): Promise<LoginState> => {
     const credentials: LoginRequest = { email, password };
