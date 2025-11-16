@@ -78,6 +78,15 @@ public class CustomOAuth2SuccessHandler implements AuthenticationSuccessHandler 
                 return newUser;
             });
 
+            // ⛔ Chặn Admin đăng nhập qua Google - Đăng nhập Google chỉ dành cho Customer
+            if (user.getRole() != null && "Admin".equalsIgnoreCase(user.getRole().getRoleName())) {
+                log.warn("⛔ Admin không được phép đăng nhập qua Google: {}", email);
+                String errorUrl = frontendUrl + "/oauth2/success"
+                        + "?error=" + URLEncoder.encode("Tài khoản Admin không được phép đăng nhập qua Google. Vui lòng sử dụng email và mật khẩu.", StandardCharsets.UTF_8);
+                response.sendRedirect(errorUrl);
+                return;
+            }
+
             // Sinh JWT token
             String accessToken = jwtUtils.generateAccessToken(user.getEmail(), user.getRole().getRoleName());
             String refreshToken = jwtUtils.generateRefreshToken(user.getEmail());
