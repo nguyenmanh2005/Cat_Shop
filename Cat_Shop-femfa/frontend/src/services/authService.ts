@@ -84,12 +84,16 @@ export const authService = {
       const data = payload?.data as TokenResponse | null | undefined;
       const message = payload?.message as string | undefined;
 
+      // QUAN TRỌNG: KHÔNG lưu token ngay cả khi backend trả về token
+      // Bắt buộc người dùng phải xác minh (OTP, QR, hoặc Google Authenticator) trước khi cho phép truy cập
+      // Token chỉ được lưu sau khi xác minh thành công
       if (data && data.accessToken) {
-        storeTokens(data, credentials.email);
+        // KHÔNG lưu token ở đây - chỉ trả về thông tin để frontend biết đăng nhập thành công
+        // Nhưng vẫn yêu cầu xác minh
         return {
-          success: true,
-          tokens: data,
-          message,
+          success: false,
+          requiresOtp: true,
+          message: message ?? 'Vui lòng xác minh tài khoản để tiếp tục đăng nhập.',
         };
       }
 
@@ -366,6 +370,51 @@ export const authService = {
     } catch (error: any) {
       console.error('Check QR status error:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Không thể kiểm tra trạng thái';
+      throw new Error(errorMessage);
+    }
+  },
+
+  async verifyGoogleAuthenticator(email: string, code: string): Promise<TokenResponse> {
+    try {
+      console.log('🔐 Verifying Google Authenticator:', {
+        email,
+        codeLength: code.length,
+      });
+      
+      const response = await apiService.post<TokenResponse>(
+        API_CONFIG.ENDPOINTS.AUTH.MFA_VERIFY,
+        { email, code }
+      );
+
+      console.log('✅ Verify Google Authenticator response:', response);
+
+      // Nếu có accessToken, lưu token
+      if (response.accessToken) {
+        storeTokens(response, email);
+      }
+
+      return response;
+    } catch (error: any) {
+      console.error('❌ Verify Google Authenticator error:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+      });
+      
+      // Lấy thông báo lỗi từ backend
+      let errorMessage = 'Xác thực Google Authenticator thất bại';
+      
+      if (error.response?.data) {
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       throw new Error(errorMessage);
     }
   },

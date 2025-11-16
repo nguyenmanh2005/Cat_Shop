@@ -101,6 +101,12 @@ public class BackupCodeServiceImpl implements BackupCodeService {
         return getRemainingBackupCodesCount(user);
     }
 
+    @Override
+    public void deleteAllBackupCodes(User user) {
+        backupCodeRepository.deleteAllByUser(user);
+        log.info("✅ Đã xóa tất cả backup codes cho user: {}", user.getEmail());
+    }
+
     /**
      * Tạo backup code ngẫu nhiên dạng: XXXX-XXXX
      */

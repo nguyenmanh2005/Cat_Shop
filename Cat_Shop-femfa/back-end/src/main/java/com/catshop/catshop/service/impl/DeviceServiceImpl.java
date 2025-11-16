@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -34,5 +35,28 @@ public class DeviceServiceImpl implements DeviceService {
         device.setTrusted(true);
         device.setLastLogin(LocalDateTime.now());
         trustedDeviceRepository.save(device);
+    }
+
+    @Override
+    public List<TrustedDevice> getUserDevices(String email) {
+        return trustedDeviceRepository.findByUserEmailOrderByLastLoginDesc(email);
+    }
+
+    @Override
+    public void removeDevice(String email, Long deviceId) {
+        TrustedDevice device = trustedDeviceRepository.findById(deviceId)
+                .orElseThrow(() -> new com.catshop.catshop.exception.ResourceNotFoundException("Thiết bị không tồn tại"));
+        
+        if (!device.getUserEmail().equals(email)) {
+            throw new com.catshop.catshop.exception.BadRequestException("Bạn không có quyền xóa thiết bị này");
+        }
+        
+        trustedDeviceRepository.delete(device);
+    }
+
+    @Override
+    public void removeAllDevices(String email) {
+        List<TrustedDevice> devices = trustedDeviceRepository.findByUserEmailOrderByLastLoginDesc(email);
+        trustedDeviceRepository.deleteAll(devices);
     }
 }

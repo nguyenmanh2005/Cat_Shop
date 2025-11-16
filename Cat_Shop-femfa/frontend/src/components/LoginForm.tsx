@@ -145,17 +145,16 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       setIsLoading(true);
       const result = await login(email, password);
 
-      // LUÔN LUÔN yêu cầu xác minh sau khi đăng nhập email/password thành công
-      // Đây là yêu cầu bảo mật - luôn cần xác minh 2 bước (OTP hoặc QR Code)
-      // Ngay cả khi backend trả về success, vẫn phải qua bước xác minh
-      if (result.success) {
-        // Nếu backend đã lưu token, xóa đi để đảm bảo phải xác minh trước
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user_email');
-      }
+      // QUAN TRỌNG: LUÔN LUÔN yêu cầu xác minh sau khi đăng nhập email/password thành công
+      // Đây là yêu cầu bảo mật - luôn cần xác minh 2 bước (OTP, QR Code, hoặc Google Authenticator)
+      // KHÔNG cho phép truy cập nếu chưa xác minh
+      
+      // Đảm bảo xóa mọi token cũ để tránh truy cập không được phép
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user_email');
 
-      // Luôn chuyển sang màn hình xác minh
+      // Luôn chuyển sang màn hình xác minh, bất kể kết quả từ backend
       setVerificationEmail(email);
       setNeedsVerification(true);
       setVerificationMethod(null); // Reset về màn hình chọn phương thức
@@ -389,10 +388,14 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   };
 
   const handleVerifyGoogleAuthenticator = async () => {
-    if (!googleAuthCode || googleAuthCode.length !== 6) {
+    // Kiểm tra mã hợp lệ: 6 số (Google Authenticator) hoặc XXXX-XXXX (Backup Code)
+    const isGoogleAuthCode = /^\d{6}$/.test(googleAuthCode);
+    const isBackupCode = /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(googleAuthCode.toUpperCase());
+    
+    if (!googleAuthCode || (!isGoogleAuthCode && !isBackupCode)) {
       toast({
         title: "Mã không hợp lệ",
-        description: "Vui lòng nhập mã Google Authenticator 6 chữ số",
+        description: "Vui lòng nhập mã 6 số từ Google Authenticator hoặc Backup Code (XXXX-XXXX)",
         variant: "destructive",
       });
       return;
@@ -409,7 +412,9 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
 
     try {
       setIsLoading(true);
-      const result = await authService.verifyGoogleAuthenticator(verificationEmail, googleAuthCode);
+      // Chuyển backup code sang uppercase nếu là backup code
+      const codeToVerify = isBackupCode ? googleAuthCode.toUpperCase() : googleAuthCode;
+      const result = await authService.verifyGoogleAuthenticator(verificationEmail, codeToVerify);
 
       if (result.accessToken && result.refreshToken) {
         // Lưu token
@@ -417,9 +422,13 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
         localStorage.setItem('refresh_token', result.refreshToken);
         localStorage.setItem('user_email', verificationEmail);
 
+        const successMessage = isBackupCode 
+          ? "Đăng nhập thành công bằng Backup Code! Mã này đã được sử dụng và không thể dùng lại."
+          : "Đăng nhập thành công!";
+
         toast({
           title: "Đăng nhập thành công!",
-          description: "Chào mừng bạn quay trở lại với Cham Pets",
+          description: successMessage,
         });
         setNeedsVerification(false);
         setVerificationMethod(null);
@@ -430,14 +439,14 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       }
 
       toast({
-        title: "Mã Google Authenticator không chính xác",
-        description: "Vui lòng kiểm tra lại mã từ ứng dụng Google Authenticator",
+        title: "Mã xác thực không chính xác",
+        description: "Vui lòng kiểm tra lại mã từ Google Authenticator hoặc Backup Code",
         variant: "destructive",
       });
     } catch (error: any) {
       toast({
         title: "Lỗi xác thực",
-        description: error.message || "Đã xảy ra lỗi khi xác thực Google Authenticator",
+        description: error.message || "Đã xảy ra lỗi khi xác thực",
         variant: "destructive",
       });
     } finally {
@@ -839,33 +848,49 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
             </>
           ) : verificationMethod === "google-authenticator" ? (
             <>
-              {/* Bước 3c: Xác minh Google Authenticator */}
+              {/* Bước 3c: Xác minh Google Authenticator hoặc Backup Code */}
               <div className="space-y-6">
               <div className="text-center space-y-2">
                 <h3 className="text-xl font-semibold">Xác minh bằng Google Authenticator</h3>
                 <p className="text-sm text-muted-foreground">
-                  Mở ứng dụng Google Authenticator và nhập mã 6 chữ số
+                  Nhập mã 6 số từ Google Authenticator hoặc Backup Code (XXXX-XXXX)
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="googleAuthCode">Mã Google Authenticator</Label>
+                <Label htmlFor="googleAuthCode">Mã xác thực</Label>
                 <Input
                   id="googleAuthCode"
                   type="text"
-                  placeholder="Nhập mã 6 chữ số"
+                  placeholder="123456 hoặc XXXX-XXXX"
                   value={googleAuthCode}
-                  onChange={(e) => setGoogleAuthCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
-                  maxLength={6}
+                  onChange={(e) => {
+                    let value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+                    // Tự động thêm dấu gạch ngang cho backup code
+                    if (value.length > 4 && !value.includes('-') && /^[A-Z0-9]+$/.test(value)) {
+                      value = value.slice(0, 4) + '-' + value.slice(4, 8);
+                    }
+                    // Giới hạn độ dài: 6 số hoặc 9 ký tự (XXXX-XXXX)
+                    if (/^\d+$/.test(value)) {
+                      value = value.slice(0, 6); // Chỉ 6 số cho Google Authenticator
+                    } else {
+                      value = value.slice(0, 9); // Tối đa 9 ký tự cho backup code (XXXX-XXXX)
+                    }
+                    setGoogleAuthCode(value);
+                  }}
+                  maxLength={9}
                   className="text-center text-2xl tracking-[0.6rem]"
                   disabled={isLoading}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Nhập mã 6 số từ Google Authenticator hoặc Backup Code (XXXX-XXXX)
+                </p>
               </div>
 
               <Button
                 onClick={handleVerifyGoogleAuthenticator}
                 className="w-full"
-                disabled={isLoading || googleAuthCode.length !== 6}
+                disabled={isLoading || (!/^\d{6}$/.test(googleAuthCode) && !/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(googleAuthCode))}
               >
                 {isLoading ? "Đang xác thực..." : "Xác thực"}
               </Button>

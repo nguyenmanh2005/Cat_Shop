@@ -22,6 +22,8 @@ export const API_CONFIG = {
       // OTP Login
       SEND_OTP: '/auth/send-otp',
       VERIFY_OTP: '/auth/verify-otp',
+      // MFA (Google Authenticator)
+      MFA_VERIFY: '/auth/mfa/verify',
       // QR Code Login
       GENERATE_QR: '/auth/generate-qr',
       VERIFY_QR: '/auth/verify-qr'

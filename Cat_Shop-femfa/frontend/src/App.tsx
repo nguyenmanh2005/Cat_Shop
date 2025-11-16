@@ -49,6 +49,7 @@ const App = () => (
               <Route path="/login-test" element={<LoginTest />} />
               <Route path="/qr-login" element={<QrLogin />} />
               <Route path="/login-success" element={<LoginSuccess />} />
+              <Route path="/oauth2/success" element={<LoginSuccess />} />
               <Route path="/auth-flow/*" element={<AuthFlowApp />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/checkout" element={<Checkout />} />

@@ -7,14 +7,37 @@ const LoginSuccess = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
+    
+    // Xử lý cả 2 format: token (cũ) hoặc accessToken + refreshToken (mới từ OAuth2)
     const token = params.get("token");
+    const accessToken = params.get("accessToken");
+    const refreshToken = params.get("refreshToken");
 
-    // Lưu token trả về từ đăng nhập Google và chuyển hướng về trang chủ
     if (token) {
+      // Format cũ: chỉ có token
       localStorage.setItem("authToken", token);
+    } else if (accessToken && refreshToken) {
+      // Format mới từ OAuth2: có accessToken và refreshToken
+      localStorage.setItem("access_token", accessToken);
+      localStorage.setItem("refresh_token", refreshToken);
+      
+      // Lấy email từ accessToken (JWT payload)
+      try {
+        const payload = JSON.parse(atob(accessToken.split(".")[1]));
+        if (payload.sub) {
+          localStorage.setItem("user_email", payload.sub);
+        }
+      } catch (e) {
+        console.error("Không thể parse email từ token:", e);
+      }
     }
 
-    navigate("/", { replace: true });
+    // Chuyển hướng về trang chủ sau khi lưu token
+    setTimeout(() => {
+      navigate("/", { replace: true });
+      // Reload để cập nhật trạng thái đăng nhập
+      window.location.reload();
+    }, 500);
   }, [location.search, navigate]);
 
   return (

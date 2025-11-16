@@ -42,5 +42,11 @@ public interface BackupCodeService {
      * @return Số lượng codes còn lại
      */
     long getAvailableBackupCodesCount(User user);
+
+    /**
+     * Xóa tất cả backup codes của user (khi tắt MFA)
+     * @param user User cần xóa backup codes
+     */
+    void deleteAllBackupCodes(User user);
 }
 

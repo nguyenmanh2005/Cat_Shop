@@ -92,10 +92,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const credentials: LoginRequest = { email, password };
     const result = await authService.login(credentials);
 
+    // QUAN TRỌNG: KHÔNG hydrate user ngay cả khi có token
+    // Bắt buộc phải xác minh trước khi cho phép truy cập
+    // Chỉ hydrate user sau khi xác minh thành công (OTP, QR, hoặc Google Authenticator)
     if (result.success && result.tokens?.accessToken) {
-      await hydrateUser(email);
-      setPendingEmail(null);
-      return result;
+      // Không hydrate user ở đây - vẫn yêu cầu xác minh
+      setPendingEmail(email);
+      return {
+        ...result,
+        success: false,
+        requiresOtp: true,
+      };
     }
 
     if (result.requiresOtp) {
