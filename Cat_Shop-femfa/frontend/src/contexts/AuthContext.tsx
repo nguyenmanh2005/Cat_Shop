@@ -62,10 +62,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const hydrateUser = async (email: string) => {
-    const profile = await authService.getProfile(email);
-    const tokenInfo = authService.parseAccessToken();
-    const authUser = buildAuthUser(profile, tokenInfo);
-    setUser(authUser);
+    try {
+      // Thử lấy profile từ API (có thể fail nếu không có quyền ADMIN)
+      const profile = await authService.getProfile(email);
+      const tokenInfo = authService.parseAccessToken();
+      const authUser = buildAuthUser(profile, tokenInfo);
+      setUser(authUser);
+    } catch (error) {
+      // Nếu không thể lấy profile từ API (403 Forbidden), tạo user từ token
+      console.warn('Không thể lấy profile từ API, sử dụng thông tin từ token:', error);
+      const tokenInfo = authService.parseAccessToken();
+      if (tokenInfo) {
+        // Tạo user object từ thông tin trong token
+        const authUser: AuthUser = {
+          email: email,
+          fullName: email.split('@')[0], // Dùng phần trước @ làm tên tạm
+          role: tokenInfo.role?.toLowerCase() === "admin" ? "admin" : "user",
+        };
+        setUser(authUser);
+      }
+    }
   };
 
   useEffect(() => {

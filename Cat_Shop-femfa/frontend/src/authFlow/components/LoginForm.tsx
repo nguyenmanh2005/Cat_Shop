@@ -16,10 +16,11 @@ const LoginForm = () => {
   } = useForm<LoginFormValues>();
   const [error, setError] = useState<string | undefined>();
 
-  // Mở popup OAuth2 tới backend Google
+  // Redirect trực tiếp trong cùng tab để đăng nhập Google
   const handleGoogleLogin = () => {
     const oauthUrl = "http://localhost:8080/oauth2/authorization/google";
-    window.open(oauthUrl, "oauth2Popup", "width=500,height=600,status=1");
+    // Redirect trong cùng tab thay vì mở popup
+    window.location.href = oauthUrl;
   };
 
   // Gửi thông tin đăng nhập kèm deviceId và xử lý các nhánh phản hồi

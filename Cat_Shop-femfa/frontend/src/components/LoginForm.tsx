@@ -47,10 +47,11 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   // Google Authenticator states
   const [googleAuthCode, setGoogleAuthCode] = useState<string>("");
 
-  // Mở popup đăng nhập Google thông qua OAuth2 backend
+  // Redirect trực tiếp trong cùng tab để đăng nhập Google
   const handleGoogleLogin = () => {
     const googleOAuthUrl = "http://localhost:8080/oauth2/authorization/google";
-    window.open(googleOAuthUrl, "google-oauth", "width=500,height=600,status=1");
+    // Redirect trong cùng tab thay vì mở popup
+    window.location.href = googleOAuthUrl;
   };
 
   useEffect(() => {

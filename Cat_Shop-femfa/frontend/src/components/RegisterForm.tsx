@@ -25,61 +25,12 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const popupCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Cleanup interval khi component unmount
-  useEffect(() => {
-    return () => {
-      if (popupCheckIntervalRef.current) {
-        clearInterval(popupCheckIntervalRef.current);
-        popupCheckIntervalRef.current = null;
-      }
-    };
-  }, []);
-
-  // Mở popup đăng ký Google thông qua OAuth2 backend
+  // Redirect trực tiếp trong cùng tab để đăng ký Google
   const handleGoogleRegister = () => {
     const googleOAuthUrl = "http://localhost:8080/oauth2/authorization/google";
-    const popup = window.open(googleOAuthUrl, "google-oauth", "width=500,height=600,status=1");
-    
-    // Kiểm tra xem popup có bị chặn không
-    if (!popup) {
-      toast({
-        title: "Popup bị chặn",
-        description: "Vui lòng cho phép popup để đăng ký bằng Google",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Clear interval cũ nếu có
-    if (popupCheckIntervalRef.current) {
-      clearInterval(popupCheckIntervalRef.current);
-    }
-
-    // Lắng nghe khi popup đóng để kiểm tra kết quả
-    popupCheckIntervalRef.current = setInterval(() => {
-      if (popup.closed) {
-        if (popupCheckIntervalRef.current) {
-          clearInterval(popupCheckIntervalRef.current);
-          popupCheckIntervalRef.current = null;
-        }
-        
-        // Kiểm tra xem đã có token chưa (đăng ký thành công)
-        setTimeout(() => {
-          const token = localStorage.getItem("access_token");
-          if (token) {
-            toast({
-              title: "Đăng ký thành công!",
-              description: "Tài khoản Google của bạn đã được tạo thành công",
-            });
-            onClose();
-            // Reload để cập nhật trạng thái đăng nhập
-            window.location.reload();
-          }
-        }, 1000);
-      }
-    }, 500);
+    // Redirect trong cùng tab thay vì mở popup
+    window.location.href = googleOAuthUrl;
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
