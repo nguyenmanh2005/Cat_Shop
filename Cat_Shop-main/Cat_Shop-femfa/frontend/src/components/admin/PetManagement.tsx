@@ -37,215 +37,173 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { petService, type PetRecord } from "@/services/petService";
+import { formatCurrencyVND, formatDateTime } from "@/lib/utils";
 
-interface Pet {
-  id: string;
+type PetStatus = "available" | "sold" | "reserved";
+
+interface AdminPet {
+  id: number;
   name: string;
-  image: string;
-  price: string;
-  age: string;
-  breed: string;
-  status: 'available' | 'sold' | 'reserved';
+  imageUrl?: string;
+  price: number;
+  age?: number;
+  breed?: string;
+  gender?: string;
+  status: PetStatus;
+  vaccinated?: boolean;
   description?: string;
-  createdAt: string;
+  createdAt?: string;
 }
 
 const PetManagement = () => {
-  const [pets, setPets] = useState<Pet[]>([]);
-  const [filteredPets, setFilteredPets] = useState<Pet[]>([]);
+  const [pets, setPets] = useState<AdminPet[]>([]);
+  const [filteredPets, setFilteredPets] = useState<AdminPet[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [breedFilter, setBreedFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  // Load pets từ localStorage hoặc mock data
+  const normalizePet = (pet: PetRecord): AdminPet => {
+    const stockQuantity = Number(pet.stockQuantity ?? 0);
+    const status: PetStatus = stockQuantity <= 0 ? "sold" : "available";
+
+    return {
+      id: pet.productId ?? 0,
+      name: pet.productName ?? "Chưa đặt tên",
+      imageUrl: pet.imageUrl,
+      breed: pet.breed,
+      age: pet.age,
+      gender: pet.gender,
+      vaccinated: pet.vaccinated,
+      price: Number(pet.price ?? 0),
+      status,
+      description: pet.description,
+      createdAt: undefined,
+    };
+  };
+
   useEffect(() => {
-    const loadPets = () => {
+    let ignore = false;
+    const loadPets = async () => {
       try {
-        // Kiểm tra localStorage trước
-        const petsData = localStorage.getItem("cham_pets_pets");
-        if (petsData) {
-          const allPets = JSON.parse(petsData);
-          setPets(allPets);
-          setFilteredPets(allPets);
-        } else {
-          // Nếu chưa có data, tạo mock data
-          const mockPets: Pet[] = [
-            {
-              id: "1",
-              name: "A'khan",
-              image: "/src/assets/pet1.jpg",
-              price: "15.000.000 VNĐ",
-              age: "3 tháng",
-              breed: "Bengal",
-              status: "available",
-              description: "Mèo Bengal đẹp, khỏe mạnh",
-              createdAt: new Date().toISOString()
-            },
-            {
-              id: "2", 
-              name: "Mochi",
-              image: "/src/assets/pet2.jpg",
-              price: "8.000.000 VNĐ",
-              age: "2 tháng",
-              breed: "Ragdoll",
-              status: "available",
-              description: "Mèo Ragdoll hiền lành",
-              createdAt: new Date().toISOString()
-            },
-            {
-              id: "3",
-              name: "Aabaa", 
-              image: "/src/assets/pet3.jpg",
-              price: "6.000.000 VNĐ",
-              age: "2.5 tháng",
-              breed: "Mèo ta",
-              status: "sold",
-              description: "Mèo ta Việt Nam",
-              createdAt: new Date().toISOString()
-            },
-            {
-              id: "4",
-              name: "Aabaan",
-              image: "/src/assets/pet4.jpg",
-              price: "7.500.000 VNĐ", 
-              age: "3 tháng",
-              breed: "British Shorthair",
-              status: "reserved",
-              description: "Mèo British Shorthair xám",
-              createdAt: new Date().toISOString()
-            },
-            {
-              id: "5",
-              name: "Luna",
-              image: "/src/assets/pet1.jpg",
-              price: "12.000.000 VNĐ",
-              age: "4 tháng", 
-              breed: "Maine Coon",
-              status: "available",
-              description: "Mèo Maine Coon lớn",
-              createdAt: new Date().toISOString()
-            },
-            {
-              id: "6",
-              name: "Mimi",
-              image: "/src/assets/pet2.jpg",
-              price: "5.500.000 VNĐ",
-              age: "2 tháng",
-              breed: "Persian",
-              status: "available",
-              description: "Mèo Persian lông dài",
-              createdAt: new Date().toISOString()
-            }
-          ];
-          setPets(mockPets);
-          setFilteredPets(mockPets);
-          localStorage.setItem("cham_pets_pets", JSON.stringify(mockPets));
-        }
-      } catch (error) {
+        setIsLoading(true);
+        const data = await petService.getAllPets();
+        if (ignore) return;
+        const normalized = (data || []).map(normalizePet);
+        setPets(normalized);
+        setFilteredPets(normalized);
+      } catch (error: any) {
+        if (ignore) return;
         console.error("Error loading pets:", error);
+        toast({
+          title: "Không thể tải danh sách mèo",
+          description: error?.message || "Vui lòng thử lại sau.",
+          variant: "destructive",
+        });
       } finally {
-        setIsLoading(false);
+        if (!ignore) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadPets();
-  }, []);
+    return () => {
+      ignore = true;
+    };
+  }, [toast]);
 
-  // Filter pets
   useEffect(() => {
     let filtered = pets;
 
-    // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(pet =>
-        pet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pet.breed.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pet.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      const keyword = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (pet) =>
+          pet.name.toLowerCase().includes(keyword) ||
+          pet.breed?.toLowerCase().includes(keyword) ||
+          pet.description?.toLowerCase().includes(keyword)
       );
     }
 
-    // Breed filter
     if (breedFilter !== "all") {
-      filtered = filtered.filter(pet => pet.breed === breedFilter);
+      filtered = filtered.filter((pet) => pet.breed === breedFilter);
     }
 
-    // Status filter
     if (statusFilter !== "all") {
-      filtered = filtered.filter(pet => pet.status === statusFilter);
+      filtered = filtered.filter((pet) => pet.status === statusFilter);
     }
 
     setFilteredPets(filtered);
   }, [pets, searchTerm, breedFilter, statusFilter]);
 
-  const handleDeletePet = (petId: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa mèo này?")) {
-      const updatedPets = pets.filter(pet => pet.id !== petId);
-      setPets(updatedPets);
-      localStorage.setItem("cham_pets_pets", JSON.stringify(updatedPets));
+  const handleDeletePet = async (petId: number) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa mèo này?")) return;
+    try {
+      await petService.deletePet(petId);
+      setPets((prev) => prev.filter((pet) => pet.id !== petId));
+      setFilteredPets((prev) => prev.filter((pet) => pet.id !== petId));
+      toast({
+        title: "Đã xóa mèo",
+        description: `Mèo #${petId} đã được xóa.`,
+      });
+    } catch (error: any) {
+      console.error("Delete pet error:", error);
+      toast({
+        title: "Xóa mèo thất bại",
+        description: error?.message || "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
     }
-  };
-
-  const handleChangeStatus = (petId: string, newStatus: 'available' | 'sold' | 'reserved') => {
-    const updatedPets = pets.map(pet => 
-      pet.id === petId ? { ...pet, status: newStatus } : pet
-    );
-    setPets(updatedPets);
-    localStorage.setItem("cham_pets_pets", JSON.stringify(updatedPets));
   };
 
   const handleExportPets = () => {
     const csvContent = [
-      ['ID', 'Tên', 'Giống', 'Tuổi', 'Giá', 'Trạng thái', 'Mô tả', 'Ngày tạo'],
-      ...filteredPets.map(pet => [
+      ["ID", "Tên", "Giống", "Tuổi", "Giá", "Trạng thái", "Mô tả", "Ngày tạo"],
+      ...filteredPets.map((pet) => [
         pet.id,
         pet.name,
-        pet.breed,
-        pet.age,
+        pet.breed || "",
+        pet.age ?? "",
         pet.price,
-        pet.status === 'available' ? 'Có sẵn' : pet.status === 'sold' ? 'Đã bán' : 'Đã đặt',
-        pet.description || '',
-        new Date(pet.createdAt).toLocaleDateString('vi-VN')
-      ])
-    ].map(row => row.join(',')).join('\n');
+        pet.status,
+        pet.description || "",
+        pet.createdAt ? formatDateTime(pet.createdAt) : "",
+      ]),
+    ]
+      .map((row) => row.join(","))
+      .join("\n");
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `pets_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `pets_${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('vi-VN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
-  };
-
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: PetStatus) => {
     const variants = {
-      available: 'default',
-      sold: 'destructive',
-      reserved: 'secondary'
+      available: "default",
+      sold: "destructive",
+      reserved: "secondary",
     } as const;
-    
+
     const labels = {
-      available: 'Có sẵn',
-      sold: 'Đã bán',
-      reserved: 'Đã đặt'
+      available: "Có sẵn",
+      sold: "Đã bán",
+      reserved: "Đã đặt",
     };
 
-    return (
-      <Badge variant={variants[status as keyof typeof variants]}>
-        {labels[status as keyof typeof labels]}
-      </Badge>
-    );
+    return <Badge variant={variants[status]}>{labels[status]}</Badge>;
   };
 
   const getUniqueBreeds = () => {
-    const breeds = pets.map(pet => pet.breed);
+    const breeds = pets
+      .map((pet) => pet.breed)
+      .filter(Boolean) as string[];
     return [...new Set(breeds)];
   };
 
@@ -400,18 +358,28 @@ const PetManagement = () => {
                   filteredPets.map((pet) => (
                     <TableRow key={pet.id}>
                       <TableCell>
-                        <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center">
-                          <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                        <div className="w-12 h-12 bg-muted rounded-lg flex items-center justify-center overflow-hidden">
+                          {pet.imageUrl ? (
+                            <img
+                              src={pet.imageUrl}
+                              alt={pet.name}
+                              className="w-12 h-12 object-cover"
+                            />
+                          ) : (
+                            <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-sm">{pet.id}</TableCell>
                       <TableCell className="font-medium">{pet.name}</TableCell>
-                      <TableCell>{pet.breed}</TableCell>
-                      <TableCell>{pet.age}</TableCell>
-                      <TableCell className="font-medium text-green-600">{pet.price}</TableCell>
+                      <TableCell>{pet.breed || "—"}</TableCell>
+                      <TableCell>{pet.age ? `${pet.age} tháng` : "—"}</TableCell>
+                      <TableCell className="font-medium text-green-600">
+                        {formatCurrencyVND(pet.price)}
+                      </TableCell>
                       <TableCell>{getStatusBadge(pet.status)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {formatDate(pet.createdAt)}
+                        {pet.createdAt ? formatDateTime(pet.createdAt) : "—"}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -431,23 +399,7 @@ const PetManagement = () => {
                               Chỉnh sửa
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              onClick={() => handleChangeStatus(pet.id, 'available')}
-                            >
-                              Đánh dấu Có sẵn
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleChangeStatus(pet.id, 'sold')}
-                            >
-                              Đánh dấu Đã bán
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleChangeStatus(pet.id, 'reserved')}
-                            >
-                              Đánh dấu Đã đặt
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="text-red-600"
                               onClick={() => handleDeletePet(pet.id)}
                             >

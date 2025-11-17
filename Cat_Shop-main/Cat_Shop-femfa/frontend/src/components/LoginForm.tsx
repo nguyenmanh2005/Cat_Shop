@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/authService";
 import { QRCodeSVG } from "qrcode.react";
 import ForgotPasswordForm from "./ForgotPasswordForm";
+import GoogleReCaptcha from "./GoogleReCaptcha";
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
@@ -25,6 +26,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   
   // Verification states
   const [needsVerification, setNeedsVerification] = useState(false);
@@ -137,6 +139,15 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       toast({
         title: "Thông tin không đầy đủ",
         description: "Vui lòng nhập email và mật khẩu",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!recaptchaToken) {
+      toast({
+        title: "Xác thực reCAPTCHA",
+        description: "Vui lòng xác thực reCAPTCHA để tiếp tục",
         variant: "destructive",
       });
       return;
@@ -453,6 +464,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     resetOtpState();
     setQrCodeData("");
     setQrStatus("pending");
+    setRecaptchaToken(null);
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
@@ -562,7 +574,12 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <GoogleReCaptcha 
+                  onVerify={setRecaptchaToken} 
+                  onExpire={() => setRecaptchaToken(null)}
+                />
+
+                <Button type="submit" className="w-full" disabled={isLoading || !recaptchaToken}>
                   {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
                 </Button>
               </form>

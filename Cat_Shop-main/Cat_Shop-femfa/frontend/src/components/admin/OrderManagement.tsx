@@ -38,217 +38,226 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { orderService } from "@/services/orderService";
+import type { Order } from "@/types";
+import { formatCurrencyVND, formatDateTime } from "@/lib/utils";
 
-interface Order {
-  id: string;
+type OrderStatus = "pending" | "confirmed" | "shipping" | "delivered" | "cancelled";
+
+interface AdminOrder {
+  id: number;
+  userId?: number;
   customerName: string;
-  customerEmail: string;
-  customerPhone: string;
-  petId: string;
-  petName: string;
-  petBreed: string;
-  amount: string;
-  status: 'pending' | 'confirmed' | 'shipping' | 'delivered' | 'cancelled';
-  paymentMethod: 'cash' | 'bank_transfer' | 'credit_card';
-  shippingAddress: string;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  petName?: string;
+  petBreed?: string;
+  amount: number;
+  status: OrderStatus;
+  paymentMethod?: string;
+  shippingAddress?: string;
+  createdAt?: string;
 }
 
 const OrderManagement = () => {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [filteredOrders, setFilteredOrders] = useState<AdminOrder[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  // Load orders từ localStorage hoặc mock data
+  const normalizeOrder = (order: Partial<Order> & Record<string, any>): AdminOrder => {
+    const id =
+      order.order_id ??
+      order.orderId ??
+      order.id ??
+      0;
+    const userId =
+      order.userId ??
+      order.user_id ??
+      order.user?.userId ??
+      order.user?.id;
+
+    const orderDetails = order.order_details ?? order.orderDetails ?? [];
+    const firstDetail = Array.isArray(orderDetails) ? orderDetails[0] : undefined;
+
+    const petName =
+      firstDetail?.product?.productName ??
+      firstDetail?.product?.product_name ??
+      order.petName;
+
+    const petBreed = order.petBreed ?? order.pet_breed ?? petName;
+
+    const status = (order.status || "pending").toString().toLowerCase() as OrderStatus;
+
+    const paymentMethodRaw =
+      order.payment?.method ??
+      order.payment_method ??
+      order.paymentMethod;
+
+    return {
+      id: Number(id),
+      userId: userId ? Number(userId) : undefined,
+      customerName:
+        order.user?.username ??
+        order.user?.fullName ??
+        order.customerName ??
+        (userId ? `Khách #${userId}` : `Khách #${id}`),
+      customerEmail: order.user?.email ?? order.customerEmail,
+      customerPhone: order.user?.phone ?? order.customerPhone,
+      petName,
+      petBreed,
+      amount: Number(order.total_amount ?? order.totalAmount ?? order.amount ?? 0),
+      status,
+      paymentMethod: paymentMethodRaw?.toString().toLowerCase(),
+      shippingAddress: order.shippingAddress ?? order.shipment?.shipping_address,
+      createdAt: order.order_date ?? order.orderDate ?? order.created_at ?? order.createdAt,
+    };
+  };
+
   useEffect(() => {
-    const loadOrders = () => {
+    let ignore = false;
+    const loadOrders = async () => {
       try {
-        const ordersData = localStorage.getItem("cham_pets_orders");
-        if (ordersData) {
-          const allOrders = JSON.parse(ordersData);
-          setOrders(allOrders);
-          setFilteredOrders(allOrders);
-        } else {
-          // Mock data
-          const mockOrders: Order[] = [
-            {
-              id: "ORD001",
-              customerName: "Nguyễn Văn A",
-              customerEmail: "nguyenvana@email.com",
-              customerPhone: "0123456789",
-              petId: "1",
-              petName: "A'khan",
-              petBreed: "Bengal",
-              amount: "15.000.000 VNĐ",
-              status: "pending",
-              paymentMethod: "bank_transfer",
-              shippingAddress: "123 Đường ABC, Quận 1, TP.HCM",
-              notes: "Giao hàng vào cuối tuần",
-              createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-              updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              id: "ORD002",
-              customerName: "Trần Thị B",
-              customerEmail: "tranthib@email.com",
-              customerPhone: "0987654321",
-              petId: "2",
-              petName: "Mochi",
-              petBreed: "Ragdoll",
-              amount: "8.000.000 VNĐ",
-              status: "confirmed",
-              paymentMethod: "cash",
-              shippingAddress: "456 Đường XYZ, Quận 2, TP.HCM",
-              createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-              updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              id: "ORD003",
-              customerName: "Lê Văn C",
-              customerEmail: "levanc@email.com",
-              customerPhone: "0369852147",
-              petId: "3",
-              petName: "Aabaa",
-              petBreed: "Mèo ta",
-              amount: "6.000.000 VNĐ",
-              status: "shipping",
-              paymentMethod: "credit_card",
-              shippingAddress: "789 Đường DEF, Quận 3, TP.HCM",
-              createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-              updatedAt: new Date().toISOString()
-            },
-            {
-              id: "ORD004",
-              customerName: "Phạm Thị D",
-              customerEmail: "phamthid@email.com",
-              customerPhone: "0741852963",
-              petId: "4",
-              petName: "Aabaan",
-              petBreed: "British Shorthair",
-              amount: "7.500.000 VNĐ",
-              status: "delivered",
-              paymentMethod: "bank_transfer",
-              shippingAddress: "321 Đường GHI, Quận 4, TP.HCM",
-              createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-              updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              id: "ORD005",
-              customerName: "Hoàng Văn E",
-              customerEmail: "hoangvane@email.com",
-              customerPhone: "0527419638",
-              petId: "5",
-              petName: "Luna",
-              petBreed: "Maine Coon",
-              amount: "12.000.000 VNĐ",
-              status: "cancelled",
-              paymentMethod: "credit_card",
-              shippingAddress: "654 Đường JKL, Quận 5, TP.HCM",
-              notes: "Khách hàng hủy do thay đổi ý định",
-              createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-              updatedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString()
-            }
-          ];
-          setOrders(mockOrders);
-          setFilteredOrders(mockOrders);
-          localStorage.setItem("cham_pets_orders", JSON.stringify(mockOrders));
-        }
-      } catch (error) {
+        setIsLoading(true);
+        const data = await orderService.getAllOrders();
+        if (ignore) return;
+        const normalized = (data || []).map(normalizeOrder);
+        setOrders(normalized);
+        setFilteredOrders(normalized);
+      } catch (error: any) {
+        if (ignore) return;
         console.error("Error loading orders:", error);
+        toast({
+          title: "Không thể tải đơn hàng",
+          description: error?.message || "Vui lòng thử lại sau.",
+          variant: "destructive",
+        });
       } finally {
-        setIsLoading(false);
+        if (!ignore) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadOrders();
-  }, []);
+    return () => {
+      ignore = true;
+    };
+  }, [toast]);
 
-  // Filter orders
   useEffect(() => {
     let filtered = orders;
 
-    // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(order =>
-        order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.customerEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.petName.toLowerCase().includes(searchTerm.toLowerCase())
+      const keyword = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (order) =>
+          order.id.toString().toLowerCase().includes(keyword) ||
+          order.customerName.toLowerCase().includes(keyword) ||
+          order.customerEmail?.toLowerCase().includes(keyword) ||
+          order.petName?.toLowerCase().includes(keyword)
       );
     }
 
-    // Status filter
     if (statusFilter !== "all") {
-      filtered = filtered.filter(order => order.status === statusFilter);
+      filtered = filtered.filter((order) => order.status === statusFilter);
     }
 
-    // Payment method filter
     if (paymentFilter !== "all") {
-      filtered = filtered.filter(order => order.paymentMethod === paymentFilter);
+      filtered = filtered.filter((order) => order.paymentMethod === paymentFilter);
     }
 
     setFilteredOrders(filtered);
   }, [orders, searchTerm, statusFilter, paymentFilter]);
 
-  const handleUpdateStatus = (orderId: string, newStatus: Order['status']) => {
-    const updatedOrders = orders.map(order => 
-      order.id === orderId 
-        ? { ...order, status: newStatus, updatedAt: new Date().toISOString() }
-        : order
-    );
-    setOrders(updatedOrders);
-    localStorage.setItem("cham_pets_orders", JSON.stringify(updatedOrders));
+  const handleUpdateStatus = async (orderId: number, newStatus: OrderStatus) => {
+    const targetOrder = orders.find((order) => order.id === orderId);
+    if (!targetOrder?.userId) {
+      toast({
+        title: "Không thể cập nhật",
+        description: "Thiếu thông tin userId để cập nhật trạng thái đơn hàng.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await orderService.updateOrderStatus(orderId, {
+        userId: targetOrder.userId,
+        status: newStatus,
+        totalAmount: targetOrder.amount,
+      });
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === orderId ? { ...order, status: newStatus } : order
+        )
+      );
+      toast({
+        title: "Đã cập nhật trạng thái",
+        description: `Đơn hàng #${orderId} đã chuyển sang trạng thái ${getStatusLabel(newStatus)}.`,
+      });
+    } catch (error: any) {
+      console.error("Update order status error:", error);
+      toast({
+        title: "Cập nhật trạng thái thất bại",
+        description: error?.message || "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDeleteOrder = (orderId: string) => {
-    if (confirm("Bạn có chắc chắn muốn xóa đơn hàng này?")) {
-      const updatedOrders = orders.filter(order => order.id !== orderId);
-      setOrders(updatedOrders);
-      localStorage.setItem("cham_pets_orders", JSON.stringify(updatedOrders));
+  const handleDeleteOrder = async (orderId: number) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa đơn hàng này?")) return;
+    try {
+      await orderService.deleteOrder(orderId);
+      setOrders((prev) => prev.filter((order) => order.id !== orderId));
+      setFilteredOrders((prev) => prev.filter((order) => order.id !== orderId));
+      toast({
+        title: "Đã xóa đơn hàng",
+        description: `Đơn hàng #${orderId} đã được xóa.`,
+      });
+    } catch (error: any) {
+      console.error("Delete order error:", error);
+      toast({
+        title: "Xóa đơn hàng thất bại",
+        description: error?.message || "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
     }
   };
 
   const handleExportOrders = () => {
     const csvContent = [
-      ['ID', 'Khách hàng', 'Email', 'SĐT', 'Mèo', 'Giống', 'Số tiền', 'Trạng thái', 'Thanh toán', 'Địa chỉ', 'Ngày tạo'],
-      ...filteredOrders.map(order => [
+      ["ID", "Khách hàng", "Email", "SĐT", "Mèo", "Giống", "Số tiền", "Trạng thái", "Thanh toán", "Địa chỉ", "Ngày tạo"],
+      ...filteredOrders.map((order) => [
         order.id,
         order.customerName,
-        order.customerEmail,
-        order.customerPhone,
-        order.petName,
-        order.petBreed,
+        order.customerEmail || "",
+        order.customerPhone || "",
+        order.petName || "",
+        order.petBreed || "",
         order.amount,
         getStatusLabel(order.status),
         getPaymentMethodLabel(order.paymentMethod),
-        order.shippingAddress,
-        new Date(order.createdAt).toLocaleDateString('vi-VN')
-      ])
-    ].map(row => row.join(',')).join('\n');
+        order.shippingAddress || "",
+        order.createdAt ? formatDateTime(order.createdAt) : "",
+      ]),
+    ]
+      .map((row) => row.join(","))
+      .join("\n");
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `orders_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `orders_${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('vi-VN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: OrderStatus) => {
     const variants = {
       pending: 'secondary',
       confirmed: 'default',
@@ -266,13 +275,13 @@ const OrderManagement = () => {
     };
 
     return (
-      <Badge variant={variants[status as keyof typeof variants]}>
-        {labels[status as keyof typeof labels]}
+      <Badge variant={variants[status]}>
+        {labels[status]}
       </Badge>
     );
   };
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: OrderStatus) => {
     const labels = {
       pending: 'Chờ xử lý',
       confirmed: 'Đã xác nhận',
@@ -280,19 +289,20 @@ const OrderManagement = () => {
       delivered: 'Đã giao',
       cancelled: 'Đã hủy'
     };
-    return labels[status as keyof typeof labels];
+    return labels[status];
   };
 
-  const getPaymentMethodLabel = (method: string) => {
+  const getPaymentMethodLabel = (method?: string) => {
     const labels = {
       cash: 'Tiền mặt',
       bank_transfer: 'Chuyển khoản',
       credit_card: 'Thẻ tín dụng'
     };
-    return labels[method as keyof typeof labels];
+    if (!method) return 'Không xác định';
+    return labels[method as keyof typeof labels] ?? method;
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: OrderStatus) => {
     switch (status) {
       case 'pending':
         return <Package className="h-4 w-4" />;
@@ -480,7 +490,9 @@ const OrderManagement = () => {
                           <div className="text-sm text-muted-foreground">{order.petBreed}</div>
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium text-green-600">{order.amount}</TableCell>
+                      <TableCell className="font-medium text-green-600">
+                        {formatCurrencyVND(order.amount)}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {getStatusIcon(order.status)}
@@ -489,7 +501,7 @@ const OrderManagement = () => {
                       </TableCell>
                       <TableCell className="text-sm">{getPaymentMethodLabel(order.paymentMethod)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {formatDate(order.createdAt)}
+                        {order.createdAt ? formatDateTime(order.createdAt) : '—'}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>

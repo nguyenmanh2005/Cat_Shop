@@ -33,8 +33,7 @@ import {
   Trash2, 
   Folder,
   Download,
-  MoreHorizontal,
-  Filter
+  MoreHorizontal
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -44,167 +43,190 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { categoryService, productService } from "@/services/productService";
+import type { Category, ProductType, Product } from "@/types";
 
-interface ProductType {
-  type_id: number;
-  type_name: string;
+interface AdminCategory {
+  id: number;
+  name: string;
+  description?: string;
+  typeId?: number;
+  typeName?: string;
+  productCount: number;
 }
 
-interface Category {
-  category_id: number;
-  category_name: string;
-  description: string;
-  type_id: number;
-  type_name?: string;
-  product_count?: number;
-}
+const TYPE_LABELS: Record<number, string> = {
+  1: "Mèo cảnh",
+  2: "Thức ăn",
+  3: "Lồng chuồng",
+  4: "Vệ sinh",
+};
 
 const CategoryManagement = () => {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<AdminCategory[]>([]);
+  const [filteredCategories, setFilteredCategories] = useState<AdminCategory[]>([]);
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const { toast } = useToast();
 
-  // Load mock data
+  const normalizeCategory = (
+    category: Partial<Category> & Record<string, any>,
+    productStats: Map<number, number>
+  ): AdminCategory => {
+    const categoryId =
+      category.categoryId ??
+      category.category_id ??
+      category.id ??
+      0;
+    const typeId =
+      category.typeId ??
+      category.type_id ??
+      category.type?.typeId ??
+      category.type?.type_id;
+
+    return {
+      id: categoryId,
+      name: category.categoryName ?? category.category_name ?? `Danh mục #${categoryId}`,
+      description: category.description ?? "",
+      typeId: typeId ? Number(typeId) : undefined,
+      typeName:
+        category.type?.typeName ??
+        category.type_name ??
+        (typeId ? TYPE_LABELS[Number(typeId)] : undefined) ??
+        "Không xác định",
+      productCount: productStats.get(categoryId) ?? 0,
+    };
+  };
+
   useEffect(() => {
-    const loadData = () => {
+    let ignore = false;
+    const loadData = async () => {
       try {
-        // Mock Product Types
-        const mockTypes: ProductType[] = [
-          { type_id: 1, type_name: "Mèo cảnh" },
-          { type_id: 2, type_name: "Thức ăn" },
-          { type_id: 3, type_name: "Lồng chuồng" },
-          { type_id: 4, type_name: "Vệ sinh" }
-        ];
+        setIsLoading(true);
+        const [categoriesResponse, productsResponse] = await Promise.all([
+          categoryService.getAllCategoriesAdmin(),
+          productService.getAllProductsCustomer().catch(() => []),
+        ]);
 
-        // Mock Categories
-        const mockCategories: Category[] = [
-          { 
-            category_id: 1, 
-            category_name: "Mèo thuần chủng", 
-            description: "Các giống mèo thuần chủng, khỏe mạnh, đã tiêm phòng", 
-            type_id: 1,
-            type_name: "Mèo cảnh",
-            product_count: 12
-          },
-          { 
-            category_id: 2, 
-            category_name: "Mèo lai", 
-            description: "Các giống mèo lai, giá cả phải chăng", 
-            type_id: 1,
-            type_name: "Mèo cảnh",
-            product_count: 8
-          },
-          { 
-            category_id: 3, 
-            category_name: "Thức ăn khô", 
-            description: "Thức ăn khô cho mèo các độ tuổi", 
-            type_id: 2,
-            type_name: "Thức ăn",
-            product_count: 25
-          },
-          { 
-            category_id: 4, 
-            category_name: "Thức ăn ướt", 
-            description: "Thức ăn ướt, pate cho mèo", 
-            type_id: 2,
-            type_name: "Thức ăn",
-            product_count: 18
-          },
-          { 
-            category_id: 5, 
-            category_name: "Lồng vận chuyển", 
-            description: "Lồng để vận chuyển mèo an toàn", 
-            type_id: 3,
-            type_name: "Lồng chuồng",
-            product_count: 6
-          },
-          { 
-            category_id: 6, 
-            category_name: "Lồng chơi", 
-            description: "Lồng để mèo vui chơi, nghỉ ngơi", 
-            type_id: 3,
-            type_name: "Lồng chuồng",
-            product_count: 4
-          },
-          { 
-            category_id: 7, 
-            category_name: "Cát vệ sinh", 
-            description: "Cát vệ sinh khử mùi cho mèo", 
-            type_id: 4,
-            type_name: "Vệ sinh",
-            product_count: 15
-          },
-          { 
-            category_id: 8, 
-            category_name: "Khay vệ sinh", 
-            description: "Khay đựng cát vệ sinh", 
-            type_id: 4,
-            type_name: "Vệ sinh",
-            product_count: 9
-          }
-        ];
+        if (ignore) return;
 
-        setProductTypes(mockTypes);
-        setCategories(mockCategories);
-        setFilteredCategories(mockCategories);
-      } catch (error) {
-        console.error("Error loading data:", error);
+        const productStats = new Map<number, number>();
+        (productsResponse || []).forEach((product: Partial<Product> & Record<string, any>) => {
+          const rawId =
+            product.categoryId ??
+            product.category_id ??
+            product.category?.categoryId ??
+            product.category?.category_id;
+          const categoryId = rawId ? Number(rawId) : undefined;
+          if (!categoryId) return;
+          const current = productStats.get(categoryId) ?? 0;
+          productStats.set(categoryId, current + 1);
+        });
+
+        const normalizedCategories = (categoriesResponse || []).map((category) =>
+          normalizeCategory(category, productStats)
+        );
+
+        const derivedTypes: ProductType[] = Array.from(
+          new Map(
+            normalizedCategories
+              .filter((category) => category.typeId)
+              .map((category) => [
+                category.typeId!,
+                category.typeName || TYPE_LABELS[category.typeId!] || "Không xác định",
+              ])
+          )
+        ).map(([typeId, typeName]) => ({
+          typeId,
+          typeName,
+        }));
+
+        setProductTypes(derivedTypes);
+        setCategories(normalizedCategories);
+        setFilteredCategories(normalizedCategories);
+      } catch (error: any) {
+        if (ignore) return;
+        console.error("Error loading categories:", error);
+        toast({
+          title: "Không thể tải danh mục",
+          description: error?.message || "Vui lòng thử lại sau.",
+          variant: "destructive",
+        });
       } finally {
-        setIsLoading(false);
+        if (!ignore) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadData();
-  }, []);
+    return () => {
+      ignore = true;
+    };
+  }, [toast]);
 
   // Filter categories
   useEffect(() => {
     let filtered = categories;
 
-    // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(category =>
-        category.category_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        category.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        category.type_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      const keyword = searchTerm.toLowerCase();
+      filtered = filtered.filter((category) =>
+        category.name.toLowerCase().includes(keyword) ||
+        category.description?.toLowerCase().includes(keyword) ||
+        category.typeName?.toLowerCase().includes(keyword)
       );
     }
 
-    // Type filter
     if (typeFilter !== "all") {
-      filtered = filtered.filter(category => category.type_id.toString() === typeFilter);
+      filtered = filtered.filter((category) => category.typeId?.toString() === typeFilter);
     }
 
     setFilteredCategories(filtered);
   }, [categories, searchTerm, typeFilter]);
 
-  const handleDeleteCategory = (categoryId: number) => {
-    if (confirm("Bạn có chắc chắn muốn xóa danh mục này?")) {
-      const updatedCategories = categories.filter(category => category.category_id !== categoryId);
-      setCategories(updatedCategories);
+  const handleDeleteCategory = async (categoryId: number) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa danh mục này?")) return;
+    try {
+      await categoryService.deleteCategory(categoryId);
+      setCategories((prev) => prev.filter((category) => category.id !== categoryId));
+      setFilteredCategories((prev) => prev.filter((category) => category.id !== categoryId));
+      toast({
+        title: "Đã xóa danh mục",
+        description: `Danh mục #${categoryId} đã được xóa.`,
+      });
+    } catch (error: any) {
+      console.error("Delete category error:", error);
+      toast({
+        title: "Xóa danh mục thất bại",
+        description: error?.message || "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
     }
   };
 
   const handleExportCategories = () => {
     const csvContent = [
-      ['ID', 'Tên danh mục', 'Loại sản phẩm', 'Mô tả', 'Số sản phẩm'],
-      ...filteredCategories.map(category => [
-        category.category_id,
-        category.category_name,
-        category.type_name,
+      ["ID", "Tên danh mục", "Loại sản phẩm", "Mô tả", "Số sản phẩm"],
+      ...filteredCategories.map((category) => [
+        category.id,
+        category.name,
+        category.typeName,
         category.description,
-        category.product_count
-      ])
-    ].map(row => row.join(',')).join('\n');
+        category.productCount,
+      ]),
+    ]
+      .map((row) => row.join(","))
+      .join("\n");
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `categories_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `categories_${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
   };
 
@@ -257,9 +279,9 @@ const CategoryManagement = () => {
                       <SelectValue placeholder="Chọn loại sản phẩm" />
                     </SelectTrigger>
                     <SelectContent>
-                      {productTypes.map(type => (
-                        <SelectItem key={type.type_id} value={type.type_id.toString()}>
-                          {type.type_name}
+                      {productTypes.map((type) => (
+                        <SelectItem key={type.typeId} value={type.typeId.toString()}>
+                          {type.typeName}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -299,7 +321,7 @@ const CategoryManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {categories.filter(c => c.type_id === 1).length}
+              {categories.filter(c => c.typeId === 1).length}
             </div>
           </CardContent>
         </Card>
@@ -309,7 +331,7 @@ const CategoryManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {categories.filter(c => c.type_id === 2).length}
+              {categories.filter(c => c.typeId === 2).length}
             </div>
           </CardContent>
         </Card>
@@ -319,7 +341,7 @@ const CategoryManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {categories.filter(c => c.type_id === 3 || c.type_id === 4).length}
+              {categories.filter(c => c.typeId === 3 || c.typeId === 4).length}
             </div>
           </CardContent>
         </Card>
@@ -349,9 +371,9 @@ const CategoryManagement = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả loại</SelectItem>
-                {productTypes.map(type => (
-                  <SelectItem key={type.type_id} value={type.type_id.toString()}>
-                    {type.type_name}
+                {productTypes.map((type) => (
+                  <SelectItem key={type.typeId} value={type.typeId.toString()}>
+                    {type.typeName}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -390,15 +412,15 @@ const CategoryManagement = () => {
                   </TableRow>
                 ) : (
                   filteredCategories.map((category) => (
-                    <TableRow key={category.category_id}>
-                      <TableCell className="font-mono text-sm">{category.category_id}</TableCell>
-                      <TableCell className="font-medium">{category.category_name}</TableCell>
+                    <TableRow key={category.id}>
+                      <TableCell className="font-mono text-sm">{category.id}</TableCell>
+                      <TableCell className="font-medium">{category.name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{category.type_name}</Badge>
+                        <Badge variant="outline">{category.typeName}</Badge>
                       </TableCell>
                       <TableCell className="max-w-xs truncate">{category.description}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{category.product_count} sản phẩm</Badge>
+                        <Badge variant="secondary">{category.productCount} sản phẩm</Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -418,9 +440,9 @@ const CategoryManagement = () => {
                               Xem sản phẩm
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="text-red-600"
-                              onClick={() => handleDeleteCategory(category.category_id)}
+                              onClick={() => handleDeleteCategory(category.id)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Xóa

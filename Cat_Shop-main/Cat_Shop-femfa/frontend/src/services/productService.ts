@@ -1,6 +1,6 @@
 import { apiService } from './api';
 import { API_CONFIG, buildUrl } from '@/config/api';
-import { Product, ProductType, Category } from '@/types';
+import { Product, Category } from '@/types';
 
 // Product Service - gọi API backend
 export const productService = {
@@ -11,12 +11,13 @@ export const productService = {
 
   // Lấy sản phẩm theo ID
   async getProductById(id: number): Promise<Product> {
-    return apiService.get<Product>(`/customer/products/${id}`);
+    const url = buildUrl(API_CONFIG.ENDPOINTS.PRODUCTS.DETAIL, { id });
+    return apiService.get<Product>(url);
   },
 
   // Lấy sản phẩm theo loại
   async getProductsByType(typeId: number): Promise<Product[]> {
-    return apiService.get<Product[]>(`${API_CONFIG.ENDPOINTS.PRODUCTS.LIST}?typeId=${typeId}`);
+    return apiService.get<Product[]>(`/customer/products/type/${typeId}`);
   },
 
   // Lấy sản phẩm theo danh mục
@@ -32,7 +33,7 @@ export const productService = {
 
   // Tìm kiếm sản phẩm
   async searchProducts(searchTerm: string): Promise<Product[]> {
-    return apiService.get<Product[]>(`${API_CONFIG.ENDPOINTS.PRODUCTS.SEARCH}?q=${encodeURIComponent(searchTerm)}`);
+    return apiService.get<Product[]>(`${API_CONFIG.ENDPOINTS.PRODUCTS.SEARCH}?keyword=${encodeURIComponent(searchTerm)}`);
   },
 
   // Tạo sản phẩm mới
@@ -55,25 +56,12 @@ export const productService = {
   // Lấy tất cả sản phẩm cho customer (public API)
   async getAllProductsCustomer(): Promise<Product[]> {
     try {
-      return await apiService.get<Product[]>("/customer/products");
+      return await apiService.get<Product[]>(API_CONFIG.ENDPOINTS.PRODUCTS.LIST);
     } catch (error: any) {
       console.error("Error fetching products:", error);
       // Trả về mảng rỗng nếu có lỗi để tránh crash
       return [];
     }
-  }
-};
-
-// ProductType Service
-export const productTypeService = {
-  // Lấy tất cả loại sản phẩm
-  async getAllProductTypes(): Promise<ProductType[]> {
-    return apiService.get<ProductType[]>(API_CONFIG.ENDPOINTS.PRODUCT_TYPES.LIST);
-  },
-
-  // Lấy loại sản phẩm theo ID
-  async getProductTypeById(id: number): Promise<ProductType> {
-    return apiService.get<ProductType>(`${API_CONFIG.ENDPOINTS.PRODUCT_TYPES.LIST}/${id}`);
   }
 };
 

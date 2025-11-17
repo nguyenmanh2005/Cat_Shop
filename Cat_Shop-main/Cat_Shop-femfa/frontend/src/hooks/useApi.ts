@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { productService, productTypeService, categoryService } from '@/services/productService';
+import { productService, categoryService } from '@/services/productService';
 import { userService } from '@/services/userService';
 import { orderService } from '@/services/orderService';
 import { reviewService } from '@/services/reviewService';
@@ -13,6 +13,13 @@ import {
   Review,
   CatDetail 
 } from '@/types';
+
+const DEFAULT_PRODUCT_TYPES: ProductType[] = [
+  { typeId: 1, typeName: "Mèo cảnh" },
+  { typeId: 2, typeName: "Thức ăn" },
+  { typeId: 3, typeName: "Lồng chuồng" },
+  { typeId: 4, typeName: "Vệ sinh" },
+];
 
 // Hook để quản lý sản phẩm qua API
 export const useProducts = () => {
@@ -136,36 +143,12 @@ export const useProducts = () => {
 
 // Hook để quản lý loại sản phẩm qua API
 export const useProductTypes = () => {
-  const [productTypes, setProductTypes] = useState<ProductType[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadProductTypes = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log("🔄 useProductTypes: Đang tải product types...");
-      const data = await productTypeService.getAllProductTypes();
-      console.log("✅ useProductTypes: Nhận được product types:", data);
-      console.log("📊 Số lượng product types:", data?.length || 0);
-      setProductTypes(data || []);
-    } catch (err) {
-      console.error("❌ useProductTypes: Lỗi khi tải product types:", err);
-      setError(err instanceof Error ? err.message : 'Lỗi không xác định');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadProductTypes();
-  }, []);
-
+  const [productTypes] = useState<ProductType[]>(DEFAULT_PRODUCT_TYPES);
   return {
     productTypes,
-    loading,
-    error,
-    loadProductTypes
+    loading: false,
+    error: null,
+    loadProductTypes: () => Promise.resolve(productTypes),
   };
 };
 

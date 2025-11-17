@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Eye, EyeOff, Mail, Lock, User, Phone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { calculatePasswordStrength, getStrengthColor, getStrengthLabel, type PasswordStrength } from "@/utils/passwordStrength";
 
 interface RegisterFormProps {
   onSwitchToLogin: () => void;
@@ -25,6 +27,7 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(calculatePasswordStrength(""));
 
   // Redirect trực tiếp trong cùng tab để đăng ký Google
   const handleGoogleRegister = () => {
@@ -39,6 +42,11 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
       ...prev,
       [name]: value
     }));
+    
+    // Tính độ mạnh mật khẩu khi password thay đổi
+    if (name === "password") {
+      setPasswordStrength(calculatePasswordStrength(value));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -170,6 +178,30 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
                 )}
               </Button>
             </div>
+            {formData.password && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Độ mạnh mật khẩu:</span>
+                  <span className={`font-medium ${passwordStrength.strength === "weak" ? "text-red-500" : passwordStrength.strength === "fair" ? "text-orange-500" : passwordStrength.strength === "good" ? "text-yellow-500" : "text-green-500"}`}>
+                    {getStrengthLabel(passwordStrength.strength)}
+                  </span>
+                </div>
+                <Progress 
+                  value={passwordStrength.score} 
+                  className={`h-2 ${passwordStrength.strength === "weak" ? "[&>div]:bg-red-500" : passwordStrength.strength === "fair" ? "[&>div]:bg-orange-500" : passwordStrength.strength === "good" ? "[&>div]:bg-yellow-500" : "[&>div]:bg-green-500"}`}
+                />
+                {passwordStrength.feedback.length > 0 && (
+                  <ul className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                    {passwordStrength.feedback.map((feedback, index) => (
+                      <li key={index} className="flex items-start">
+                        <span className="mr-1">•</span>
+                        <span>{feedback}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

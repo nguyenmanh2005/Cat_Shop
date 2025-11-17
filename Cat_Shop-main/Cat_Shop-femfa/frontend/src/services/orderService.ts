@@ -32,14 +32,24 @@ export const orderService = {
   },
 
   // Cập nhật trạng thái đơn hàng
-  async updateOrderStatus(id: number, status: string): Promise<Order> {
+  async updateOrderStatus(id: number, params: { userId: number; status: string; totalAmount: number }): Promise<Order> {
     const url = buildUrl(API_CONFIG.ENDPOINTS.ORDERS.UPDATE, { id });
-    return apiService.patch<Order>(url, { status });
+    return apiService.put<Order>(url, {
+      userId: params.userId,
+      status: params.status,
+      totalAmount: params.totalAmount
+    });
   },
 
   // Cập nhật đơn hàng
   async updateOrder(id: number, orderData: Partial<Order>): Promise<Order> {
     const url = buildUrl(API_CONFIG.ENDPOINTS.ORDERS.UPDATE, { id });
     return apiService.put<Order>(url, orderData);
+  },
+
+  // Xóa đơn hàng
+  async deleteOrder(id: number): Promise<void> {
+    const url = buildUrl(API_CONFIG.ENDPOINTS.ORDERS.DELETE, { id });
+    return apiService.delete<void>(url);
   }
 };

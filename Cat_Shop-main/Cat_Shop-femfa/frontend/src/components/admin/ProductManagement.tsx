@@ -35,8 +35,7 @@ import {
   Package,
   Download,
   MoreHorizontal,
-  Image as ImageIcon,
-  Filter
+  Image as ImageIcon
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -46,206 +45,206 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { productService, categoryService } from "@/services/productService";
+import type { Product, ProductType, Category } from "@/types";
+import { formatCurrencyVND } from "@/lib/utils";
 
-interface ProductType {
-  type_id: number;
-  type_name: string;
-}
-
-interface Category {
-  category_id: number;
-  category_name: string;
-  description: string;
-  type_id: number;
-}
-
-interface Product {
-  product_id: number;
-  product_name: string;
-  type_id: number;
-  category_id?: number;
+interface AdminProduct {
+  id: number;
+  name: string;
+  typeId?: number;
+  typeName?: string;
+  categoryId?: number;
+  categoryName?: string;
   price: number;
-  stock_quantity: number;
-  description: string;
-  image_url?: string;
-  type_name?: string;
-  category_name?: string;
+  stockQuantity: number;
+  description?: string;
 }
 
-interface CatDetail {
-  cat_id: number;
-  breed: string;
-  age: number;
-  gender: string;
-  vaccinated: boolean;
-}
-
-interface FoodDetail {
-  food_id: number;
-  weight_kg: number;
-  ingredients: string;
-  expiry_date: string;
-}
+const TYPE_LABELS: Record<number, string> = {
+  1: "Mèo cảnh",
+  2: "Thức ăn",
+  3: "Lồng chuồng",
+  4: "Vệ sinh",
+};
 
 const ProductManagement = () => {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<AdminProduct[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<AdminProduct[]>([]);
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<AdminProduct | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const { toast } = useToast();
 
-  // Load mock data
+  const normalizeProduct = (
+    product: Partial<Product> & Record<string, any>,
+    categoryLookup: Map<number, string>
+  ): AdminProduct => {
+    const productId =
+      product.productId ??
+      product.product_id ??
+      product.id ??
+      0;
+    const typeId =
+      product.typeId ??
+      product.type_id ??
+      product.type?.typeId ??
+      product.type?.type_id;
+    const categoryId =
+      product.categoryId ??
+      product.category_id ??
+      product.category?.categoryId ??
+      product.category?.category_id;
+
+    return {
+      id: productId,
+      name: product.productName ?? product.product_name ?? product.name ?? `Sản phẩm #${productId}`,
+      typeId: typeId ? Number(typeId) : undefined,
+      typeName:
+        product.typeName ??
+        product.type_name ??
+        product.type?.typeName ??
+        (typeId ? TYPE_LABELS[Number(typeId)] : undefined) ??
+        "Không xác định",
+      categoryId: categoryId ? Number(categoryId) : undefined,
+      categoryName:
+        product.categoryName ??
+        product.category_name ??
+        product.category?.categoryName ??
+        categoryLookup.get(Number(categoryId)) ??
+        "Chưa phân loại",
+      price: Number(product.price ?? 0),
+      stockQuantity: Number(product.stockQuantity ?? product.stock_quantity ?? 0),
+      description: product.description || "",
+    };
+  };
+
   useEffect(() => {
-    const loadData = () => {
+    let ignore = false;
+
+    const loadData = async () => {
       try {
-        // Mock Product Types
-        const mockTypes: ProductType[] = [
-          { type_id: 1, type_name: "Mèo cảnh" },
-          { type_id: 2, type_name: "Thức ăn" },
-          { type_id: 3, type_name: "Lồng chuồng" },
-          { type_id: 4, type_name: "Vệ sinh" }
-        ];
+        setIsLoading(true);
+        const [categoriesResponse, productsResponse] = await Promise.all([
+          categoryService.getAllCategoriesAdmin().catch(() => []),
+          productService.getAllProductsCustomer(),
+        ]);
 
-        // Mock Categories
-        const mockCategories: Category[] = [
-          { category_id: 1, category_name: "Mèo thuần chủng", description: "Các giống mèo thuần chủng", type_id: 1 },
-          { category_id: 2, category_name: "Thức ăn khô", description: "Thức ăn khô cho mèo", type_id: 2 },
-          { category_id: 3, category_name: "Lồng vận chuyển", description: "Lồng để vận chuyển mèo", type_id: 3 },
-          { category_id: 4, category_name: "Cát vệ sinh", description: "Cát vệ sinh cho mèo", type_id: 4 }
-        ];
+        if (ignore) return;
 
-        // Mock Products
-        const mockProducts: Product[] = [
-          {
-            product_id: 1,
-            product_name: "Mèo Bengal",
-            type_id: 1,
-            category_id: 1,
-            price: 15000000,
-            stock_quantity: 5,
-            description: "Mèo Bengal thuần chủng, khỏe mạnh, đã tiêm phòng",
-            type_name: "Mèo cảnh",
-            category_name: "Mèo thuần chủng"
-          },
-          {
-            product_id: 2,
-            product_name: "Royal Canin Adult",
-            type_id: 2,
-            category_id: 2,
-            price: 450000,
-            stock_quantity: 50,
-            description: "Thức ăn khô cho mèo trưởng thành",
-            type_name: "Thức ăn",
-            category_name: "Thức ăn khô"
-          },
-          {
-            product_id: 3,
-            product_name: "Lồng vận chuyển nhựa",
-            type_id: 3,
-            category_id: 3,
-            price: 350000,
-            stock_quantity: 20,
-            description: "Lồng vận chuyển an toàn cho mèo",
-            type_name: "Lồng chuồng",
-            category_name: "Lồng vận chuyển"
-          },
-          {
-            product_id: 4,
-            product_name: "Cát vệ sinh Ever Clean",
-            type_id: 4,
-            category_id: 4,
-            price: 120000,
-            stock_quantity: 100,
-            description: "Cát vệ sinh khử mùi tốt",
-            type_name: "Vệ sinh",
-            category_name: "Cát vệ sinh"
-          },
-          {
-            product_id: 5,
-            product_name: "Mèo Persian",
-            type_id: 1,
-            category_id: 1,
-            price: 8000000,
-            stock_quantity: 3,
-            description: "Mèo Persian lông dài, hiền lành",
-            type_name: "Mèo cảnh",
-            category_name: "Mèo thuần chủng"
-          }
-        ];
+        const categoryLookup = new Map<number, string>(
+          (categoriesResponse || []).map((category) => [
+            (category as any).categoryId ?? (category as any).category_id ?? (category as any).id,
+            (category as any).categoryName ?? (category as any).category_name ?? "Danh mục",
+          ])
+        );
 
-        setProductTypes(mockTypes);
-        setCategories(mockCategories);
-        setProducts(mockProducts);
-        setFilteredProducts(mockProducts);
-      } catch (error) {
-        console.error("Error loading data:", error);
+        const normalizedProducts = (productsResponse || []).map((product) =>
+          normalizeProduct(product, categoryLookup)
+        );
+
+        const derivedTypes: ProductType[] = Array.from(
+          new Map(
+            normalizedProducts
+              .filter((product) => product.typeId)
+              .map((product) => [product.typeId!, product.typeName || TYPE_LABELS[product.typeId!] || "Không xác định"])
+          )
+        ).map(([typeId, typeName]) => ({
+          typeId,
+          typeName,
+        }));
+
+        setProductTypes(derivedTypes);
+        setCategories(categoriesResponse || []);
+        setProducts(normalizedProducts);
+        setFilteredProducts(normalizedProducts);
+      } catch (error: any) {
+        if (ignore) return;
+        console.error("Error loading products:", error);
+        toast({
+          title: "Không thể tải sản phẩm",
+          description: error?.message || "Vui lòng thử lại sau.",
+          variant: "destructive",
+        });
       } finally {
-        setIsLoading(false);
+        if (!ignore) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadData();
-  }, []);
+    return () => {
+      ignore = true;
+    };
+  }, [toast]);
 
   // Filter products
   useEffect(() => {
     let filtered = products;
 
-    // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(product =>
-        product.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.type_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.category_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      const keyword = searchTerm.toLowerCase();
+      filtered = filtered.filter((product) =>
+        product.name.toLowerCase().includes(keyword) ||
+        product.description?.toLowerCase().includes(keyword) ||
+        product.typeName?.toLowerCase().includes(keyword) ||
+        product.categoryName?.toLowerCase().includes(keyword)
       );
     }
 
-    // Type filter
     if (typeFilter !== "all") {
-      filtered = filtered.filter(product => product.type_id.toString() === typeFilter);
+      filtered = filtered.filter((product) => product.typeId?.toString() === typeFilter);
     }
 
-    // Category filter
     if (categoryFilter !== "all") {
-      filtered = filtered.filter(product => product.category_id?.toString() === categoryFilter);
+      filtered = filtered.filter((product) => product.categoryId?.toString() === categoryFilter);
     }
 
     setFilteredProducts(filtered);
   }, [products, searchTerm, typeFilter, categoryFilter]);
 
-  const handleDeleteProduct = (productId: number) => {
-    if (confirm("Bạn có chắc chắn muốn xóa sản phẩm này?")) {
-      const updatedProducts = products.filter(product => product.product_id !== productId);
-      setProducts(updatedProducts);
+  const handleDeleteProduct = async (productId: number) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa sản phẩm này?")) {
+      return;
+    }
+    try {
+      await productService.deleteProduct(productId);
+      setProducts((prev) => prev.filter((product) => product.id !== productId));
+      setFilteredProducts((prev) => prev.filter((product) => product.id !== productId));
+      toast({
+        title: "Đã xóa sản phẩm",
+        description: `Sản phẩm #${productId} đã được xóa.`,
+      });
+    } catch (error: any) {
+      console.error("Delete product error:", error);
+      toast({
+        title: "Xóa sản phẩm thất bại",
+        description: error?.message || "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleViewDetails = (product: Product) => {
+  const handleViewDetails = (product: AdminProduct) => {
     setSelectedProduct(product);
     setIsDetailOpen(true);
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(amount);
   };
 
   const getStockBadge = (quantity: number) => {
     if (quantity === 0) {
       return <Badge variant="destructive">Hết hàng</Badge>;
-    } else if (quantity < 10) {
-      return <Badge variant="secondary">Sắp hết</Badge>;
-    } else {
-      return <Badge variant="default">Còn hàng</Badge>;
     }
+    if (quantity < 10) {
+      return <Badge variant="secondary">Sắp hết</Badge>;
+    }
+    return <Badge variant="default">Còn hàng</Badge>;
   };
 
   if (isLoading) {
@@ -294,7 +293,7 @@ const ProductManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {products.filter(p => p.type_id === 1).length}
+              {products.filter(p => p.typeId === 1).length}
             </div>
           </CardContent>
         </Card>
@@ -304,7 +303,7 @@ const ProductManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {products.filter(p => p.type_id === 2).length}
+              {products.filter(p => p.typeId === 2).length}
             </div>
           </CardContent>
         </Card>
@@ -314,7 +313,7 @@ const ProductManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {products.filter(p => p.type_id === 3 || p.type_id === 4).length}
+              {products.filter(p => p.typeId === 3 || p.typeId === 4).length}
             </div>
           </CardContent>
         </Card>
@@ -344,11 +343,15 @@ const ProductManagement = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả loại</SelectItem>
-                {productTypes.map(type => (
-                  <SelectItem key={type.type_id} value={type.type_id.toString()}>
-                    {type.type_name}
-                  </SelectItem>
-                ))}
+                {productTypes.map((type) => {
+                  const typeId = type.typeId ?? type.type_id;
+                  const typeName = type.typeName ?? type.type_name;
+                  return (
+                    <SelectItem key={typeId} value={typeId?.toString() ?? ""}>
+                      {typeName}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -357,11 +360,15 @@ const ProductManagement = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả danh mục</SelectItem>
-                {categories.map(category => (
-                  <SelectItem key={category.category_id} value={category.category_id.toString()}>
-                    {category.category_name}
-                  </SelectItem>
-                ))}
+                {categories.map((category) => {
+                  const categoryId = category.categoryId ?? category.category_id;
+                  const categoryName = category.categoryName ?? category.category_name;
+                  return (
+                    <SelectItem key={categoryId} value={categoryId?.toString() ?? ""}>
+                      {categoryName}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -400,18 +407,18 @@ const ProductManagement = () => {
                   </TableRow>
                 ) : (
                   filteredProducts.map((product) => (
-                    <TableRow key={product.product_id}>
-                      <TableCell className="font-mono text-sm">{product.product_id}</TableCell>
-                      <TableCell className="font-medium">{product.product_name}</TableCell>
+                    <TableRow key={product.id}>
+                      <TableCell className="font-mono text-sm">{product.id}</TableCell>
+                      <TableCell className="font-medium">{product.name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{product.type_name}</Badge>
+                        <Badge variant="outline">{product.typeName}</Badge>
                       </TableCell>
-                      <TableCell>{product.category_name}</TableCell>
+                      <TableCell>{product.categoryName}</TableCell>
                       <TableCell className="font-medium text-green-600">
-                        {formatCurrency(product.price)}
+                        {formatCurrencyVND(product.price)}
                       </TableCell>
-                      <TableCell>{product.stock_quantity}</TableCell>
-                      <TableCell>{getStockBadge(product.stock_quantity)}</TableCell>
+                      <TableCell>{product.stockQuantity}</TableCell>
+                      <TableCell>{getStockBadge(product.stockQuantity)}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -430,9 +437,9 @@ const ProductManagement = () => {
                               Chỉnh sửa
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="text-red-600"
-                              onClick={() => handleDeleteProduct(product.product_id)}
+                              onClick={() => handleDeleteProduct(product.id)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Xóa
@@ -463,46 +470,35 @@ const ProductManagement = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Tên sản phẩm</label>
-                  <p className="text-lg font-semibold">{selectedProduct.product_name}</p>
+                  <p className="text-lg font-semibold">{selectedProduct.name}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">ID</label>
-                  <p className="font-mono">{selectedProduct.product_id}</p>
+                  <p className="font-mono">{selectedProduct.id}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Loại</label>
-                  <p>{selectedProduct.type_name}</p>
+                  <p>{selectedProduct.typeName}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Danh mục</label>
-                  <p>{selectedProduct.category_name}</p>
+                  <p>{selectedProduct.categoryName}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Giá</label>
                   <p className="text-lg font-semibold text-green-600">
-                    {formatCurrency(selectedProduct.price)}
+                    {formatCurrencyVND(selectedProduct.price)}
                   </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Tồn kho</label>
-                  <p>{selectedProduct.stock_quantity}</p>
+                  <p>{selectedProduct.stockQuantity}</p>
                 </div>
               </div>
               <div>
                 <label className="text-sm font-medium">Mô tả</label>
-                <p className="text-muted-foreground">{selectedProduct.description}</p>
+                <p className="text-muted-foreground">{selectedProduct.description || "—"}</p>
               </div>
-              {selectedProduct.type_id === 1 && (
-                <div className="border-t pt-4">
-                  <h4 className="font-medium mb-2">Thông tin mèo</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>Giống: <span className="font-medium">Bengal</span></div>
-                    <div>Tuổi: <span className="font-medium">3 tháng</span></div>
-                    <div>Giới tính: <span className="font-medium">Đực</span></div>
-                    <div>Đã tiêm phòng: <span className="font-medium">Có</span></div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </DialogContent>

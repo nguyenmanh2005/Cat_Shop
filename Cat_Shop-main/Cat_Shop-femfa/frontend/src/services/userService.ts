@@ -17,7 +17,7 @@ export const userService = {
 
   // Lấy người dùng theo email
   async getUserByEmail(email: string): Promise<User> {
-    return apiService.get<User>(`${API_CONFIG.ENDPOINTS.USERS.LIST}?email=${encodeURIComponent(email)}`);
+    return apiService.get<User>(`/users/email/${encodeURIComponent(email)}`);
   },
 
   // Lấy người dùng theo username

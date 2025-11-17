@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { authService } from "../api/authService";
 import type { RegisterPayload } from "../api/authService";
 import ErrorAlert from "./ErrorAlert";
+import { calculatePasswordStrength, getStrengthLabel } from "@/utils/passwordStrength";
 
 type RegisterFormValues = RegisterPayload;
 
@@ -10,11 +11,14 @@ const RegisterForm = () => {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
     reset,
   } = useForm<RegisterFormValues>();
   const [error, setError] = useState<string | undefined>();
   const [successMessage, setSuccessMessage] = useState<string | undefined>();
+  const password = watch("password");
+  const passwordStrength = calculatePasswordStrength(password || "");
 
   // Xử lý gửi form đăng ký lên server
   const onSubmit = async (formValues: RegisterFormValues) => {
@@ -90,6 +94,40 @@ const RegisterForm = () => {
             })}
           />
           {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>}
+          {password && (
+            <div className="mt-2 space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500">Độ mạnh mật khẩu:</span>
+                <span className={`font-medium ${passwordStrength.strength === "weak" ? "text-red-500" : passwordStrength.strength === "fair" ? "text-orange-500" : passwordStrength.strength === "good" ? "text-yellow-500" : "text-green-500"}`}>
+                  {getStrengthLabel(passwordStrength.strength)}
+                </span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    passwordStrength.strength === "weak"
+                      ? "bg-red-500"
+                      : passwordStrength.strength === "fair"
+                      ? "bg-orange-500"
+                      : passwordStrength.strength === "good"
+                      ? "bg-yellow-500"
+                      : "bg-green-500"
+                  }`}
+                  style={{ width: `${passwordStrength.score}%` }}
+                />
+              </div>
+              {passwordStrength.feedback.length > 0 && (
+                <ul className="text-xs text-slate-500 space-y-0.5 mt-1">
+                  {passwordStrength.feedback.map((feedback, index) => (
+                    <li key={index} className="flex items-start">
+                      <span className="mr-1">•</span>
+                      <span>{feedback}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
 
         <button

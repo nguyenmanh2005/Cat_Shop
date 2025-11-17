@@ -31,14 +31,14 @@ export const API_CONFIG = {
     
     // Products
     PRODUCTS: {
-      LIST: '/products',
-      DETAIL: '/products/:id',
-      CREATE: '/products',
-      UPDATE: '/products/:id',
-      DELETE: '/products/:id',
-      SEARCH: '/products/search',
-      BY_CATEGORY: '/products/category/:categoryId',
-      FEATURED: '/products/featured'
+      LIST: '/customer/products',
+      DETAIL: '/customer/products/:id',
+      CREATE: '/admin/products',
+      UPDATE: '/admin/products/:id',
+      DELETE: '/admin/products/:id',
+      SEARCH: '/customer/products/search',
+      BY_CATEGORY: '/customer/products/category/:categoryId',
+      FEATURED: '/customer/products'
     },
     
     // Categories
@@ -63,7 +63,7 @@ export const API_CONFIG = {
     
     // Users
     USERS: {
-      LIST: '/users',
+      LIST: '/users/getAll',
       DETAIL: '/users/:id',
       CREATE: '/users',
       UPDATE: '/users/:id',
@@ -74,13 +74,13 @@ export const API_CONFIG = {
     
     // Orders
     ORDERS: {
-      LIST: '/orders',
+      LIST: '/orders/admin/all',
       DETAIL: '/orders/:id',
       CREATE: '/orders',
       UPDATE: '/orders/:id',
       DELETE: '/orders/:id',
       USER_ORDERS: '/orders/user/:userId',
-      UPDATE_STATUS: '/orders/:id/status'
+      UPDATE_STATUS: '/orders/:id'
     },
     
     // Order Items
@@ -104,10 +104,12 @@ export const API_CONFIG = {
     // Cat Details
     CAT_DETAILS: {
       LIST: '/cat-details',
+      LIST_ADMIN: '/admin/cat-details',
       DETAIL: '/cat-details/:id',
-      CREATE: '/cat-details',
-      UPDATE: '/cat-details/:id',
-      DELETE: '/cat-details/:id'
+      DETAIL_ADMIN: '/admin/cat-details/:id',
+      CREATE: '/admin/cat-details',
+      UPDATE: '/admin/cat-details/:id',
+      DELETE: '/admin/cat-details/:id'
     },
     
     // File Upload
