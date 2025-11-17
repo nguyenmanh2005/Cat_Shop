@@ -369,4 +369,49 @@ export const authService = {
       throw new Error(errorMessage);
     }
   },
+
+  async verifyGoogleAuthenticator(email: string, code: string): Promise<TokenResponse> {
+    try {
+      console.log('🔐 Verifying Google Authenticator:', {
+        email,
+        codeLength: code.length,
+      });
+      
+      const response = await apiService.post<TokenResponse>(
+        API_CONFIG.ENDPOINTS.AUTH.MFA_VERIFY,
+        { email, code }
+      );
+
+      console.log('✅ Verify Google Authenticator response:', response);
+
+      // Nếu có accessToken, lưu token
+      if (response.accessToken) {
+        storeTokens(response, email);
+      }
+
+      return response;
+    } catch (error: any) {
+      console.error('❌ Verify Google Authenticator error:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+      });
+      
+      // Lấy thông báo lỗi từ backend
+      let errorMessage = 'Xác thực Google Authenticator thất bại';
+      
+      if (error.response?.data) {
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  },
 };

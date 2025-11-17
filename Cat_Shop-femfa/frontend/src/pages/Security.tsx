@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Key, Download, RefreshCw, Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -79,30 +80,53 @@ const Security = () => {
       setError(undefined);
       setLoadingQr(true);
       setQrBase64(null);
+      
+      // Gọi API với query string theo word.txt: POST /auth/mfa/enable?email=<email>
       const data = await apiService.post<{
         qrBase64: string;
         backupCodes?: string[];
         backupCodesCount?: number;
-      }>("/auth/mfa/enable", null, {
-        params: { email: user.email },
-      });
-      setQrBase64(data.qrBase64);
+        secret?: string;
+      }>(`/auth/mfa/enable?email=${encodeURIComponent(user.email)}`, null);
+      
+      console.log('✅ MFA Enable Response:', data);
+      
+      // Kiểm tra và xử lý QR code
+      if (data.qrBase64) {
+        // Đảm bảo QR code có prefix data:image nếu chưa có
+        let qrCodeUrl = data.qrBase64;
+        if (!qrCodeUrl.startsWith('data:image')) {
+          qrCodeUrl = `data:image/png;base64,${qrCodeUrl}`;
+        }
+        setQrBase64(qrCodeUrl);
+        console.log('✅ QR Code đã được set:', qrCodeUrl.substring(0, 50) + '...');
+      } else {
+        console.warn('⚠️ Không có QR code trong response');
+        setError("Không nhận được QR code từ server. Vui lòng thử lại.");
+      }
+      
+      // Xử lý backup codes
       if (data.backupCodes && Array.isArray(data.backupCodes)) {
         setBackupCodes(data.backupCodes);
         setShowBackupCodes(true);
         setRemainingBackupCodes(data.backupCodes.length);
+        console.log('✅ Backup codes đã được set:', data.backupCodes.length);
       }
+      
       setMfaEnabled(true);
       toast({
         title: "Thành công",
         description: "MFA đã được bật. Vui lòng quét QR code và lưu backup codes.",
       });
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-        return;
-      }
-      setError("Không thể bật MFA. Vui lòng thử lại.");
+    } catch (err: any) {
+      console.error('❌ Error enabling MFA:', err);
+      const errorMessage = err?.response?.data?.message || err?.message || "Không thể bật MFA. Vui lòng thử lại.";
+      setError(errorMessage);
+      toast({
+        title: "Lỗi",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setLoadingQr(false);
     }
@@ -152,22 +176,52 @@ const Security = () => {
     try {
       setError(undefined);
       setVerifyingCode(true);
-      await apiService.post("/auth/mfa/verify", {
+      
+      // Validate và format code theo word.txt
+      // - Google Authenticator: 6 số → convert sang number
+      // - Backup Code: XXXX-XXXX → giữ nguyên string
+      const isGoogleAuthCode = /^\d{6}$/.test(code);
+      const isBackupCode = /^[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(code);
+      
+      if (!isGoogleAuthCode && !isBackupCode) {
+        setError("Mã phải là 6 số (Google Authenticator) hoặc XXXX-XXXX (Backup Code)");
+        return;
+      }
+      
+      // Format code: số → number, backup code → string uppercase
+      const formattedCode = isGoogleAuthCode 
+        ? parseInt(code, 10)  // Convert 6-digit code to number
+        : code.toUpperCase().replace(/\s/g, ''); // Backup code: uppercase, remove spaces
+      
+      console.log('🔐 Verifying MFA:', {
         email: user.email,
-        code,
+        code: formattedCode,
+        codeType: isGoogleAuthCode ? 'GoogleAuth' : 'BackupCode',
       });
+      
+      const response = await apiService.post("/auth/mfa/verify", {
+        email: user.email,
+        code: formattedCode,
+      });
+      
+      console.log('✅ MFA Verify Response:', response);
+      
       reset();
+      setQrBase64(null); // Clear QR code after successful verification
       toast({
         title: "Thành công",
         description: "Xác minh Google Authenticator thành công!",
       });
       await checkMfaStatus();
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-        return;
-      }
-      setError("Mã Google Authenticator không chính xác, vui lòng thử lại.");
+    } catch (err: any) {
+      console.error('❌ Verify Google Authenticator error:', err);
+      const errorMessage = err?.response?.data?.message || err?.message || "Mã Google Authenticator không chính xác, vui lòng thử lại.";
+      setError(errorMessage);
+      toast({
+        title: "Lỗi xác thực",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setVerifyingCode(false);
     }
@@ -204,13 +258,36 @@ const Security = () => {
           {/* Google Authenticator Section */}
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Key className="h-5 w-5" />
-                Google Authenticator (MFA)
-              </CardTitle>
-              <CardDescription>
-                Bật xác thực đa yếu tố để bảo vệ tài khoản của bạn
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Key className="h-5 w-5" />
+                    Google Authenticator (MFA)
+                  </CardTitle>
+                  <CardDescription>
+                    Bật xác thực đa yếu tố để bảo vệ tài khoản của bạn
+                  </CardDescription>
+                </div>
+                {!checkingMfa && mfaEnabled !== null && (
+                  <div className="flex items-center gap-3">
+                    <Label htmlFor="mfa-toggle" className="text-sm font-medium cursor-pointer">
+                      {mfaEnabled ? "Đã bật" : "Đã tắt"}
+                    </Label>
+                    <Switch
+                      id="mfa-toggle"
+                      checked={mfaEnabled}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          handleEnableMfa();
+                        } else {
+                          handleDisableMfa();
+                        }
+                      }}
+                      disabled={loadingQr || checkingMfa}
+                    />
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {checkingMfa ? (
@@ -236,13 +313,49 @@ const Security = () => {
                       <div className="h-2 w-2 rounded-full bg-green-500"></div>
                       <p className="text-sm font-semibold text-green-800">MFA đã được bật</p>
                     </div>
+                    <p className="text-xs text-green-700 mt-2">
+                      Tài khoản của bạn đang được bảo vệ bằng xác thực đa yếu tố. Bạn có thể tắt MFA bằng cách sử dụng Switch ở trên.
+                    </p>
                   </div>
 
-                  {qrBase64 && (
+                  {qrBase64 ? (
+                    <div className="space-y-4">
+                      <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-6 text-center">
+                        <div className="mb-4">
+                          <h3 className="text-sm font-semibold text-blue-900 mb-2">
+                            Bước 1: Quét mã QR
+                          </h3>
+                          <p className="text-xs text-blue-700 mb-4">
+                            Mở ứng dụng Google Authenticator trên điện thoại và quét mã QR bên dưới
+                          </p>
+                        </div>
+                        <div className="bg-white rounded-lg p-4 inline-block">
+                          <img 
+                            src={qrBase64} 
+                            alt="QR Code MFA" 
+                            className="mx-auto h-48 w-48 object-contain"
+                            onError={(e) => {
+                              console.error('❌ QR Code image load error:', e);
+                              setError("Không thể hiển thị QR code. Vui lòng thử lại.");
+                            }}
+                          />
+                        </div>
+                        <p className="mt-4 text-xs text-blue-700">
+                          💡 <strong>Chưa có ứng dụng?</strong> Tải Google Authenticator từ App Store hoặc Google Play
+                        </p>
+                      </div>
+                      
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                        <p className="text-xs text-amber-800">
+                          <strong>⚠️ Lưu ý:</strong> Sau khi quét QR code, bạn sẽ thấy mã 6 số trong ứng dụng Google Authenticator. 
+                          Nhập mã đó vào ô "Mã xác thực" bên dưới để hoàn tất việc bật MFA.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center">
-                      <img src={qrBase64} alt="QR MFA" className="mx-auto h-40 w-40 object-contain" />
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Quét mã QR này bằng ứng dụng Google Authenticator
+                      <p className="text-sm text-muted-foreground">
+                        QR code sẽ được hiển thị sau khi bật MFA
                       </p>
                     </div>
                   )}
