@@ -61,7 +61,7 @@ const ProfileMenu = () => {
           <User className="mr-2 h-4 w-4" />
           <span>Thông tin cá nhân</span>
         </DropdownMenuItem>
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/favorites")}>
           <Heart className="mr-2 h-4 w-4" />
           <span>Thú cưng yêu thích</span>
         </DropdownMenuItem>

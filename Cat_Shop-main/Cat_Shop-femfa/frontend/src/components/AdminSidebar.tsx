@@ -6,11 +6,9 @@ import {
   Users, 
   PawPrint, 
   ShoppingCart, 
-  Settings, 
   BarChart3,
   Bell,
   FileText,
-  Shield,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -39,37 +37,25 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
       id: "users",
       label: "Quản lý Users",
       icon: Users,
-      badge: "12"
-    },
-    {
-      id: "users-db",
-      label: "Users (Database)",
-      icon: Users,
-      badge: "5"
+      badge: null
     },
     {
       id: "products",
       label: "Quản lý Sản phẩm",
       icon: PawPrint,
-      badge: "25"
+      badge: null
     },
     {
       id: "categories",
       label: "Quản lý Danh mục",
       icon: FileText,
-      badge: "8"
+      badge: null
     },
     {
       id: "orders",
       label: "Đơn hàng",
       icon: ShoppingCart,
-      badge: "156"
-    },
-    {
-      id: "orders-db",
-      label: "Đơn hàng (Database)",
-      icon: ShoppingCart,
-      badge: "5"
+      badge: null
     },
     {
       id: "analytics",
@@ -93,24 +79,6 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
       id: "notifications",
       label: "Thông báo",
       icon: Bell,
-      badge: "3"
-    },
-    {
-      id: "reports",
-      label: "Báo cáo",
-      icon: FileText,
-      badge: null
-    },
-    {
-      id: "security",
-      label: "Bảo mật",
-      icon: Shield,
-      badge: null
-    },
-    {
-      id: "settings",
-      label: "Cài đặt",
-      icon: Settings,
       badge: null
     }
   ];

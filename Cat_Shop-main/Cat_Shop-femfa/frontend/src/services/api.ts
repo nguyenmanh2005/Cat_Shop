@@ -38,10 +38,8 @@ const createApiInstance = (): AxiosInstance => {
         '/api/auth/qr/confirm',
         '/api/auth/qr/status',
         // Public customer endpoints - không cần authentication
-        '/customer/products',
         '/customer/categories',
         '/categories/customer',
-        '/api/customer/products',
         '/api/customer/categories',
         '/api/categories/customer',
       ];
@@ -130,10 +128,8 @@ const createApiInstance = (): AxiosInstance => {
         '/api/auth/forgot-password',
         '/api/auth/reset-password',
         // Public customer endpoints - không cần authentication
-        '/customer/products',
         '/customer/categories',
         '/categories/customer',
-        '/api/customer/products',
         '/api/customer/categories',
         '/api/categories/customer',
       ];

@@ -14,6 +14,9 @@ import { Product, ProductType, Category } from "@/types/index";
 import { productService } from "@/services/productService"; // 🆕 import trực tiếp service
 import { getCategoryDisplayName } from "@/utils/categoryMapping"; // 🔧 Import mapping utility
 import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
+import { useToast } from "@/hooks/use-toast";
+import { loadFavoriteIds, saveFavoriteIds } from "@/utils/favorites";
 
 const PetGrid = () => {
   const navigate = useNavigate();
@@ -24,10 +27,13 @@ const PetGrid = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [favoriteIds, setFavoriteIds] = useState<number[]>(() => loadFavoriteIds());
 
   //  Lấy loại sản phẩm & danh mục
   const { productTypes, loading: typesLoading } = useProductTypes();
   const { categories, loading: categoriesLoading } = useCategories();
+  const { addItem } = useCart();
+  const { toast } = useToast();
 
   //  Lấy danh sách sản phẩm public (không cần đăng nhập)
   useEffect(() => {
@@ -51,6 +57,10 @@ const PetGrid = () => {
 
     fetchProducts();
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    saveFavoriteIds(favoriteIds);
+  }, [favoriteIds]);
 
   const breadcrumbItems = [
     { label: "TRANG CHỦ", href: "/" },
@@ -105,6 +115,36 @@ const PetGrid = () => {
     }
 
     setFilteredProducts(filtered);
+  };
+
+  const handleViewDetails = (product: Product) => {
+    if (!product?.productId) return;
+    navigate(`/product/${product.productId}`);
+  };
+
+  const handleAddToCart = (product: Product) => {
+    addItem(product, 1);
+    toast({
+      title: "Đã thêm vào giỏ hàng",
+      description: `${product.productName} đã được thêm vào giỏ.`,
+    });
+  };
+
+  const handleToggleFavorite = (product: Product) => {
+    if (!product?.productId) return;
+    setFavoriteIds((prev) => {
+      const exists = prev.includes(product.productId);
+      const updated = exists
+        ? prev.filter((id) => id !== product.productId)
+        : [...prev, product.productId];
+
+      toast({
+        title: exists ? "Đã bỏ yêu thích" : "Đã thêm vào yêu thích",
+        description: product.productName,
+      });
+
+      return updated;
+    });
   };
 
   const totalLoading = loading || typesLoading || categoriesLoading;
@@ -214,9 +254,10 @@ const PetGrid = () => {
               <ProductCard
                 key={product.productId}
                 product={product}
-                onClick={() => {
-                  navigate(`/product/${product.productId}`);
-                }}
+                onViewDetails={() => handleViewDetails(product)}
+                onAddToCart={handleAddToCart}
+                onToggleFavorite={handleToggleFavorite}
+                isFavorite={favoriteIds.includes(product.productId)}
               />
             ))}
           </div>

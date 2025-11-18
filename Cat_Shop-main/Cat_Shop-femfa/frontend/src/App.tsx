@@ -15,6 +15,7 @@ import Admin from "./pages/Admin";
 import Profile from "./pages/Profile";
 import Security from "./pages/Security";
 import Settings from "./pages/Settings";
+import Favorites from "./pages/Favorites";
 import LoginTest from "./pages/LoginTest";
 import NotFound from "./pages/NotFound";
 import ProductDetail from "./pages/ProductDetail";
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/cat-food" element={<CatFood />} />
               <Route path="/cattail" element={<Cattail />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/favorites" element={<Favorites />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/security" element={<Security />} />
               <Route path="/admin" element={<Admin />} />

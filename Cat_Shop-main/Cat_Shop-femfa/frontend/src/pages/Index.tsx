@@ -150,10 +150,10 @@ const Index = () => {
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {features.map((feature, index) => {
+              {features.map((feature) => {
                 const Icon = feature.icon;
                 return (
-                  <Card key={index} className="text-center hover:shadow-lg transition-shadow">
+                  <Card key={feature.title} className="text-center hover:shadow-lg transition-shadow">
                     <CardContent className="p-6">
                       <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                         <Icon className="h-8 w-8 text-primary" />
@@ -222,8 +222,8 @@ const Index = () => {
                   Cham Pets cung cấp đầy đủ các dịch vụ từ tư vấn, chọn mèo đến chăm sóc sau khi mua.
                 </p>
                 <div className="space-y-3">
-                  {services.map((service, index) => (
-                    <div key={index} className="flex items-center gap-3">
+                  {services.map((service) => (
+                    <div key={service} className="flex items-center gap-3">
                       <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
                       <span>{service}</span>
                     </div>

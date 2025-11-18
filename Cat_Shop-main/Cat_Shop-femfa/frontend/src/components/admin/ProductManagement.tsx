@@ -346,9 +346,12 @@ const ProductManagement = () => {
                 {productTypes.map((type) => {
                   const typeId = type.typeId ?? type.type_id;
                   const typeName = type.typeName ?? type.type_name;
+                  if (typeId == null) {
+                    return null;
+                  }
                   return (
-                    <SelectItem key={typeId} value={typeId?.toString() ?? ""}>
-                      {typeName}
+                    <SelectItem key={`type-${typeId}`} value={typeId.toString()}>
+                      {typeName || TYPE_LABELS[typeId] || "Không xác định"}
                     </SelectItem>
                   );
                 })}
@@ -363,9 +366,12 @@ const ProductManagement = () => {
                 {categories.map((category) => {
                   const categoryId = category.categoryId ?? category.category_id;
                   const categoryName = category.categoryName ?? category.category_name;
+                  if (categoryId == null) {
+                    return null;
+                  }
                   return (
-                    <SelectItem key={categoryId} value={categoryId?.toString() ?? ""}>
-                      {categoryName}
+                    <SelectItem key={`category-${categoryId}`} value={categoryId.toString()}>
+                      {categoryName || "Không có tên"}
                     </SelectItem>
                   );
                 })}
@@ -406,8 +412,13 @@ const ProductManagement = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredProducts.map((product) => (
-                    <TableRow key={product.id}>
+                  filteredProducts.map((product, index) => {
+                    const rowKey =
+                      product.id && product.id !== 0
+                        ? `product-${product.id}`
+                        : `product-index-${index}`;
+                    return (
+                      <TableRow key={rowKey}>
                       <TableCell className="font-mono text-sm">{product.id}</TableCell>
                       <TableCell className="font-medium">{product.name}</TableCell>
                       <TableCell>
@@ -439,7 +450,7 @@ const ProductManagement = () => {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-red-600"
-                              onClick={() => handleDeleteProduct(product.id)}
+                              onClick={() => product.id && handleDeleteProduct(product.id)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Xóa
@@ -448,7 +459,8 @@ const ProductManagement = () => {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))
+                  );
+                  })
                 )}
               </TableBody>
             </Table>
