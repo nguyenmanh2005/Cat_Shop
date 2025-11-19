@@ -13,10 +13,8 @@ import com.catshop.catshop.entity.User;
 import com.catshop.catshop.exception.BadRequestException;
 import com.catshop.catshop.exception.ResourceNotFoundException;
 import com.catshop.catshop.repository.UserRepository;
-import com.catshop.catshop.service.AuthService;
-import com.catshop.catshop.service.DeviceService;
-import com.catshop.catshop.service.MfaService;
-import com.catshop.catshop.service.QrLoginService;
+import com.catshop.catshop.entity.SecurityEventType;
+import com.catshop.catshop.service.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +38,10 @@ public class AuthController {
     private final DeviceService deviceService;
     private final QrLoginService qrLoginService;
     private final com.catshop.catshop.service.BackupCodeService backupCodeService;
+    private final AuthRateLimiter authRateLimiter;
+    private final SecurityEventService securityEventService;
+    private final SafeModeService safeModeService;
+    private final EmailService emailService;
 
     // ✅ Bước 1: Login (gửi OTP nếu thiết bị lạ)
     @PostMapping("/login")
@@ -50,6 +52,9 @@ public class AuthController {
         log.info("🔐 Login request received for email: {}", loginRequest.getEmail());
         String email = loginRequest.getEmail();
         String deviceId = loginRequest.getDeviceId();
+        String ip = request.getRemoteAddr();
+        String agent = request.getHeader("User-Agent");
+        String hostName = request.getRemoteHost();
         
         // Xử lý trường hợp deviceId null hoặc empty
         if (deviceId == null || deviceId.isBlank()) {
@@ -57,21 +62,37 @@ public class AuthController {
             throw new BadRequestException("Thiết bị ID không được để trống");
         }
         
+        authRateLimiter.validateLoginAttempt(email, ip);
+
+        if (safeModeService.isSafeModeEnabled(email)) {
+            securityEventService.recordEvent(email, SecurityEventType.LOGIN_FAILED,
+                    "Đăng nhập bị chặn vì Safe Mode đang bật",
+                    ip, agent, null);
+            throw new BadRequestException("Tài khoản đang bật Safe Mode. Vui lòng tắt Safe Mode để tiếp tục đăng nhập.");
+        }
+
         // 1️⃣ Kiểm tra email + password
         // Nếu email/password sai → throw exception ngay
         try {
             authService.validateCredentials(loginRequest);
             log.info("✅ Credentials validated for: {}", email);
         } catch (com.catshop.catshop.exception.ResourceNotFoundException e) {
-            // Email không tồn tại
             log.error("❌ Email not found: {}", email);
-            throw e; // Re-throw để GlobalExceptionHandler xử lý
+            securityEventService.recordEvent(email, SecurityEventType.LOGIN_FAILED,
+                    "Đăng nhập thất bại - Email không tồn tại",
+                    ip, agent, null);
+            throw e;
         } catch (BadRequestException e) {
-            // Mật khẩu sai
             log.error("❌ Invalid password for: {}", email);
-            throw e; // Re-throw để GlobalExceptionHandler xử lý
+            securityEventService.recordEvent(email, SecurityEventType.LOGIN_FAILED,
+                    "Đăng nhập thất bại - Sai mật khẩu",
+                    ip, agent, null);
+            throw e;
         } catch (Exception e) {
             log.error("❌ Credential validation failed for {}: {}", email, e.getMessage(), e);
+            securityEventService.recordEvent(email, SecurityEventType.LOGIN_FAILED,
+                    "Đăng nhập thất bại - Lỗi hệ thống",
+                    ip, agent, null);
             throw new BadRequestException("Email hoặc mật khẩu không chính xác");
         }
 
@@ -81,17 +102,15 @@ public class AuthController {
             User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new BadRequestException("Không tìm thấy người dùng"));
 
+            boolean newDeviceDetected = false;
             // Kiểm tra device trust chỉ để log (không chặn đăng nhập)
             try {
                 boolean trusted = deviceService.isTrusted(email, deviceId);
                 log.info("🔍 Device trust check for {}: trusted={}", email, trusted);
-                
+
                 if (!trusted) {
+                    newDeviceDetected = true;
                     log.info("⚠️ New device detected for: {} - Device will be marked as trusted after successful login", email);
-                    // Đánh dấu thiết bị là trusted sau khi đăng nhập thành công
-                    String ip = request.getRemoteAddr();
-                    String agent = request.getHeader("User-Agent");
-                    String hostName = request.getRemoteHost(); // tên máy nếu server xác định được
                     try {
                         deviceService.markTrusted(email, deviceId, ip, agent, hostName);
                     } catch (Exception e) {
@@ -118,6 +137,17 @@ public class AuthController {
 
             TokenResponse tokens = new TokenResponse(accessToken, refreshToken, false);
             log.info("✅ Login successful for: {}", email);
+            securityEventService.recordEvent(email, SecurityEventType.LOGIN_SUCCESS,
+                    "Đăng nhập thành công",
+                    ip, agent, Map.of("deviceId", deviceId, "hostName", hostName == null ? "" : hostName));
+
+            if (newDeviceDetected) {
+                securityEventService.recordEvent(email, SecurityEventType.NEW_DEVICE_LOGIN,
+                        "Đăng nhập từ thiết bị mới",
+                        ip, agent,
+                        Map.of("deviceId", deviceId, "hostName", hostName == null ? "" : hostName));
+                sendNewDeviceEmail(email, ip, agent, hostName);
+            }
             return ResponseEntity.ok(ApiResponse.success(tokens, "Đăng nhập thành công"));
         } catch (BadRequestException e) {
             log.error("❌ Bad request during login for {}: {}", email, e.getMessage());
@@ -137,20 +167,38 @@ public class AuthController {
 
         String email = otpRequest.getEmail();
         String deviceId = otpRequest.getDeviceId();
+        String ip = request.getRemoteAddr();
+        String agent = request.getHeader("User-Agent");
 
         if (deviceId == null || deviceId.isBlank()) {
             throw new BadRequestException("Thiết bị ID không được để trống");
         }
 
+        authRateLimiter.validateOtpVerification(email, ip);
+
         // ✅ Kiểm tra + xác thực OTP
-        TokenResponse tokenResponse = authService.verifyOtp(otpRequest);
+        TokenResponse tokenResponse;
+        try {
+            tokenResponse = authService.verifyOtp(otpRequest);
+        } catch (BadRequestException e) {
+            securityEventService.recordEvent(email, SecurityEventType.OTP_FAILED,
+                    "OTP không hợp lệ",
+                    ip, agent, null);
+            throw e;
+        }
 
         // ✅ Nếu OTP đúng → đánh dấu thiết bị là trusted
-        String ip = request.getRemoteAddr();
-        String agent = request.getHeader("User-Agent");
         String hostName = request.getRemoteHost();
 
         deviceService.markTrusted(email, deviceId, ip, agent, hostName);
+        securityEventService.recordEvent(email, SecurityEventType.OTP_VERIFIED,
+                "OTP xác thực thành công",
+                ip, agent,
+                Map.of("deviceId", deviceId));
+        securityEventService.recordEvent(email, SecurityEventType.DEVICE_TRUSTED,
+                "Thiết bị đã được đánh dấu tin cậy",
+                ip, agent,
+                Map.of("deviceId", deviceId, "hostName", hostName == null ? "" : hostName));
 
         // ✅ OTP verification hoàn tất - OTP và MFA là 2 phương thức xác thực độc lập
         return ResponseEntity.ok(ApiResponse.success(tokenResponse,
@@ -274,20 +322,27 @@ public class AuthController {
 
     // ✅ Gửi OTP khi user click nút "Nhận OTP"
     @PostMapping("/send-otp")
-    public ResponseEntity<ApiResponse<String>> sendOtp(@RequestBody Map<String, String> request) {
+    public ResponseEntity<ApiResponse<String>> sendOtp(@RequestBody Map<String, String> request,
+                                                      HttpServletRequest servletRequest) {
         log.info("═══════════════════════════════════════════════════════════");
         log.info("📨 [SEND-OTP] Request received: {}", request);
         String email = request.get("email");
+        String ip = servletRequest.getRemoteAddr();
+        String agent = servletRequest.getHeader("User-Agent");
         if (email == null || email.isBlank()) {
             log.error("❌ [SEND-OTP] Email is null or blank");
             throw new BadRequestException("Email không được để trống");
         }
-        
+        authRateLimiter.validateOtpRequest(email, ip);
+
         log.info("📧 [SEND-OTP] Processing OTP request for email: {}", email);
         
         try {
             authService.sendOtp(email);
             log.info("✅ [SEND-OTP] OTP sent successfully to: {}", email);
+            securityEventService.recordEvent(email, SecurityEventType.OTP_SENT,
+                    "Đã gửi OTP tới email",
+                    ip, agent, null);
             log.info("═══════════════════════════════════════════════════════════");
             return ResponseEntity.ok(ApiResponse.success(
                     "Mã OTP đã được gửi đến email của bạn",
@@ -296,12 +351,18 @@ public class AuthController {
             log.error("❌ [SEND-OTP] Email not found: {}", email);
             log.error("❌ [SEND-OTP] Exception: {}", e.getMessage());
             log.info("═══════════════════════════════════════════════════════════");
+            securityEventService.recordEvent(email, SecurityEventType.OTP_FAILED,
+                    "Gửi OTP thất bại - Email không tồn tại",
+                    ip, agent, null);
             throw e; // Re-throw để GlobalExceptionHandler xử lý
         } catch (Exception e) {
             log.error("❌ [SEND-OTP] Failed to send OTP to {}: {}", email, e.getMessage());
             log.error("❌ [SEND-OTP] Exception type: {}", e.getClass().getName());
             log.error("❌ [SEND-OTP] Full exception: ", e);
             log.info("═══════════════════════════════════════════════════════════");
+            securityEventService.recordEvent(email, SecurityEventType.OTP_FAILED,
+                    "Gửi OTP thất bại - Lỗi hệ thống",
+                    ip, agent, null);
             // Không throw exception - vẫn trả về success để OTP có thể được log và test
             // OTP vẫn được tạo và lưu, chỉ là email không gửi được
             return ResponseEntity.ok(ApiResponse.success(
@@ -412,6 +473,29 @@ public class AuthController {
             log.error("❌ [QR-LOGIN] Failed to check status: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(ApiResponse.error(500, 
                     "Không thể kiểm tra trạng thái: " + e.getMessage()));
+        }
+    }
+
+    private void sendNewDeviceEmail(String email, String ip, String agent, String hostName) {
+        try {
+            String subject = "Cảnh báo bảo mật: Đăng nhập từ thiết bị mới";
+            String safeAgent = agent == null ? "Thiết bị không xác định" : agent;
+            String safeHost = hostName == null ? "Không xác định" : hostName;
+            String body = """
+                    <div style="font-family: Arial; padding: 20px; background-color: #f9fafc;">
+                        <h2 style="color: #e53e3e;">Đăng nhập từ thiết bị mới</h2>
+                        <p>Tài khoản của bạn vừa đăng nhập từ thiết bị chưa từng được xác minh.</p>
+                        <ul>
+                            <li><strong>Địa chỉ IP:</strong> %s</li>
+                            <li><strong>Thiết bị:</strong> %s</li>
+                            <li><strong>Tên máy:</strong> %s</li>
+                        </ul>
+                        <p>Nếu không phải bạn, vui lòng bật Safe Mode và đổi mật khẩu ngay lập tức.</p>
+                    </div>
+                    """.formatted(ip, safeAgent, safeHost);
+            emailService.sendSecurityAlertEmail(email, subject, body);
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to send new device email for {}: {}", email, e.getMessage());
         }
     }
 

@@ -8,13 +8,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Key, Download, RefreshCw, Eye, EyeOff, Lock, Smartphone, Trash2, AlertTriangle, Clock, Globe } from "lucide-react";
+import { Shield, Key, Download, RefreshCw, Eye, EyeOff, Lock, Smartphone, Trash2, AlertTriangle, Clock, Globe, ShieldAlert, Activity } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { apiService } from "@/services/api";
 import { userService } from "@/services/userService";
 
 type GoogleAuthenticatorFormValues = {
   code: string;
+};
+
+type SecurityEvent = {
+  id: number;
+  eventType: string;
+  message: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  metadata?: Record<string, any> | null;
+  createdAt: string;
 };
 
 const Security = () => {
@@ -47,6 +57,10 @@ const Security = () => {
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [securityAlerts, setSecurityAlerts] = useState<any[]>([]);
+  const [safeModeEnabled, setSafeModeEnabled] = useState(false);
+  const [processingSafeMode, setProcessingSafeMode] = useState(false);
+  const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(false);
 
   const {
     register,
@@ -77,6 +91,8 @@ const Security = () => {
 
       // Tải danh sách thiết bị để hiển thị + sinh cảnh báo
       loadDevices();
+      fetchSafeModeStatus();
+      loadSecurityEvents();
     }
   }, [isAuthenticated, user, navigate]);
 
@@ -292,6 +308,23 @@ const Security = () => {
     }
   };
 
+  const loadSecurityEvents = async () => {
+    if (!user?.email) return;
+    try {
+      setLoadingEvents(true);
+      const data = await apiService.get<SecurityEvent[]>(
+        "/security/events",
+        { params: { email: user.email, limit: 20 } }
+      );
+      setSecurityEvents(data || []);
+    } catch (err) {
+      console.error("Không thể tải nhật ký bảo mật:", err);
+      setSecurityEvents([]);
+    } finally {
+      setLoadingEvents(false);
+    }
+  };
+
   // Đăng xuất (xóa) một thiết bị
   const handleRemoveDevice = async (deviceId: number) => {
     if (!user?.email) return;
@@ -310,6 +343,7 @@ const Security = () => {
         description: "Thiết bị này sẽ cần đăng nhập lại lần sau.",
       });
       await loadDevices();
+      await loadSecurityEvents();
     } catch (err: any) {
       toast({
         title: "Lỗi",
@@ -337,12 +371,60 @@ const Security = () => {
         description: "Tất cả thiết bị khác sẽ cần đăng nhập lại.",
       });
       await loadDevices();
+      await loadSecurityEvents();
     } catch (err: any) {
       toast({
         title: "Lỗi",
         description: err.message || "Không thể xóa thiết bị",
         variant: "destructive",
       });
+    }
+  };
+
+  const fetchSafeModeStatus = async () => {
+    if (!user?.email) return;
+    try {
+      const data = await apiService.get<{ enabled: boolean }>(
+        "/security/safe-mode/status",
+        { params: { email: user.email } }
+      );
+      setSafeModeEnabled(!!data?.enabled);
+    } catch (err) {
+      console.error("Không thể lấy trạng thái Safe Mode:", err);
+    }
+  };
+
+  const handleSafeModeToggle = async (enable: boolean) => {
+    if (!user?.email) return;
+    try {
+      setProcessingSafeMode(true);
+      if (enable) {
+        await apiService.post("/security/safe-mode/enable", null, {
+          params: { email: user.email },
+        });
+        toast({
+          title: "Safe Mode đã bật",
+          description: "Tài khoản sẽ chặn mọi đăng nhập mới cho đến khi bạn tắt Safe Mode.",
+        });
+      } else {
+        await apiService.post("/security/safe-mode/disable", null, {
+          params: { email: user.email },
+        });
+        toast({
+          title: "Safe Mode đã tắt",
+          description: "Bạn có thể đăng nhập bình thường trên các thiết bị.",
+        });
+      }
+      setSafeModeEnabled(enable);
+      await loadSecurityEvents();
+    } catch (err: any) {
+      toast({
+        title: "Không thể thay đổi Safe Mode",
+        description: err.message || "Vui lòng thử lại sau",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingSafeMode(false);
     }
   };
 
@@ -406,6 +488,24 @@ const Security = () => {
     return date.toLocaleDateString("vi-VN");
   };
 
+  const renderEventIcon = (type: string) => {
+    switch (type) {
+      case "LOGIN_SUCCESS":
+        return <Shield className="h-4 w-4 text-green-600" />;
+      case "LOGIN_FAILED":
+      case "OTP_FAILED":
+        return <ShieldAlert className="h-4 w-4 text-red-600" />;
+      case "NEW_DEVICE_LOGIN":
+      case "DEVICE_TRUSTED":
+        return <Smartphone className="h-4 w-4 text-blue-600" />;
+      case "SAFE_MODE_ENABLED":
+      case "SAFE_MODE_DISABLED":
+        return <Lock className="h-4 w-4 text-amber-600" />;
+      default:
+        return <Activity className="h-4 w-4 text-slate-600" />;
+    }
+  };
+
   // Parse user agent để lấy tên thiết bị
   const parseUserAgent = (userAgent: string | null) => {
     if (!userAgent) return "Thiết bị không xác định";
@@ -439,6 +539,12 @@ const Security = () => {
         : "";
 
     return `${label}: ${normalizedIp}${hostDisplay}`;
+  };
+
+  const getHostNameFromMetadata = (metadata?: Record<string, any> | null) => {
+    if (!metadata) return null;
+    const host = metadata.hostName ?? metadata.hostname;
+    return typeof host === "string" ? host : null;
   };
 
   // Tắt MFA
@@ -586,6 +692,46 @@ const Security = () => {
               <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
+
+          {/* Safe Mode Section */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5" />
+                Safe Mode (Khoá bảo mật)
+              </CardTitle>
+              <CardDescription>
+                Khi bật Safe Mode, mọi đăng nhập mới sẽ bị chặn cho đến khi bạn tắt chế độ này.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Trạng thái:{" "}
+                  <span className={safeModeEnabled ? "text-red-600" : "text-green-600"}>
+                    {safeModeEnabled ? "Đang bật" : "Đang tắt"}
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {safeModeEnabled
+                    ? "Tài khoản đang được bảo vệ. Không thiết bị nào có thể đăng nhập mới."
+                    : "Bật Safe Mode khi bạn nghi ngờ tài khoản bị xâm nhập."}
+                </p>
+              </div>
+              <Button
+                variant={safeModeEnabled ? "destructive" : "outline"}
+                onClick={() => handleSafeModeToggle(!safeModeEnabled)}
+                disabled={processingSafeMode}
+                className="w-full md:w-auto"
+              >
+                {processingSafeMode
+                  ? "Đang xử lý..."
+                  : safeModeEnabled
+                  ? "Tắt Safe Mode"
+                  : "Bật Safe Mode"}
+              </Button>
+            </CardContent>
+          </Card>
 
           {/* Đổi mật khẩu Section */}
           <Card className="mb-6">
@@ -969,6 +1115,55 @@ const Security = () => {
               </CardContent>
             </Card>
           )}
+
+          {/* Security Events Section */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Nhật ký bảo mật
+              </CardTitle>
+              <CardDescription>
+                Các hoạt động gần đây liên quan đến đăng nhập, OTP và Safe Mode
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingEvents ? (
+                <div className="text-center py-6 text-sm text-muted-foreground">Đang tải nhật ký...</div>
+              ) : securityEvents.length === 0 ? (
+                <div className="text-center py-6 text-sm text-muted-foreground">
+                  Chưa có hoạt động bảo mật nào gần đây
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {securityEvents.map((event) => (
+                    <div
+                      key={event.id}
+                      className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3"
+                    >
+                      <div className="mt-1">
+                        {renderEventIcon(event.eventType)}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-foreground">{event.message}</p>
+                        <div className="mt-1 text-xs text-muted-foreground space-y-1">
+                          {event.ipAddress && (
+                            <p>
+                              IP:{" "}
+                              <span className="font-medium">
+                                {formatIpDisplay(event.ipAddress, getHostNameFromMetadata(event.metadata))}
+                              </span>
+                            </p>
+                          )}
+                          <p>{formatTime(event.createdAt)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Cảnh báo bảo mật Section */}
           {securityAlerts.length > 0 && (
