@@ -26,21 +26,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { 
-  Search, 
-  Plus, 
-  Eye, 
-  Edit, 
-  Trash2, 
+import {
+  Search,
+  Plus,
+  Eye,
+  Edit,
+  Trash2,
   Users,
   Download,
   MoreHorizontal,
   Shield,
-  User,
   Mail,
   Phone,
   MapPin
 } from "lucide-react";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -86,7 +86,7 @@ const UserManagementDB = () => {
   const resolveRoleName = (user: Partial<User> & Record<string, any>): string => {
     const rawRole =
       user.role?.roleName ??
-      user.role?.role_name ??
+      user.role?.roleName ??
       user.roleName ??
       user.role_name;
     if (rawRole) {

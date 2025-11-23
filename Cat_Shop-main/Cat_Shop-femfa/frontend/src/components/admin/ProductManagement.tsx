@@ -24,7 +24,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { 
   Search, 
@@ -35,8 +34,11 @@ import {
   Package,
   Download,
   MoreHorizontal,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Upload
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,11 +64,13 @@ interface AdminProduct {
   description?: string;
 }
 
-const TYPE_LABELS: Record<number, string> = {
-  1: "Mèo cảnh",
-  2: "Thức ăn",
-  3: "Lồng chuồng",
-  4: "Vệ sinh",
+// Map typeName từ database (tiếng Anh) sang tiếng Việt để hiển thị
+const TYPE_NAME_MAP: Record<string, string> = {
+  "Cat": "Mèo cảnh",
+  "Food": "Thức ăn",
+  "Cage": "Lồng chuồng",
+  "Cleaning": "Vệ sinh",
+  "Toy": "Đồ chơi",
 };
 
 const ProductManagement = () => {
@@ -80,6 +84,18 @@ const ProductManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<AdminProduct | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [formData, setFormData] = useState({
+    productName: "",
+    typeId: "",
+    categoryId: "",
+    price: "",
+    stockQuantity: "",
+    description: "",
+  });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const { toast } = useToast();
 
   const normalizeProduct = (
@@ -106,12 +122,14 @@ const ProductManagement = () => {
       id: productId,
       name: product.productName ?? product.product_name ?? product.name ?? `Sản phẩm #${productId}`,
       typeId: typeId ? Number(typeId) : undefined,
-      typeName:
-        product.typeName ??
-        product.type_name ??
-        product.type?.typeName ??
-        (typeId ? TYPE_LABELS[Number(typeId)] : undefined) ??
-        "Không xác định",
+      typeName: (() => {
+        const rawTypeName = product.typeName ?? product.type_name ?? product.type?.typeName;
+        if (rawTypeName) {
+          // Nếu có typeName từ response, map sang tiếng Việt
+          return TYPE_NAME_MAP[rawTypeName] ?? rawTypeName;
+        }
+        return "Không xác định";
+      })(),
       categoryId: categoryId ? Number(categoryId) : undefined,
       categoryName:
         product.categoryName ??
@@ -138,30 +156,106 @@ const ProductManagement = () => {
 
         if (ignore) return;
 
-        const categoryLookup = new Map<number, string>(
-          (categoriesResponse || []).map((category) => [
-            (category as any).categoryId ?? (category as any).category_id ?? (category as any).id,
-            (category as any).categoryName ?? (category as any).category_name ?? "Danh mục",
-          ])
-        );
+        // Tạo mapping categoryName + typeId -> categoryId từ products (giống CategoryManagement)
+        const categoryIdMap = new Map<string, number>();
+        const productStats = new Map<number, number>();
+        
+        (productsResponse || []).forEach((product: Partial<Product> & Record<string, any>) => {
+          const rawCategoryId =
+            product.categoryId ??
+            product.category_id ??
+            product.category?.categoryId ??
+            product.category?.category_id;
+          const categoryId = rawCategoryId ? Number(rawCategoryId) : undefined;
+          
+          if (categoryId) {
+            // Tạo key từ categoryName + typeId để map
+            const categoryName = product.categoryName ?? product.category_name ?? product.category?.categoryName;
+            const typeId = product.typeId ?? product.type_id ?? product.type?.typeId;
+            if (categoryName && typeId) {
+              const mapKey = `${categoryName}|${typeId}`;
+              if (!categoryIdMap.has(mapKey)) {
+                categoryIdMap.set(mapKey, categoryId);
+              }
+            }
+            
+            // Count products per category
+            const current = productStats.get(categoryId) ?? 0;
+            productStats.set(categoryId, current + 1);
+          }
+        });
+
+        // Enrich categories với ID từ mapping (giống CategoryManagement)
+        const enrichedCategories = (categoriesResponse || []).map((category: any) => {
+          const categoryName = category.categoryName ?? category.category_name;
+          const typeId = category.typeId ?? category.type_id;
+          
+          // Nếu chưa có ID, thử lấy từ mapping
+          if (!category.categoryId && !category.category_id && !category.id) {
+            if (categoryName && typeId) {
+              const mapKey = `${categoryName}|${typeId}`;
+              const mappedId = categoryIdMap.get(mapKey);
+              if (mappedId) {
+                return { ...category, categoryId: mappedId, _mappedId: true };
+              }
+            }
+          }
+          return category;
+        });
+
+        // Tạo categoryLookup với ID đã được enrich
+        const categoryLookup = new Map<number, string>();
+        enrichedCategories.forEach((category: any) => {
+          const categoryId = category.categoryId ?? category.category_id ?? category.id;
+          const categoryName = category.categoryName ?? category.category_name;
+          if (categoryId && categoryName) {
+            categoryLookup.set(Number(categoryId), categoryName);
+          }
+        });
+
+        // Set categories state (để dùng trong form)
+        // Log để debug
+        console.log("📦 ProductManagement - Categories response:", categoriesResponse);
+        console.log("🗺️  ProductManagement - Category ID mapping:", Array.from(categoryIdMap.entries()));
+        console.log("✨ ProductManagement - Enriched categories:", enrichedCategories);
+        
+        setCategories(enrichedCategories as Category[]);
 
         const normalizedProducts = (productsResponse || []).map((product) =>
           normalizeProduct(product, categoryLookup)
         );
 
+        // Derive productTypes từ categories (giống CategoryManagement)
         const derivedTypes: ProductType[] = Array.from(
           new Map(
-            normalizedProducts
-              .filter((product) => product.typeId)
-              .map((product) => [product.typeId!, product.typeName || TYPE_LABELS[product.typeId!] || "Không xác định"])
+            enrichedCategories
+              .filter((category: any) => {
+                const typeId = category.typeId ?? category.type_id;
+                return typeId != null;
+              })
+              .map((category: any) => {
+                const typeId = category.typeId ?? category.type_id;
+                const rawTypeName = category.type?.typeName ?? category.type_name;
+                // Map typeId -> typeName nếu không có từ response
+                const typeIdToName: Record<number, string> = {
+                  1: "Cat",
+                  2: "Food",
+                  3: "Cage",
+                  4: "Cleaning",
+                };
+                const typeName = rawTypeName ?? typeIdToName[Number(typeId)];
+                return [Number(typeId), typeName ? (TYPE_NAME_MAP[typeName] ?? typeName) : "Không xác định"];
+              })
           )
         ).map(([typeId, typeName]) => ({
-          typeId,
-          typeName,
+          typeId: typeId as number,
+          typeName: typeName as string,
         }));
 
+        // Log sau khi derivedTypes được khai báo
+        console.log("📊 ProductManagement - ProductTypes derived:", derivedTypes);
+
         setProductTypes(derivedTypes);
-        setCategories(categoriesResponse || []);
         setProducts(normalizedProducts);
         setFilteredProducts(normalizedProducts);
       } catch (error: any) {
@@ -237,6 +331,208 @@ const ProductManagement = () => {
     setIsDetailOpen(true);
   };
 
+  const handleOpenAddForm = () => {
+    setIsEditMode(false);
+    setFormData({
+      productName: "",
+      typeId: "",
+      categoryId: "none",
+      price: "",
+      stockQuantity: "",
+      description: "",
+    });
+    setSelectedFile(null);
+    setImagePreview(null);
+    setIsFormOpen(true);
+  };
+
+  const handleOpenEditForm = (product: AdminProduct) => {
+    setIsEditMode(true);
+    setSelectedProduct(product);
+    setFormData({
+      productName: product.name,
+      typeId: product.typeId?.toString() || "",
+      categoryId: product.categoryId?.toString() || "none",
+      price: product.price.toString(),
+      stockQuantity: product.stockQuantity.toString(),
+      description: product.description || "",
+    });
+    setSelectedFile(null);
+    setImagePreview(null);
+    setIsFormOpen(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmitForm = async () => {
+    try {
+      if (!formData.productName || !formData.typeId || !formData.price || !formData.stockQuantity) {
+        toast({
+          title: "Vui lòng điền đầy đủ thông tin",
+          description: "Tên sản phẩm, loại, giá và số lượng là bắt buộc.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Format data theo ProductRequest của backend
+      // Backend yêu cầu: productName (String), typeId (Long), categoryId (Long, optional), 
+      // price (BigDecimal), stockQuantity (Integer), description (String, optional)
+      const productPayload: any = {
+        productName: formData.productName,
+        typeId: parseInt(formData.typeId),
+        price: parseFloat(formData.price), // Backend sẽ convert sang BigDecimal
+        stockQuantity: parseInt(formData.stockQuantity) || 0,
+        description: formData.description || null, // Backend có thể nhận null
+      };
+
+      // categoryId là optional trong ProductRequest
+      // Nếu categoryId là ID tạm thời (>= 2000000), không gửi lên backend
+      if (formData.categoryId && formData.categoryId !== "none") {
+        const categoryIdNum = parseInt(formData.categoryId);
+        if (categoryIdNum < 2000000) {
+          // Chỉ gửi nếu là ID thực (< 2000000)
+          productPayload.categoryId = categoryIdNum;
+        }
+        // Nếu là ID tạm thời (>= 2000000), bỏ qua (không gửi categoryId)
+      }
+
+      if (isEditMode && selectedProduct) {
+        // Update product
+        await productService.updateProduct(selectedProduct.id, productPayload, selectedFile || undefined);
+        toast({
+          title: "Cập nhật thành công",
+          description: `Sản phẩm "${formData.productName}" đã được cập nhật.`,
+        });
+      } else {
+        // Create product
+        if (!selectedFile) {
+          toast({
+            title: "Vui lòng chọn hình ảnh",
+            description: "Hình ảnh sản phẩm là bắt buộc khi tạo mới.",
+            variant: "destructive",
+          });
+          return;
+        }
+        await productService.createProduct(productPayload, selectedFile);
+        toast({
+          title: "Tạo thành công",
+          description: `Sản phẩm "${formData.productName}" đã được tạo.`,
+        });
+      }
+
+      // Reload products (giống logic trong useEffect)
+      const [categoriesResponse, productsResponse] = await Promise.all([
+        categoryService.getAllCategoriesAdmin().catch(() => []),
+        productService.getAllProductsCustomer(),
+      ]);
+
+      // Tạo mapping categoryName + typeId -> categoryId từ products
+      const categoryIdMap = new Map<string, number>();
+      (productsResponse || []).forEach((product: Partial<Product> & Record<string, any>) => {
+        const rawCategoryId =
+          product.categoryId ??
+          product.category_id ??
+          product.category?.categoryId ??
+          product.category?.category_id;
+        const categoryId = rawCategoryId ? Number(rawCategoryId) : undefined;
+        
+        if (categoryId) {
+          const categoryName = product.categoryName ?? product.category_name ?? product.category?.categoryName;
+          const typeId = product.typeId ?? product.type_id ?? product.type?.typeId;
+          if (categoryName && typeId) {
+            const mapKey = `${categoryName}|${typeId}`;
+            if (!categoryIdMap.has(mapKey)) {
+              categoryIdMap.set(mapKey, categoryId);
+            }
+          }
+        }
+      });
+
+      // Enrich categories với ID từ mapping
+      const enrichedCategories = (categoriesResponse || []).map((category: any) => {
+        const categoryName = category.categoryName ?? category.category_name;
+        const typeId = category.typeId ?? category.type_id;
+        
+        if (!category.categoryId && !category.category_id && !category.id) {
+          if (categoryName && typeId) {
+            const mapKey = `${categoryName}|${typeId}`;
+            const mappedId = categoryIdMap.get(mapKey);
+            if (mappedId) {
+              return { ...category, categoryId: mappedId, _mappedId: true };
+            }
+          }
+        }
+        return category;
+      });
+
+      // Tạo categoryLookup với ID đã được enrich
+      const categoryLookup = new Map<number, string>();
+      enrichedCategories.forEach((category: any) => {
+        const categoryId = category.categoryId ?? category.category_id ?? category.id;
+        const categoryName = category.categoryName ?? category.category_name;
+        if (categoryId && categoryName) {
+          categoryLookup.set(Number(categoryId), categoryName);
+        }
+      });
+
+      // Set categories state
+      setCategories(enrichedCategories as Category[]);
+
+      const normalizedProducts = (productsResponse || []).map((product) =>
+        normalizeProduct(product, categoryLookup)
+      );
+
+      // Derive productTypes từ categories
+      const derivedTypes: ProductType[] = Array.from(
+        new Map(
+          enrichedCategories
+            .filter((category: any) => {
+              const typeId = category.typeId ?? category.type_id;
+              return typeId != null;
+            })
+            .map((category: any) => {
+              const typeId = category.typeId ?? category.type_id;
+              const rawTypeName = category.type?.typeName ?? category.type_name;
+              const typeIdToName: Record<number, string> = {
+                1: "Cat",
+                2: "Food",
+                3: "Cage",
+                4: "Cleaning",
+              };
+              const typeName = rawTypeName ?? typeIdToName[Number(typeId)];
+              return [Number(typeId), typeName ? (TYPE_NAME_MAP[typeName] ?? typeName) : "Không xác định"];
+            })
+        )
+      ).map(([typeId, typeName]) => ({
+        typeId: typeId as number,
+        typeName: typeName as string,
+      }));
+
+      setProductTypes(derivedTypes);
+      setProducts(normalizedProducts);
+      setFilteredProducts(normalizedProducts);
+      setIsFormOpen(false);
+    } catch (error: any) {
+      console.error("Submit product error:", error);
+      toast({
+        title: isEditMode ? "Cập nhật thất bại" : "Tạo thất bại",
+        description: error?.response?.data?.message || error?.message || "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStockBadge = (quantity: number) => {
     if (quantity === 0) {
       return <Badge variant="destructive">Hết hàng</Badge>;
@@ -270,7 +566,7 @@ const ProductManagement = () => {
             <Download className="h-4 w-4 mr-2" />
             Xuất CSV
           </Button>
-          <Button>
+          <Button onClick={handleOpenAddForm}>
             <Plus className="h-4 w-4 mr-2" />
             Thêm sản phẩm
           </Button>
@@ -351,7 +647,7 @@ const ProductManagement = () => {
                   }
                   return (
                     <SelectItem key={`type-${typeId}`} value={typeId.toString()}>
-                      {typeName || TYPE_LABELS[typeId] || "Không xác định"}
+                      {typeName || "Không xác định"}
                     </SelectItem>
                   );
                 })}
@@ -363,18 +659,37 @@ const ProductManagement = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả danh mục</SelectItem>
-                {categories.map((category) => {
-                  const categoryId = category.categoryId ?? category.category_id;
-                  const categoryName = category.categoryName ?? category.category_name;
-                  if (categoryId == null) {
-                    return null;
-                  }
-                  return (
-                    <SelectItem key={`category-${categoryId}`} value={categoryId.toString()}>
-                      {categoryName || "Không có tên"}
-                    </SelectItem>
-                  );
-                })}
+                    {categories.map((category: any, index: number) => {
+                      // Lấy ID từ nhiều nguồn (giống normalizeCategory)
+                      const categoryId = category.categoryId ?? 
+                                        category.category_id ?? 
+                                        category.id;
+                      const categoryName = category.categoryName ?? category.category_name;
+                      const typeId = category.typeId ?? category.type_id;
+                      
+                      // Nếu không có ID hợp lệ, dùng index tạm thời nhưng vẫn hiển thị
+                      // Vì backend có thể không trả về ID, nhưng vẫn cần hiển thị category
+                      if (!categoryName) {
+                        return null; // Bỏ qua nếu không có tên
+                      }
+                      
+                      // Nếu có ID hợp lệ (< 1000000), dùng ID đó
+                      // Nếu không, dùng index + offset để tạo unique key
+                      const displayId = (categoryId != null && categoryId < 1000000) 
+                        ? categoryId 
+                        : (index + 2000000); // Offset khác với CategoryManagement để tránh conflict
+                      
+                      // Tạo unique key từ name + typeId nếu không có ID
+                      const uniqueKey = categoryId && categoryId < 1000000
+                        ? `category-${categoryId}`
+                        : `category-${categoryName}-${typeId}-${index}`;
+                      
+                      return (
+                        <SelectItem key={uniqueKey} value={displayId.toString()}>
+                          {categoryName || "Không có tên"}
+                        </SelectItem>
+                      );
+                    })}
               </SelectContent>
             </Select>
           </div>
@@ -443,7 +758,7 @@ const ProductManagement = () => {
                               <Eye className="mr-2 h-4 w-4" />
                               Xem chi tiết
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenEditForm(product)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Chỉnh sửa
                             </DropdownMenuItem>
@@ -513,6 +828,178 @@ const ProductManagement = () => {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Product Form Dialog */}
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{isEditMode ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}</DialogTitle>
+            <DialogDescription>
+              {isEditMode ? "Cập nhật thông tin sản phẩm" : "Điền thông tin để tạo sản phẩm mới"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="productName">Tên sản phẩm *</Label>
+              <Input
+                id="productName"
+                value={formData.productName}
+                onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
+                placeholder="Nhập tên sản phẩm"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="typeId">Loại sản phẩm *</Label>
+                <Select value={formData.typeId} onValueChange={(value) => setFormData({ ...formData, typeId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn loại" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {productTypes.map((type) => {
+                      const typeId = type.typeId ?? type.type_id;
+                      const rawTypeName = type.typeName ?? type.type_name;
+                      const typeName = rawTypeName ? (TYPE_NAME_MAP[rawTypeName] ?? rawTypeName) : "Không xác định";
+                      if (typeId == null) return null;
+                      return (
+                        <SelectItem key={`type-${typeId}`} value={typeId.toString()}>
+                          {typeName}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="categoryId">Danh mục</Label>
+                <Select
+                  value={formData.categoryId}
+                  onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn danh mục (tùy chọn)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Không có</SelectItem>
+                    {categories.length === 0 ? (
+                      <SelectItem value="loading" disabled>
+                        Đang tải danh mục... (có {categories.length} danh mục)
+                      </SelectItem>
+                    ) : (
+                      categories.map((category: any, index: number) => {
+                        // Lấy ID từ nhiều nguồn (giống normalizeCategory)
+                        const categoryId = category.categoryId ?? 
+                                          category.category_id ?? 
+                                          category.id;
+                        const categoryName = category.categoryName ?? category.category_name;
+                        const typeId = category.typeId ?? category.type_id;
+                        
+                        // Nếu không có tên, bỏ qua
+                        if (!categoryName) {
+                          return null;
+                        }
+                        
+                        // Nếu có ID hợp lệ (< 2000000), dùng ID đó
+                        // Nếu không, dùng index + offset để tạo unique key
+                        const displayId = (categoryId != null && categoryId < 2000000) 
+                          ? categoryId 
+                          : (index + 2000000); // Offset khác với CategoryManagement để tránh conflict
+                        
+                        // Tạo unique key từ name + typeId nếu không có ID
+                        const uniqueKey = categoryId && categoryId < 2000000
+                          ? `category-${categoryId}`
+                          : `category-${categoryName}-${typeId}-${index}`;
+                        
+                        return (
+                          <SelectItem key={uniqueKey} value={displayId.toString()}>
+                            {categoryName || "Không có tên"}
+                          </SelectItem>
+                        );
+                      })
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="price">Giá (VNĐ) *</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="stockQuantity">Số lượng tồn kho *</Label>
+                <Input
+                  id="stockQuantity"
+                  type="number"
+                  min="0"
+                  value={formData.stockQuantity}
+                  onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="description">Mô tả</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Nhập mô tả sản phẩm"
+                rows={4}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="image">Hình ảnh {!isEditMode && "*"}</Label>
+              <div className="mt-2">
+                <Input
+                  id="image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="cursor-pointer"
+                />
+                {imagePreview && (
+                  <div className="mt-4">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-48 object-cover rounded-md border"
+                    />
+                  </div>
+                )}
+                {isEditMode && !imagePreview && selectedProduct && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Để trống nếu không muốn thay đổi hình ảnh
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setIsFormOpen(false)}>
+                Hủy
+              </Button>
+              <Button onClick={handleSubmitForm}>
+                {isEditMode ? "Cập nhật" : "Tạo mới"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

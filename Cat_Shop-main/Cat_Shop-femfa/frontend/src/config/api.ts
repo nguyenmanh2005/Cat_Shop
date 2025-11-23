@@ -25,19 +25,21 @@ export const API_CONFIG = {
       // MFA (Google Authenticator)
       MFA_VERIFY: '/auth/mfa/verify',
       // QR Code Login
-      GENERATE_QR: '/auth/generate-qr',
-      VERIFY_QR: '/auth/verify-qr'
+      GENERATE_QR: '/auth/qr/generate',
+      QR_STATUS: '/auth/qr/status/:sessionId'
     },
     
     // Products
     PRODUCTS: {
       LIST: '/customer/products',
       DETAIL: '/customer/products/:id',
-      CREATE: '/admin/products',
-      UPDATE: '/admin/products/:id',
+      CREATE: '/admin/products', // Cần gửi multipart/form-data với 'product' (JSON) và 'file' (MultipartFile)
+      UPDATE: '/admin/products/:id', // Cũng cần multipart/form-data
       DELETE: '/admin/products/:id',
       SEARCH: '/customer/products/search',
       BY_CATEGORY: '/customer/products/category/:categoryId',
+      BY_TYPE: '/customer/products/type/:typeId',
+      BY_PRICE_RANGE: '/customer/products/price-range',
       FEATURED: '/customer/products'
     },
     
@@ -68,37 +70,43 @@ export const API_CONFIG = {
       CREATE: '/users',
       UPDATE: '/users/:id',
       DELETE: '/users/:id',
-      PROFILE: '/users/profile',
-      CHANGE_PASSWORD: '/users/change-password'
+      // PROFILE và CHANGE_PASSWORD không tồn tại trong backend
+      // Sử dụng GET /users/email/{email} để lấy profile
     },
     
     // Orders
     ORDERS: {
       LIST: '/orders/admin/all',
-      DETAIL: '/orders/:id',
+      // DETAIL: '/orders/:id' - Backend không có endpoint này, cần lấy qua USER_ORDERS hoặc LIST
       CREATE: '/orders',
-      UPDATE: '/orders/:id',
-      DELETE: '/orders/:id',
+      UPDATE: '/orders/:orderId',
+      DELETE: '/orders/:orderId',
       USER_ORDERS: '/orders/user/:userId',
-      UPDATE_STATUS: '/orders/:id'
+      USER_ORDERS_BY_EMAIL: '/orders/user/email/:email'
     },
     
-    // Order Items
+    // Order Items (Order Details)
     ORDER_ITEMS: {
-      LIST: '/order-items',
-      CREATE: '/order-items',
-      UPDATE: '/order-items/:id',
-      DELETE: '/order-items/:id'
+      LIST: '/order-details', // Backend có endpoint này
+      DETAIL: '/order-details/:id',
+      BY_ORDER: '/order-details/order/:orderId', // Lấy order details theo orderId
+      BY_PRODUCT: '/order-details/product/:productId',
+      CREATE: '/order-details',
+      UPDATE: '/order-details/:id',
+      DELETE: '/order-details/:id'
     },
     
     // Reviews
     REVIEWS: {
-      LIST: '/reviews',
+      LIST: '/reviews/admin/all', // Sửa từ '/reviews' (không tồn tại)
       CREATE: '/reviews',
-      UPDATE: '/reviews/:id',
-      DELETE: '/reviews/:id',
+      UPDATE: '/reviews/:reviewId',
+      DELETE: '/reviews/:reviewId',
+      DETAIL: '/reviews/:reviewId',
       PRODUCT_REVIEWS: '/reviews/product/:productId',
-      USER_REVIEWS: '/reviews/user/:userId'
+      USER_REVIEWS: '/reviews/user/:userId',
+      PRODUCT_AVERAGE: '/reviews/product/:productId/average',
+      PRODUCT_COUNT: '/reviews/product/:productId/count'
     },
     
     // Cat Details
@@ -112,10 +120,13 @@ export const API_CONFIG = {
       DELETE: '/admin/cat-details/:id'
     },
     
-    // File Upload
+    // File Upload - Backend không có UploadController riêng
+    // Upload được xử lý trực tiếp trong ProductController với multipart/form-data
+    // Nếu cần upload riêng, tạo UploadController trong backend
     UPLOAD: {
-      IMAGE: '/upload/image',
-      MULTIPLE: '/upload/multiple'
+      // IMAGE: '/upload/image', // ❌ Không tồn tại
+      // MULTIPLE: '/upload/multiple' // ❌ Không tồn tại
+      // Upload product: POST /api/admin/products với multipart/form-data
     }
   }
 };

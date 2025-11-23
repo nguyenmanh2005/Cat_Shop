@@ -32,7 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 
 const Settings = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isAdmin } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -234,7 +234,7 @@ const Settings = () => {
           </div>
 
           <Tabs defaultValue="notifications" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-5' : 'grid-cols-4'}`}>
               <TabsTrigger value="notifications" className="flex items-center gap-2">
                 <Bell className="h-4 w-4" />
                 <span className="hidden sm:inline">Thông báo</span>
@@ -247,6 +247,12 @@ const Settings = () => {
                 <Shield className="h-4 w-4" />
                 <span className="hidden sm:inline">Quyền riêng tư</span>
               </TabsTrigger>
+              {isAdmin && (
+                <TabsTrigger value="admin" className="flex items-center gap-2">
+                  <SettingsIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Quản trị</span>
+                </TabsTrigger>
+              )}
               <TabsTrigger value="account" className="flex items-center gap-2">
                 <SettingsIcon className="h-4 w-4" />
                 <span className="hidden sm:inline">Tài khoản</span>
@@ -583,6 +589,95 @@ const Settings = () => {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {/* Admin Tab - Chỉ hiển thị cho Admin */}
+            {isAdmin && (
+              <TabsContent value="admin" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <SettingsIcon className="h-5 w-5" />
+                      Cài đặt Quản trị
+                    </CardTitle>
+                    <CardDescription>
+                      Quản lý cài đặt hệ thống và quyền truy cập
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                      <Label>Vai trò</Label>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="default" className="bg-primary">
+                          {user?.role === "admin" ? "Quản trị viên" : "Người dùng"}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {user?.email}
+                        </span>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      <Label>Quản lý hệ thống</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <Button
+                          variant="outline"
+                          onClick={() => navigate("/admin")}
+                          className="flex items-center gap-2"
+                        >
+                          <SettingsIcon className="h-4 w-4" />
+                          Bảng điều khiển
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => navigate("/admin/categories")}
+                          className="flex items-center gap-2"
+                        >
+                          <SettingsIcon className="h-4 w-4" />
+                          Quản lý danh mục
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      <Label>Báo cáo và Thống kê</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Xem báo cáo và thống kê hệ thống
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => navigate("/admin")}
+                        className="flex items-center gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        Xem báo cáo
+                      </Button>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                      <Label>Bảo mật hệ thống</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Cài đặt bảo mật và quyền truy cập cho hệ thống
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="system-logging">Ghi log hệ thống</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Ghi lại tất cả hoạt động của hệ thống
+                          </p>
+                        </div>
+                        <Switch id="system-logging" defaultChecked />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
 
             {/* Account Tab */}
             <TabsContent value="account" className="space-y-6">

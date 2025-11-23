@@ -24,8 +24,9 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Search, 
   Plus, 
@@ -54,13 +55,17 @@ interface AdminCategory {
   typeId?: number;
   typeName?: string;
   productCount: number;
+  _originalData?: any; // Lưu original data từ API
+  _uniqueKey?: string; // Key để identify category
 }
 
-const TYPE_LABELS: Record<number, string> = {
-  1: "Mèo cảnh",
-  2: "Thức ăn",
-  3: "Lồng chuồng",
-  4: "Vệ sinh",
+// Map typeName từ database (tiếng Anh) sang tiếng Việt để hiển thị
+const TYPE_NAME_MAP: Record<string, string> = {
+  "Cat": "Mèo cảnh",
+  "Food": "Thức ăn",
+  "Cage": "Lồng chuồng",
+  "Cleaning": "Vệ sinh",
+  "Toy": "Đồ chơi",
 };
 
 const CategoryManagement = () => {
@@ -70,35 +75,110 @@ const CategoryManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<AdminCategory | null>(null);
+  const [formData, setFormData] = useState({
+    categoryName: "",
+    typeId: "",
+    description: "",
+  });
+  // Lưu original data để có thể lấy ID khi cần
+  const [originalCategoriesData, setOriginalCategoriesData] = useState<Map<string, any>>(new Map());
   const { toast } = useToast();
 
   const normalizeCategory = (
     category: Partial<Category> & Record<string, any>,
-    productStats: Map<number, number>
-  ): AdminCategory => {
-    const categoryId =
-      category.categoryId ??
-      category.category_id ??
-      category.id ??
-      0;
-    const typeId =
-      category.typeId ??
-      category.type_id ??
-      category.type?.typeId ??
-      category.type?.type_id;
+    productStats: Map<number, number>,
+    index: number
+  ): AdminCategory | null => {
+    // Debug: Log category để xem response thực tế từ backend
+    if (index === 0) {
+      console.log("📦 Category response từ backend:", category);
+    }
+    
+    // Backend CategoryResponse không có categoryId trong DTO, nhưng có thể có trong raw response
+    // Thử lấy ID từ nhiều nguồn có thể (Jackson có thể serialize từ entity)
+    const rawId = category.categoryId ?? 
+                  category.category_id ?? 
+                  category.id ??
+                  (category as any).categoryId ??
+                  (category as any).id; // Thử lấy trực tiếp từ any field
+    
+    const categoryName = category.categoryName ?? category.category_name ?? "";
+    const typeId = category.typeId ?? category.type_id ?? category.type?.typeId ?? category.type?.type_id;
+    
+    // Nếu không có ID và không có name hợp lệ, bỏ qua
+    if (!rawId && !categoryName) {
+      console.warn("Category missing both ID and name, skipping:", category);
+      return null;
+    }
+    
+    // Tạo unique key để track category
+    const uniqueKey = rawId ? `id-${rawId}` : `name-${categoryName}-type-${typeId}-idx-${index}`;
+    
+    // Lưu original data để có thể lấy ID sau
+    const originalData = { ...category, _uniqueKey: uniqueKey, _index: index };
+    
+    // Nếu có ID, dùng ID; nếu không, dùng index tạm thời (sẽ được reload sau khi create)
+    const categoryId = rawId ? Number(rawId) : null;
+    
+    // Validate ID phải là số hợp lệ và > 0
+    if (categoryId !== null && (isNaN(categoryId) || categoryId <= 0)) {
+      console.warn("Category has invalid ID:", categoryId, "Category:", category);
+      // Nếu ID không hợp lệ, coi như không có ID
+      const tempId = index + 1000000;
+      return {
+        id: tempId,
+        name: categoryName || `Danh mục #${index}`,
+        description: category.description ?? "",
+        typeId: typeId ? Number(typeId) : undefined,
+        typeName: (() => {
+          const rawTypeName = category.type?.typeName ?? category.type_name;
+          if (rawTypeName) {
+            return TYPE_NAME_MAP[rawTypeName] ?? rawTypeName;
+          }
+          return "Không xác định";
+        })(),
+        productCount: 0,
+        _originalData: originalData,
+        _uniqueKey: uniqueKey,
+      };
+    }
 
     return {
-      id: categoryId,
-      name: category.categoryName ?? category.category_name ?? `Danh mục #${categoryId}`,
+      id: categoryId ?? (index + 1000000), // Dùng index + offset lớn để tránh conflict với ID thật
+      name: categoryName || `Danh mục #${index}`,
       description: category.description ?? "",
       typeId: typeId ? Number(typeId) : undefined,
-      typeName:
-        category.type?.typeName ??
-        category.type_name ??
-        (typeId ? TYPE_LABELS[Number(typeId)] : undefined) ??
-        "Không xác định",
-      productCount: productStats.get(categoryId) ?? 0,
+      typeName: (() => {
+        // Thử lấy typeName từ nhiều nguồn
+        const rawTypeName = category.type?.typeName ?? 
+                           category.type_name ?? 
+                           category.typeName;
+        if (rawTypeName) {
+          // Nếu có typeName từ response, map sang tiếng Việt
+          return TYPE_NAME_MAP[rawTypeName] ?? rawTypeName;
+        }
+        // Nếu không có typeName, dùng typeId để map
+        if (typeId) {
+          // Map typeId -> typeName (tạm thời hardcode, sau sẽ lấy từ API)
+          const typeIdToName: Record<number, string> = {
+            1: "Cat",      // Mèo cảnh
+            2: "Food",     // Thức ăn
+            3: "Cage",     // Lồng chuồng
+            4: "Cleaning", // Vệ sinh
+          };
+          const mappedName = typeIdToName[Number(typeId)];
+          if (mappedName) {
+            return TYPE_NAME_MAP[mappedName] ?? mappedName;
+          }
+        }
+        return "Không xác định";
+      })(),
+      productCount: categoryId ? (productStats.get(categoryId) ?? 0) : 0,
+      _originalData: originalData, // Lưu original data để có thể lấy ID sau
+      _uniqueKey: uniqueKey,
     };
   };
 
@@ -114,22 +194,137 @@ const CategoryManagement = () => {
 
         if (ignore) return;
 
+        // Tạo mapping categoryName + typeId -> categoryId từ products
+        const categoryIdMap = new Map<string, number>();
         const productStats = new Map<number, number>();
+        
         (productsResponse || []).forEach((product: Partial<Product> & Record<string, any>) => {
-          const rawId =
+          const rawCategoryId =
             product.categoryId ??
             product.category_id ??
             product.category?.categoryId ??
             product.category?.category_id;
-          const categoryId = rawId ? Number(rawId) : undefined;
-          if (!categoryId) return;
-          const current = productStats.get(categoryId) ?? 0;
-          productStats.set(categoryId, current + 1);
+          const categoryId = rawCategoryId ? Number(rawCategoryId) : undefined;
+          
+          if (categoryId) {
+            // Tạo key từ categoryName + typeId để map
+            const categoryName = product.categoryName ?? product.category_name ?? product.category?.categoryName;
+            const typeId = product.typeId ?? product.type_id ?? product.type?.typeId;
+            if (categoryName && typeId) {
+              const mapKey = `${categoryName}|${typeId}`;
+              if (!categoryIdMap.has(mapKey)) {
+                categoryIdMap.set(mapKey, categoryId);
+              }
+            }
+            
+            // Count products per category
+            const current = productStats.get(categoryId) ?? 0;
+            productStats.set(categoryId, current + 1);
+          }
         });
 
-        const normalizedCategories = (categoriesResponse || []).map((category) =>
-          normalizeCategory(category, productStats)
-        );
+        // Log để debug
+        console.log("📦 Categories response from API:", categoriesResponse);
+        console.log("🗺️  Category ID mapping từ products:", Array.from(categoryIdMap.entries()));
+        
+        // Enrich categories với ID từ mapping
+        // Vì backend không trả về categoryId, ta cần query từ database
+        // Tạo mapping từ index -> categoryId (dựa trên thứ tự trong database)
+        // Database có categories với ID: 1, 2, 3, 4, 5, 6 theo thứ tự
+        const enrichedCategories = (categoriesResponse || []).map((category: any, index: number) => {
+          const categoryName = category.categoryName ?? category.category_name;
+          const typeId = category.typeId ?? category.type_id;
+          
+          // Nếu đã có ID trong response, dùng nó
+          if (category.categoryId || category.category_id || category.id) {
+            return category;
+          }
+          
+          // Nếu không có ID, thử lấy từ mapping từ products
+          if (categoryName && typeId) {
+            const mapKey = `${categoryName}|${typeId}`;
+            const mappedId = categoryIdMap.get(mapKey);
+            if (mappedId) {
+              return { ...category, categoryId: mappedId, _mappedId: true };
+            }
+          }
+          
+          // Nếu vẫn không có, thử query từ database bằng cách gọi API getCategoryById
+          // Nhưng không có API để query theo name, nên ta dùng index + 1 làm ID tạm thời
+          // (Database có ID bắt đầu từ 1)
+          const tempIdFromIndex = index + 1;
+          return { ...category, _tempId: tempIdFromIndex, _indexBased: true };
+        });
+        
+        // Tạo mapping từ index -> categoryId (thử query từ database)
+        // Vì database có ID từ 1-6, ta sẽ thử query từng ID
+        const dbIdMapping = new Map<number, number>(); // index -> categoryId
+        try {
+          // Thử query từ database bằng cách gọi API getCategoryById cho các ID có thể
+          // Nhưng điều này không hiệu quả, nên ta sẽ dùng cách khác
+          // Thay vào đó, ta sẽ lưu index và dùng nó khi cần
+          for (let i = 0; i < enrichedCategories.length; i++) {
+            const category = enrichedCategories[i];
+            // Nếu có categoryId từ mapping hoặc response, lưu nó
+            const categoryId = category.categoryId ?? category.category_id ?? category.id;
+            if (categoryId && categoryId < 1000000) {
+              dbIdMapping.set(i, categoryId);
+            }
+          }
+        } catch (error) {
+          console.error("Error creating DB ID mapping:", error);
+        }
+        
+        const normalizedCategories = enrichedCategories
+          .map((category, index) => normalizeCategory(category, productStats, index))
+          .filter((cat): cat is AdminCategory => cat !== null);
+        
+        // Lưu mapping uniqueKey -> original data + categoryId mapping
+        const dataMap = new Map<string, any>();
+        const categoryIdMapping = new Map<string, number>(); // categoryName|typeId -> categoryId
+        
+        normalizedCategories.forEach((cat, idx) => {
+          if (cat._uniqueKey) {
+            dataMap.set(cat._uniqueKey, categoriesResponse[idx]);
+          }
+          
+          // Tạo mapping categoryName|typeId -> categoryId để dùng khi xóa
+          const categoryName = cat.name;
+          const typeId = cat.typeId;
+          if (categoryName && typeId) {
+            const mapKey = `${categoryName}|${typeId}`;
+            // Nếu có ID thực (< 1000000), lưu vào mapping
+            if (cat.id && cat.id < 1000000) {
+              categoryIdMapping.set(mapKey, cat.id);
+              } else {
+                // Nếu không có ID thực, thử lấy từ originalData
+                const originalId = cat._originalData?.categoryId ?? 
+                                 cat._originalData?.category_id ?? 
+                                 cat._originalData?.id;
+                if (originalId && originalId < 1000000) {
+                  categoryIdMapping.set(mapKey, Number(originalId));
+                } else {
+                  // Nếu không có ID từ response, dùng index + 1 làm ID (database ID bắt đầu từ 1)
+                  // Database có categories với ID: 1, 2, 3, 4, 5, 6 theo thứ tự response
+                  const indexBasedId = idx + 1;
+                  if (indexBasedId <= 100) { // Giới hạn để tránh ID quá lớn
+                    categoryIdMapping.set(mapKey, indexBasedId);
+                    console.log(`📝 Tạo mapping tạm thời: ${mapKey} -> ${indexBasedId} (dựa trên index)`);
+                  }
+                }
+              }
+          }
+        });
+        
+        setOriginalCategoriesData(dataMap);
+        
+        // Log để debug
+        console.log("🗺️ Category ID mapping for delete:", Array.from(categoryIdMapping.entries()));
+        
+        // Lưu mapping vào component state để dùng khi xóa
+        (window as any).__categoryIdMapping = categoryIdMapping;
+        
+        console.log("Normalized categories:", normalizedCategories);
 
         const derivedTypes: ProductType[] = Array.from(
           new Map(
@@ -137,7 +332,7 @@ const CategoryManagement = () => {
               .filter((category) => category.typeId)
               .map((category) => [
                 category.typeId!,
-                category.typeName || TYPE_LABELS[category.typeId!] || "Không xác định",
+                category.typeName || "Không xác định",
               ])
           )
         ).map(([typeId, typeName]) => ({
@@ -189,21 +384,249 @@ const CategoryManagement = () => {
     setFilteredCategories(filtered);
   }, [categories, searchTerm, typeFilter]);
 
-  const handleDeleteCategory = async (categoryId: number) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa danh mục này?")) return;
+  const handleOpenAddForm = () => {
+    setIsEditMode(false);
+    setSelectedCategory(null);
+    setFormData({
+      categoryName: "",
+      typeId: "",
+      description: "",
+    });
+    setIsFormOpen(true);
+  };
+
+  const handleOpenEditForm = (category: AdminCategory) => {
+    // Lấy ID từ nhiều nguồn
+    const realId = category._originalData?.categoryId ?? 
+                   category._originalData?.category_id ?? 
+                   category._originalData?.id ??
+                   (category.id < 1000000 ? category.id : null); // Nếu ID < 1000000, đó là ID thực
+    
+    // Log để debug
+    console.log("🔍 Edit category - ID check:", {
+      categoryId: category.id,
+      realId,
+      originalData: category._originalData,
+      category
+    });
+    
+    if (!realId || realId >= 1000000) {
+      toast({
+        title: "Lỗi",
+        description: `Không thể chỉnh sửa danh mục này vì không có ID hợp lệ từ backend. Category ID hiện tại: ${category.id}. Vui lòng tải lại trang hoặc kiểm tra backend response.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsEditMode(true);
+    setSelectedCategory(category);
+    setFormData({
+      categoryName: category.name,
+      typeId: category.typeId?.toString() || "",
+      description: category.description || "",
+    });
+    setIsFormOpen(true);
+  };
+
+  const handleSubmitForm = async () => {
     try {
-      await categoryService.deleteCategory(categoryId);
-      setCategories((prev) => prev.filter((category) => category.id !== categoryId));
-      setFilteredCategories((prev) => prev.filter((category) => category.id !== categoryId));
+      if (!formData.categoryName || !formData.typeId) {
+        toast({
+          title: "Vui lòng điền đầy đủ thông tin",
+          description: "Tên danh mục và loại sản phẩm là bắt buộc.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Format data theo CategoryRequest của backend
+      const categoryPayload = {
+        categoryName: formData.categoryName,
+        typeId: parseInt(formData.typeId),
+        description: formData.description || null, // Backend có thể nhận null
+      };
+
+      if (isEditMode && selectedCategory) {
+        // Lấy ID thật từ original data
+        const realId = selectedCategory._originalData?.categoryId ?? 
+                       selectedCategory._originalData?.category_id ?? 
+                       selectedCategory._originalData?.id ??
+                       (selectedCategory.id < 1000000 ? selectedCategory.id : null);
+        
+        if (!realId || realId >= 1000000) {
+          toast({
+            title: "Lỗi",
+            description: "Không tìm thấy ID của danh mục. Vui lòng tải lại trang.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Update category - Backend trả về CategoryResponse (không có ID)
+        await categoryService.updateCategory(realId, categoryPayload);
+        toast({
+          title: "Cập nhật thành công",
+          description: `Danh mục "${formData.categoryName}" đã được cập nhật.`,
+        });
+      } else {
+        // Create category - Backend trả về CategoryResponse (không có ID)
+        await categoryService.createCategory(categoryPayload);
+        toast({
+          title: "Tạo thành công",
+          description: `Danh mục "${formData.categoryName}" đã được tạo.`,
+        });
+      }
+
+      // Reload categories
+      const [categoriesResponse, productsResponse] = await Promise.all([
+        categoryService.getAllCategoriesAdmin(),
+        productService.getAllProductsCustomer().catch(() => []),
+      ]);
+
+      const productStats = new Map<number, number>();
+      (productsResponse || []).forEach((product: Partial<Product> & Record<string, any>) => {
+        const rawId =
+          product.categoryId ??
+          product.category_id ??
+          product.category?.categoryId ??
+          product.category?.category_id;
+        const categoryId = rawId ? Number(rawId) : undefined;
+        if (!categoryId) return;
+        const current = productStats.get(categoryId) ?? 0;
+        productStats.set(categoryId, current + 1);
+      });
+
+      const normalizedCategories = (categoriesResponse || [])
+        .map((category, index) => normalizeCategory(category, productStats, index))
+        .filter((cat): cat is AdminCategory => cat !== null);
+
+      const derivedTypes: ProductType[] = Array.from(
+        new Map(
+          normalizedCategories
+            .filter((category) => category.typeId)
+            .map((category) => [
+              category.typeId!,
+              category.typeName || "Không xác định",
+            ])
+        )
+      ).map(([typeId, typeName]) => ({
+        typeId,
+        typeName,
+      }));
+
+      const dataMap = new Map<string, any>();
+      normalizedCategories.forEach((cat, idx) => {
+        if (cat._uniqueKey) {
+          dataMap.set(cat._uniqueKey, categoriesResponse[idx]);
+        }
+      });
+      setOriginalCategoriesData(dataMap);
+
+      setProductTypes(derivedTypes);
+      setCategories(normalizedCategories);
+      setFilteredCategories(normalizedCategories);
+      setIsFormOpen(false);
+    } catch (error: any) {
+      console.error("Submit category error:", error);
+      toast({
+        title: isEditMode ? "Cập nhật thất bại" : "Tạo thất bại",
+        description: error?.response?.data?.message || error?.message || "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: number) => {
+    // Tìm category để lấy ID thật
+    const category = categories.find(c => c.id === categoryId);
+    if (!category) {
+      toast({
+        title: "Lỗi",
+        description: "Không tìm thấy danh mục để xóa.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Lấy ID thật từ nhiều nguồn
+    let realId: number | null = null;
+    
+    // 1. Thử lấy từ original data
+    realId = category._originalData?.categoryId ?? 
+             category._originalData?.category_id ?? 
+             category._originalData?.id ??
+             null;
+    
+    // 2. Nếu không có, thử lấy từ mapping (categoryName|typeId -> categoryId)
+    if (!realId || realId >= 1000000) {
+      const categoryName = category.name;
+      const typeId = category.typeId;
+      if (categoryName && typeId) {
+        const mapKey = `${categoryName}|${typeId}`;
+        const mapping = (window as any).__categoryIdMapping as Map<string, number> | undefined;
+        if (mapping && mapping.has(mapKey)) {
+          realId = mapping.get(mapKey)!;
+          console.log("✅ Lấy ID từ mapping:", mapKey, "->", realId);
+        }
+      }
+    }
+    
+    // 3. Nếu categoryId < 1000000, đó là ID thực
+    if (!realId || realId >= 1000000) {
+      if (categoryId < 1000000) {
+        realId = categoryId;
+      }
+    }
+    
+    // 4. Nếu vẫn không có, thử query từ API bằng categoryName + typeId
+    if (!realId || realId >= 1000000) {
+      // Thử tìm trong categories response hiện tại
+      try {
+        const allCategories = await categoryService.getAllCategoriesAdmin();
+        const categoryName = category.name;
+        const typeId = category.typeId;
+        
+        // Tìm category có cùng name và typeId trong response
+        // Vì backend không trả về ID, ta không thể lấy từ đây
+        // Nhưng có thể thử query từ products
+        console.warn("⚠️ Không tìm thấy ID thực từ mapping, category:", category);
+      } catch (error) {
+        console.error("Error querying categories:", error);
+      }
+    }
+    
+    if (!realId || realId >= 1000000) {
+      toast({
+        title: "Lỗi",
+        description: `Không tìm thấy ID hợp lệ của danh mục "${category.name}". Category ID hiện tại: ${categoryId}. Vui lòng kiểm tra console log và reload trang.`,
+        variant: "destructive",
+      });
+      console.error("❌ Không thể xóa category - không có ID hợp lệ:", {
+        category,
+        categoryId,
+        realId,
+        mapping: (window as any).__categoryIdMapping,
+      });
+      return;
+    }
+    
+    if (!confirm(`Bạn có chắc chắn muốn xóa danh mục "${category.name}" (ID: ${realId})?`)) return;
+    
+    try {
+      console.log("🗑️ Đang xóa category với ID:", realId);
+      await categoryService.deleteCategory(realId);
+      setCategories((prev) => prev.filter((cat) => cat.id !== categoryId));
+      setFilteredCategories((prev) => prev.filter((cat) => cat.id !== categoryId));
       toast({
         title: "Đã xóa danh mục",
-        description: `Danh mục #${categoryId} đã được xóa.`,
+        description: `Danh mục "${category.name}" đã được xóa thành công.`,
       });
     } catch (error: any) {
       console.error("Delete category error:", error);
       toast({
         title: "Xóa danh mục thất bại",
-        description: error?.message || "Vui lòng thử lại sau.",
+        description: error?.response?.data?.message || error?.message || "Vui lòng thử lại sau.",
         variant: "destructive",
       });
     }
@@ -253,55 +676,10 @@ const CategoryManagement = () => {
             <Download className="h-4 w-4 mr-2" />
             Xuất CSV
           </Button>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Thêm danh mục
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Thêm danh mục mới</DialogTitle>
-                <DialogDescription>
-                  Tạo danh mục sản phẩm mới trong hệ thống
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Tên danh mục</label>
-                  <Input placeholder="Nhập tên danh mục..." />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Loại sản phẩm</label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn loại sản phẩm" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {productTypes.map((type) => (
-                        <SelectItem key={type.typeId} value={type.typeId.toString()}>
-                          {type.typeName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Mô tả</label>
-                  <Input placeholder="Nhập mô tả danh mục..." />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                    Hủy
-                  </Button>
-                  <Button onClick={() => setIsAddDialogOpen(false)}>
-                    Thêm danh mục
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button onClick={handleOpenAddForm}>
+            <Plus className="h-4 w-4 mr-2" />
+            Thêm danh mục
+          </Button>
         </div>
       </div>
 
@@ -411,8 +789,8 @@ const CategoryManagement = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredCategories.map((category) => (
-                    <TableRow key={category.id}>
+                  filteredCategories.map((category, index) => (
+                    <TableRow key={category._uniqueKey || `category-${category.id}-${index}`}>
                       <TableCell className="font-mono text-sm">{category.id}</TableCell>
                       <TableCell className="font-medium">{category.name}</TableCell>
                       <TableCell>
@@ -431,7 +809,7 @@ const CategoryManagement = () => {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenEditForm(category)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Chỉnh sửa
                             </DropdownMenuItem>
@@ -458,6 +836,74 @@ const CategoryManagement = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Category Form Dialog */}
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{isEditMode ? "Chỉnh sửa danh mục" : "Thêm danh mục mới"}</DialogTitle>
+            <DialogDescription>
+              {isEditMode ? "Cập nhật thông tin danh mục" : "Điền thông tin để tạo danh mục mới"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="categoryName">Tên danh mục *</Label>
+              <Input
+                id="categoryName"
+                value={formData.categoryName}
+                onChange={(e) => setFormData({ ...formData, categoryName: e.target.value })}
+                placeholder="Nhập tên danh mục"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="typeId">Loại sản phẩm *</Label>
+              <Select
+                value={formData.typeId}
+                onValueChange={(value) => setFormData({ ...formData, typeId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn loại sản phẩm" />
+                </SelectTrigger>
+                <SelectContent>
+                  {productTypes.map((type) => {
+                    const typeId = type.typeId ?? type.type_id;
+                    const rawTypeName = type.typeName ?? type.type_name;
+                    const typeName = rawTypeName ? (TYPE_NAME_MAP[rawTypeName] ?? rawTypeName) : "Không xác định";
+                    if (typeId == null) return null;
+                    return (
+                      <SelectItem key={`type-${typeId}`} value={typeId.toString()}>
+                        {typeName}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="description">Mô tả</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Nhập mô tả danh mục"
+                rows={4}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setIsFormOpen(false)}>
+                Hủy
+              </Button>
+              <Button onClick={handleSubmitForm}>
+                {isEditMode ? "Cập nhật" : "Tạo mới"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

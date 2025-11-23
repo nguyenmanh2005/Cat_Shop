@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "test-db": "tsx test-connection.ts",
     "init-db": "tsx scripts/init-catshop-db.ts",
+    "init-product-types": "tsx scripts/init-product-types.ts",
     "create-admin": "tsx scripts/create-admin-user.ts",
     "test-backend": "node test-backend-connection.js"
   },
