@@ -62,6 +62,7 @@ interface AdminProduct {
   price: number;
   stockQuantity: number;
   description?: string;
+  _originalData?: any; // Lưu data gốc từ backend để lấy ID khi cần
 }
 
 // Map typeName từ database (tiếng Anh) sang tiếng Việt để hiển thị
@@ -83,6 +84,8 @@ const ProductManagement = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<AdminProduct | null>(null);
+  // Lưu mapping từ unique key -> productId để dùng khi edit (vì backend không trả về productId)
+  const [productIdMap, setProductIdMap] = useState<Map<string, number>>(new Map());
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -102,11 +105,24 @@ const ProductManagement = () => {
     product: Partial<Product> & Record<string, any>,
     categoryLookup: Map<number, string>
   ): AdminProduct => {
+    // Tìm productId từ nhiều nguồn khác nhau
     const productId =
       product.productId ??
       product.product_id ??
       product.id ??
-      0;
+      product._originalData?.productId ??
+      product._originalData?.product_id ??
+      product._originalData?.id ??
+      null;
+    
+    // Nếu không tìm thấy ID, log warning và throw error thay vì default về 0
+    if (!productId || productId === 0) {
+      console.warn("⚠️ ProductManagement: Không tìm thấy productId cho product:", {
+        product,
+        availableKeys: Object.keys(product),
+        productId,
+      });
+    }
     const typeId =
       product.typeId ??
       product.type_id ??
@@ -119,7 +135,7 @@ const ProductManagement = () => {
       product.category?.category_id;
 
     return {
-      id: productId,
+      id: productId || 0, // Giữ 0 để hiển thị, nhưng sẽ validate khi update/delete
       name: product.productName ?? product.product_name ?? product.name ?? `Sản phẩm #${productId}`,
       typeId: typeId ? Number(typeId) : undefined,
       typeName: (() => {
@@ -140,6 +156,7 @@ const ProductManagement = () => {
       price: Number(product.price ?? 0),
       stockQuantity: Number(product.stockQuantity ?? product.stock_quantity ?? 0),
       description: product.description || "",
+      _originalData: product, // Lưu data gốc để có thể lấy ID khi cần
     };
   };
 
@@ -221,6 +238,17 @@ const ProductManagement = () => {
         
         setCategories(enrichedCategories as Category[]);
 
+        // Log để kiểm tra response từ API có productId không
+        console.log("🔍 ProductManagement: Kiểm tra productsResponse:", {
+          totalProducts: productsResponse?.length || 0,
+          firstProduct: productsResponse?.[0] ? {
+            keys: Object.keys(productsResponse[0]),
+            hasProductId: 'productId' in (productsResponse[0] || {}),
+            productId: (productsResponse[0] as any)?.productId,
+            sample: productsResponse[0]
+          } : null
+        });
+        
         const normalizedProducts = (productsResponse || []).map((product) =>
           normalizeProduct(product, categoryLookup)
         );
@@ -408,8 +436,163 @@ const ProductManagement = () => {
       }
 
       if (isEditMode && selectedProduct) {
+        // Lấy ID từ nhiều nguồn: id field, _originalData, hoặc query lại từ API
+        let productId = selectedProduct.id;
+        
+        console.log("🔍 ProductManagement: Bắt đầu tìm ID cho update:", {
+          selectedProductId: selectedProduct.id,
+          selectedProductName: selectedProduct.name,
+          _originalData: selectedProduct._originalData,
+          _originalDataKeys: selectedProduct._originalData ? Object.keys(selectedProduct._originalData) : []
+        });
+        
+        // Nếu id = 0, thử lấy từ _originalData
+        if (!productId || productId === 0) {
+          const originalData = selectedProduct._originalData;
+          if (originalData) {
+            // Thử nhiều cách để lấy ID
+            productId = originalData.productId ?? 
+                       originalData.product_id ?? 
+                       originalData.id ??
+                       (originalData as any).data?.productId ??
+                       null;
+            console.log("🔄 Lấy ID từ _originalData:", { 
+              productId, 
+              originalData,
+              availableKeys: Object.keys(originalData),
+              hasProductId: 'productId' in originalData,
+              hasProduct_id: 'product_id' in originalData,
+              hasId: 'id' in originalData
+            });
+          }
+        }
+        
+        // Nếu vẫn không có ID, query lại từ API để lấy data mới nhất
+        if (!productId || productId === 0) {
+          console.log("🔄 Query lại products từ API để tìm ID...");
+          try {
+            const freshProductsResponse = await productService.getAllProductsCustomer();
+            const originalData = selectedProduct._originalData || selectedProduct;
+            
+            // Tìm product match dựa trên unique fields
+            const matchedProduct = freshProductsResponse.find((p: any) => {
+              const nameMatch = (p.productName ?? p.product_name ?? p.name) === selectedProduct.name;
+              const priceMatch = Number(p.price) === Number(selectedProduct.price);
+              const stockMatch = Number(p.stockQuantity ?? p.stock_quantity) === Number(selectedProduct.stockQuantity);
+              const descMatch = (p.description || '') === (selectedProduct.description || '');
+              
+              return nameMatch && priceMatch && stockMatch && descMatch;
+            });
+            
+            if (matchedProduct) {
+              // Lấy ID từ matched product
+              productId = matchedProduct.productId ?? matchedProduct.product_id ?? matchedProduct.id ?? null;
+              console.log("✅ Tìm thấy product match từ fresh API response:", {
+                productId,
+                matchedProduct,
+                hasProductId: 'productId' in matchedProduct,
+                availableKeys: Object.keys(matchedProduct)
+              });
+              
+              // Nếu vẫn không có ID, backend có thể chưa restart
+              if (!productId || productId === 0) {
+                console.error("❌ Backend vẫn chưa trả về productId. Có thể backend chưa được restart sau khi sửa code.");
+              }
+            } else {
+              console.warn("⚠️ Không tìm thấy product match trong fresh API response");
+            }
+          } catch (error) {
+            console.error("❌ Lỗi khi query fresh products:", error);
+          }
+        }
+        
+        // Nếu vẫn không có ID, thử tìm trong productIdMap bằng unique key
+        if (!productId || productId === 0) {
+          console.log("🔍 Không tìm thấy ID, đang tìm trong productIdMap...");
+          const uniqueKey = `${selectedProduct.name}|${selectedProduct.price}|${selectedProduct.stockQuantity}|${selectedProduct.description || ''}`;
+          const mappedId = productIdMap.get(uniqueKey);
+          
+          if (mappedId && mappedId >= 1000000) {
+            // Nếu là mapped ID (>= 1000000), query lại products và dùng index để lấy product
+            try {
+              const productsResponse = await productService.getAllProductsCustomer();
+              const index = mappedId - 1000000;
+              
+              if (productsResponse && productsResponse[index]) {
+                const productAtIndex = productsResponse[index];
+                
+                // Query backend để lấy productId bằng cách search theo name và match các field khác
+                // Nhưng vì backend không có endpoint search với đủ thông tin, ta cần một cách khác
+                // Cách tốt nhất: Query tất cả products và tìm exact match
+                const matchedProduct = productsResponse.find((p: any) => {
+                  const nameMatch = (p.productName ?? p.product_name ?? p.name) === selectedProduct.name;
+                  const priceMatch = Number(p.price) === Number(selectedProduct.price);
+                  const stockMatch = Number(p.stockQuantity ?? p.stock_quantity) === Number(selectedProduct.stockQuantity);
+                  const descMatch = (p.description || '') === (selectedProduct.description || '');
+                  return nameMatch && priceMatch && stockMatch && descMatch;
+                });
+                
+                if (matchedProduct) {
+                  // Vẫn không có ID từ matched product vì backend không trả về
+                  // Nhưng ta có thể thử search API để lấy ID
+                  console.log("✅ Tìm thấy product match:", matchedProduct);
+                  
+                  // Thử search theo productName để lấy list và tìm exact match
+                  const searchResults = await productService.searchProducts(selectedProduct.name);
+                  const exactMatch = searchResults.find((p: Product) => {
+                    return p.productName === selectedProduct.name &&
+                           p.price === selectedProduct.price &&
+                           p.stockQuantity === selectedProduct.stockQuantity;
+                  });
+                  
+                  if (exactMatch && exactMatch.productId) {
+                    productId = exactMatch.productId;
+                    console.log("✅ Tìm thấy ID từ search:", productId);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error("❌ Lỗi khi query products để tìm ID:", error);
+            }
+          }
+        }
+        
+        // Nếu vẫn không có ID hợp lệ, báo lỗi và hướng dẫn
+        if (!productId || productId === 0) {
+          console.error("❌ Invalid product ID for update:", {
+            selectedProduct,
+            id: selectedProduct.id,
+            _originalData: selectedProduct._originalData,
+          });
+          
+          // Kiểm tra xem backend có trả về productId không
+          try {
+            const testResponse = await productService.getAllProductsCustomer();
+            const firstProduct = testResponse?.[0];
+            const hasProductId = firstProduct && ('productId' in firstProduct || 'product_id' in firstProduct);
+            
+            const errorMessage = hasProductId 
+              ? "Không tìm thấy ID sản phẩm. Vui lòng reload trang và thử lại."
+              : "Backend không trả về productId. Vui lòng:\n1. Kiểm tra backend đã được restart chưa\n2. Kiểm tra ProductResponse.java có field productId\n3. Kiểm tra ProductMapper.java có mapping productId\n4. Rebuild và restart backend";
+            
+            toast({
+              title: "Lỗi",
+              description: errorMessage,
+              variant: "destructive",
+            });
+          } catch (error) {
+            toast({
+              title: "Lỗi",
+              description: "Không thể cập nhật sản phẩm: Không tìm thấy ID. Vui lòng kiểm tra backend và thử lại.",
+              variant: "destructive",
+            });
+          }
+          return;
+        }
+        
         // Update product
-        await productService.updateProduct(selectedProduct.id, productPayload, selectedFile || undefined);
+        console.log("🔄 Updating product with ID:", productId);
+        await productService.updateProduct(productId, productPayload, selectedFile || undefined);
         toast({
           title: "Cập nhật thành công",
           description: `Sản phẩm "${formData.productName}" đã được cập nhật.`,

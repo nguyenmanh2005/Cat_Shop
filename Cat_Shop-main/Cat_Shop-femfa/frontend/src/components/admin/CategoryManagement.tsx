@@ -97,13 +97,12 @@ const CategoryManagement = () => {
       console.log("📦 Category response từ backend:", category);
     }
     
-    // Backend CategoryResponse không có categoryId trong DTO, nhưng có thể có trong raw response
-    // Thử lấy ID từ nhiều nguồn có thể (Jackson có thể serialize từ entity)
+    // Lấy ID từ nhiều nguồn (đã được enrich từ database)
     const rawId = category.categoryId ?? 
                   category.category_id ?? 
-                  category.id ??
-                  (category as any).categoryId ??
-                  (category as any).id; // Thử lấy trực tiếp từ any field
+                  category.id ?? 
+                  (category as any).categoryId ?? 
+                  (category as any).id;
     
     const categoryName = category.categoryName ?? category.category_name ?? "";
     const typeId = category.typeId ?? category.type_id ?? category.type?.typeId ?? category.type?.type_id;
@@ -120,34 +119,25 @@ const CategoryManagement = () => {
     // Lưu original data để có thể lấy ID sau
     const originalData = { ...category, _uniqueKey: uniqueKey, _index: index };
     
-    // Nếu có ID, dùng ID; nếu không, dùng index tạm thời (sẽ được reload sau khi create)
+    // Lấy ID thật (đã được enrich từ database)
     const categoryId = rawId ? Number(rawId) : null;
     
-    // Validate ID phải là số hợp lệ và > 0
-    if (categoryId !== null && (isNaN(categoryId) || categoryId <= 0)) {
+    // Validate ID phải là số hợp lệ và > 0, và phải < 1000000 (ID thật từ database)
+    if (categoryId !== null && (isNaN(categoryId) || categoryId <= 0 || categoryId >= 1000000)) {
       console.warn("Category has invalid ID:", categoryId, "Category:", category);
-      // Nếu ID không hợp lệ, coi như không có ID
-      const tempId = index + 1000000;
-      return {
-        id: tempId,
-        name: categoryName || `Danh mục #${index}`,
-        description: category.description ?? "",
-        typeId: typeId ? Number(typeId) : undefined,
-        typeName: (() => {
-          const rawTypeName = category.type?.typeName ?? category.type_name;
-          if (rawTypeName) {
-            return TYPE_NAME_MAP[rawTypeName] ?? rawTypeName;
-          }
-          return "Không xác định";
-        })(),
-        productCount: 0,
-        _originalData: originalData,
-        _uniqueKey: uniqueKey,
-      };
+      // Nếu ID không hợp lệ hoặc là ID giả, không tạo category
+      // Vì đã query từ database, nếu không có ID thì có thể category chưa được tạo
+      return null;
+    }
+
+    // Nếu không có ID thật, không tạo category (đợi reload sau khi create)
+    if (!categoryId) {
+      console.warn("Category không có ID thật, bỏ qua:", category);
+      return null;
     }
 
     return {
-      id: categoryId ?? (index + 1000000), // Dùng index + offset lớn để tránh conflict với ID thật
+      id: categoryId, // Dùng ID thật từ database
       name: categoryName || `Danh mục #${index}`,
       description: category.description ?? "",
       typeId: typeId ? Number(typeId) : undefined,
@@ -227,20 +217,51 @@ const CategoryManagement = () => {
         console.log("📦 Categories response from API:", categoriesResponse);
         console.log("🗺️  Category ID mapping từ products:", Array.from(categoryIdMap.entries()));
         
-        // Enrich categories với ID từ mapping
-        // Vì backend không trả về categoryId, ta cần query từ database
-        // Tạo mapping từ index -> categoryId (dựa trên thứ tự trong database)
-        // Database có categories với ID: 1, 2, 3, 4, 5, 6 theo thứ tự
+        // Query từng category từ database để lấy ID thật
+        // Database có ID: 1, 2, 3, 4, 6 (và có thể nhiều hơn)
+        // Thử query từ ID 1 đến 50 để tìm tất cả categories
+        const dbCategoryMap = new Map<string, number>(); // categoryName|typeId -> categoryId
+        const maxQueryId = 50; // Query tối đa 50 IDs
+        
+        try {
+          console.log("🔍 Đang query categories từ database để lấy ID thật...");
+          const queryPromises = [];
+          for (let id = 1; id <= maxQueryId; id++) {
+            queryPromises.push(
+              categoryService.getCategoryById(id).catch(() => null)
+            );
+          }
+          
+          const dbCategories = await Promise.all(queryPromises);
+          dbCategories.forEach((cat: any, index: number) => {
+            if (cat) {
+              const categoryId = index + 1; // ID thật từ database
+              const categoryName = cat.categoryName ?? cat.category_name ?? "";
+              const typeId = cat.typeId ?? cat.type_id;
+              
+              if (categoryName && typeId) {
+                const mapKey = `${categoryName}|${typeId}`;
+                dbCategoryMap.set(mapKey, categoryId);
+                console.log(`✅ Tìm thấy category trong DB: ${mapKey} -> ID ${categoryId}`);
+              }
+            }
+          });
+          console.log(`📊 Đã query ${dbCategories.filter(c => c !== null).length} categories từ database`);
+        } catch (error) {
+          console.error("❌ Lỗi khi query categories từ database:", error);
+        }
+        
+        // Enrich categories với ID thật từ database
         const enrichedCategories = (categoriesResponse || []).map((category: any, index: number) => {
           const categoryName = category.categoryName ?? category.category_name;
           const typeId = category.typeId ?? category.type_id;
           
-          // Nếu đã có ID trong response, dùng nó
+          // 1. Nếu đã có ID trong response, dùng nó
           if (category.categoryId || category.category_id || category.id) {
             return category;
           }
           
-          // Nếu không có ID, thử lấy từ mapping từ products
+          // 2. Thử lấy từ mapping từ products
           if (categoryName && typeId) {
             const mapKey = `${categoryName}|${typeId}`;
             const mappedId = categoryIdMap.get(mapKey);
@@ -249,31 +270,18 @@ const CategoryManagement = () => {
             }
           }
           
-          // Nếu vẫn không có, thử query từ database bằng cách gọi API getCategoryById
-          // Nhưng không có API để query theo name, nên ta dùng index + 1 làm ID tạm thời
-          // (Database có ID bắt đầu từ 1)
-          const tempIdFromIndex = index + 1;
-          return { ...category, _tempId: tempIdFromIndex, _indexBased: true };
-        });
-        
-        // Tạo mapping từ index -> categoryId (thử query từ database)
-        // Vì database có ID từ 1-6, ta sẽ thử query từng ID
-        const dbIdMapping = new Map<number, number>(); // index -> categoryId
-        try {
-          // Thử query từ database bằng cách gọi API getCategoryById cho các ID có thể
-          // Nhưng điều này không hiệu quả, nên ta sẽ dùng cách khác
-          // Thay vào đó, ta sẽ lưu index và dùng nó khi cần
-          for (let i = 0; i < enrichedCategories.length; i++) {
-            const category = enrichedCategories[i];
-            // Nếu có categoryId từ mapping hoặc response, lưu nó
-            const categoryId = category.categoryId ?? category.category_id ?? category.id;
-            if (categoryId && categoryId < 1000000) {
-              dbIdMapping.set(i, categoryId);
+          // 3. Query từ database mapping (ID thật)
+          if (categoryName && typeId) {
+            const mapKey = `${categoryName}|${typeId}`;
+            const dbId = dbCategoryMap.get(mapKey);
+            if (dbId) {
+              return { ...category, categoryId: dbId, _fromDb: true };
             }
           }
-        } catch (error) {
-          console.error("Error creating DB ID mapping:", error);
-        }
+          
+          // 4. Nếu vẫn không có, để normalizeCategory xử lý (sẽ tạo ID tạm thời)
+          return category;
+        });
         
         const normalizedCategories = enrichedCategories
           .map((category, index) => normalizeCategory(category, productStats, index))
@@ -285,7 +293,15 @@ const CategoryManagement = () => {
         
         normalizedCategories.forEach((cat, idx) => {
           if (cat._uniqueKey) {
-            dataMap.set(cat._uniqueKey, categoriesResponse[idx]);
+            // Tìm category tương ứng trong categoriesResponse
+            const matchingCategory = categoriesResponse.find((c: any) => {
+              const cName = c.categoryName ?? c.category_name;
+              const cTypeId = c.typeId ?? c.type_id;
+              return cName === cat.name && cTypeId === cat.typeId;
+            });
+            if (matchingCategory) {
+              dataMap.set(cat._uniqueKey, matchingCategory);
+            }
           }
           
           // Tạo mapping categoryName|typeId -> categoryId để dùng khi xóa
@@ -293,26 +309,13 @@ const CategoryManagement = () => {
           const typeId = cat.typeId;
           if (categoryName && typeId) {
             const mapKey = `${categoryName}|${typeId}`;
-            // Nếu có ID thực (< 1000000), lưu vào mapping
+            // Dùng ID thật từ database (đã được query và match)
             if (cat.id && cat.id < 1000000) {
               categoryIdMapping.set(mapKey, cat.id);
-              } else {
-                // Nếu không có ID thực, thử lấy từ originalData
-                const originalId = cat._originalData?.categoryId ?? 
-                                 cat._originalData?.category_id ?? 
-                                 cat._originalData?.id;
-                if (originalId && originalId < 1000000) {
-                  categoryIdMapping.set(mapKey, Number(originalId));
-                } else {
-                  // Nếu không có ID từ response, dùng index + 1 làm ID (database ID bắt đầu từ 1)
-                  // Database có categories với ID: 1, 2, 3, 4, 5, 6 theo thứ tự response
-                  const indexBasedId = idx + 1;
-                  if (indexBasedId <= 100) { // Giới hạn để tránh ID quá lớn
-                    categoryIdMapping.set(mapKey, indexBasedId);
-                    console.log(`📝 Tạo mapping tạm thời: ${mapKey} -> ${indexBasedId} (dựa trên index)`);
-                  }
-                }
-              }
+              console.log(`✅ Lưu mapping: ${mapKey} -> ID ${cat.id} (từ database)`);
+            } else {
+              console.warn(`⚠️ Category "${categoryName}" không có ID hợp lệ:`, cat.id);
+            }
           }
         });
         

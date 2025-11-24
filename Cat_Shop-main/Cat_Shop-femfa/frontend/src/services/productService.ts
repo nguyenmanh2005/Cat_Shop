@@ -54,14 +54,27 @@ export const productService = {
   },
 
   // Cập nhật sản phẩm (với file upload - multipart/form-data)
-  // Backend yêu cầu: @RequestPart("product") String productJson và @RequestPart(value = "file", required = false) MultipartFile file
+  // Backend yêu cầu: @RequestPart String productJson (không có tên, mặc định tìm "productJson") và @RequestPart(value = "file", required = false) MultipartFile file
   async updateProduct(id: number, productData: Partial<Product>, file?: File): Promise<Product> {
+    if (!id || id === 0) {
+      throw new Error(`Invalid product ID: ${id}. Cannot update product.`);
+    }
+    
     const url = buildUrl(API_CONFIG.ENDPOINTS.PRODUCTS.UPDATE, { id });
     const formData = new FormData();
-    formData.append('product', JSON.stringify(productData));
+    // Backend UPDATE yêu cầu field tên là "productJson" (không có @RequestPart("product"))
+    formData.append('productJson', JSON.stringify(productData));
     if (file) {
       formData.append('file', file);
     }
+    
+    console.log("📤 productService.updateProduct:", {
+      id,
+      url,
+      productData,
+      hasFile: !!file,
+      formDataKeys: Array.from(formData.keys())
+    });
     
     return api.put<Product>(url, formData, {
       headers: {
