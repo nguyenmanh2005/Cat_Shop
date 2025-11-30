@@ -81,21 +81,31 @@ public class AuthController {
             User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new BadRequestException("Không tìm thấy người dùng"));
 
-            // Kiểm tra device trust chỉ để log (không chặn đăng nhập)
+            // Cập nhật lastLogin mỗi lần đăng nhập thành công (dù thiết bị đã trusted hay chưa)
             try {
                 boolean trusted = deviceService.isTrusted(email, deviceId);
                 log.info("🔍 Device trust check for {}: trusted={}", email, trusted);
                 
+                String ip = request.getRemoteAddr();
+                String agent = request.getHeader("User-Agent");
+                
                 if (!trusted) {
                     log.info("⚠️ New device detected for: {} - Device will be marked as trusted after successful login", email);
                     // Đánh dấu thiết bị là trusted sau khi đăng nhập thành công
-                    String ip = request.getRemoteAddr();
-                    String agent = request.getHeader("User-Agent");
                     try {
                         deviceService.markTrusted(email, deviceId, ip, agent);
                     } catch (Exception e) {
                         log.warn("⚠️ Failed to mark device as trusted for {}: {}", email, e.getMessage());
                         // Không chặn đăng nhập nếu không thể mark device as trusted
+                    }
+                } else {
+                    // Thiết bị đã trusted, chỉ cập nhật lastLogin
+                    try {
+                        deviceService.updateLastLogin(email, deviceId, ip, agent);
+                        log.info("✅ Updated lastLogin for trusted device: {}", deviceId);
+                    } catch (Exception e) {
+                        log.warn("⚠️ Failed to update lastLogin for {}: {}", email, e.getMessage());
+                        // Không chặn đăng nhập nếu không thể update lastLogin
                     }
                 }
             } catch (Exception e) {
@@ -144,11 +154,19 @@ public class AuthController {
         // ✅ Kiểm tra + xác thực OTP
         TokenResponse tokenResponse = authService.verifyOtp(otpRequest);
 
-        // ✅ Nếu OTP đúng → đánh dấu thiết bị là trusted
+        // ✅ Nếu OTP đúng → cập nhật lastLogin (thiết bị đã trusted hoặc mới)
         String ip = request.getRemoteAddr();
         String agent = request.getHeader("User-Agent");
-
-        deviceService.markTrusted(email, deviceId, ip, agent);
+        
+        // Kiểm tra xem thiết bị đã trusted chưa
+        boolean trusted = deviceService.isTrusted(email, deviceId);
+        if (trusted) {
+            // Thiết bị đã trusted, chỉ cập nhật lastLogin
+            deviceService.updateLastLogin(email, deviceId, ip, agent);
+        } else {
+            // Thiết bị mới, markTrusted (sẽ tự động cập nhật lastLogin)
+            deviceService.markTrusted(email, deviceId, ip, agent);
+        }
 
         // ✅ OTP verification hoàn tất - OTP và MFA là 2 phương thức xác thực độc lập
         return ResponseEntity.ok(ApiResponse.success(tokenResponse,
@@ -157,7 +175,8 @@ public class AuthController {
 
     @PostMapping("/mfa/verify")
     public ResponseEntity<ApiResponse<TokenResponse>> verifyMfa(
-            @RequestBody @Valid MfaVerifyRequest request) {
+            @RequestBody @Valid MfaVerifyRequest request,
+            HttpServletRequest httpRequest) {
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new BadRequestException("Không tìm thấy user với email: " + request.getEmail()));
@@ -193,6 +212,23 @@ public class AuthController {
         String accessToken = authService.generateAccessTokenForUser(user);
         String refreshToken = authService.generateRefreshTokenForUser(user);
         authService.saveRefreshToken(user.getEmail(), refreshToken);
+        
+        // ✅ Cập nhật lastLogin sau khi verify MFA thành công
+        String deviceId = request.getDeviceId();
+        if (deviceId != null && !deviceId.isBlank()) {
+            try {
+                String ip = httpRequest.getRemoteAddr();
+                String agent = httpRequest.getHeader("User-Agent");
+                boolean trusted = deviceService.isTrusted(user.getEmail(), deviceId);
+                if (trusted) {
+                    deviceService.updateLastLogin(user.getEmail(), deviceId, ip, agent);
+                } else {
+                    deviceService.markTrusted(user.getEmail(), deviceId, ip, agent);
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ Failed to update lastLogin for MFA login {}: {}", user.getEmail(), e.getMessage());
+            }
+        }
 
         TokenResponse tokenResponse = new TokenResponse(accessToken, refreshToken, false);
         String message = verificationMethod.equals("backup code") 

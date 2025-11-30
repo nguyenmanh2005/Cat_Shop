@@ -23,6 +23,7 @@ export type VerifyOtpPayload = {
 export type VerifyMfaPayload = {
   email: string;
   code: string;
+  deviceId?: string;
 };
 
 export type EnableMfaResponse = {
@@ -80,10 +81,12 @@ export const authService = {
     saveTokens(data);
     return data;
   },
-  verifyMfa: async ({ email, code }: VerifyMfaPayload) => {
+  verifyMfa: async ({ email, code, deviceId }: VerifyMfaPayload) => {
+    const finalDeviceId = deviceId ?? ensureDeviceId();
     const { data } = await axiosInstance.post<AuthResponse>("/auth/mfa/verify", {
       email,
       code,
+      deviceId: finalDeviceId,
     });
     saveTokens(data);
     return data;

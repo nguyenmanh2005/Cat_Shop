@@ -202,18 +202,9 @@ const QrLogin = () => {
     try {
       setIsSubmitting(true);
 
-      // Get device ID
-      const getOrCreateDeviceId = (): string => {
-        const DEVICE_ID_STORAGE_KEY = 'cat_shop_device_id';
-        let deviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
-        if (!deviceId) {
-          deviceId = crypto.randomUUID();
-          localStorage.setItem(DEVICE_ID_STORAGE_KEY, deviceId);
-        }
-        return deviceId;
-      };
-
-      const deviceId = getOrCreateDeviceId();
+      // Get device ID using FingerprintJS
+      const { getOrCreateDeviceFingerprint } = await import('@/utils/deviceFingerprint');
+      const deviceId = await getOrCreateDeviceFingerprint();
 
       // Call confirm endpoint
       const response = await apiService.post<{ message: string }>(

@@ -38,6 +38,27 @@ public class DeviceServiceImpl implements DeviceService {
     }
 
     @Override
+    public void updateLastLogin(String email, String deviceId, String ip, String agent) {
+        TrustedDevice device = trustedDeviceRepository.findByUserEmailAndDeviceId(email, deviceId)
+                .orElse(null);
+        
+        if (device != null) {
+            // Cập nhật lastLogin và có thể cập nhật IP/UserAgent nếu thay đổi
+            device.setLastLogin(LocalDateTime.now());
+            if (ip != null && !ip.isEmpty()) {
+                device.setIpAddress(ip);
+            }
+            if (agent != null && !agent.isEmpty()) {
+                device.setUserAgent(agent);
+            }
+            trustedDeviceRepository.save(device);
+        } else {
+            // Nếu thiết bị chưa tồn tại, tạo mới và đánh dấu là trusted
+            markTrusted(email, deviceId, ip, agent);
+        }
+    }
+
+    @Override
     public List<TrustedDevice> getUserDevices(String email) {
         return trustedDeviceRepository.findByUserEmailOrderByLastLoginDesc(email);
     }

@@ -9,6 +9,7 @@ import { authService } from "@/services/authService";
 import { QRCodeSVG } from "qrcode.react";
 import ForgotPasswordForm from "./ForgotPasswordForm";
 import GoogleReCaptcha from "./GoogleReCaptcha";
+import { ShieldCheck } from "lucide-react";
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
@@ -647,23 +648,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   </div>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setVerificationMethod("qr");
-                    setQrCodeData("");
-                    setQrStatus("pending");
-                  }}
-                  className="flex items-center gap-4 p-4 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
-                >
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                    <QrCode className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <h4 className="font-semibold">Xác minh bằng QR Code</h4>
-                    <p className="text-sm text-muted-foreground">Quét mã QR bằng ứng dụng di động</p>
-                  </div>
-                </button>
+              
+
 
                 <button
                   type="button"

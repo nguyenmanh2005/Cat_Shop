@@ -12,6 +12,8 @@ import { Shield, Key, Download, RefreshCw, Eye, EyeOff, Lock, Smartphone, Trash2
 import { useNavigate } from "react-router-dom";
 import { apiService } from "@/services/api";
 import { userService } from "@/services/userService";
+import { deviceService } from "@/services/deviceService";
+import { TrustedDevice } from "@/types";
 
 type GoogleAuthenticatorFormValues = {
   code: string;
@@ -43,7 +45,7 @@ const Security = () => {
   const [changingPassword, setChangingPassword] = useState(false);
   
   // Quản lý thiết bị states
-  const [devices, setDevices] = useState<any[]>([]);
+  const [devices, setDevices] = useState<TrustedDevice[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   
@@ -64,6 +66,13 @@ const Security = () => {
     }
     if (user?.email) {
       checkMfaStatus();
+      loadDevices();
+      loadSecurityAlerts();
+      
+      // Lấy deviceId hiện tại từ localStorage
+      const DEVICE_ID_STORAGE_KEY = 'cat_shop_device_id';
+      const deviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+      setCurrentDeviceId(deviceId);
     }
   }, [isAuthenticated, user, navigate]);
 
@@ -266,14 +275,16 @@ const Security = () => {
     if (!user?.email) return;
     try {
       setLoadingDevices(true);
-      const data = await apiService.get<any[]>(
-        "/auth/devices",
-        { params: { email: user.email } }
-      );
+      const data = await deviceService.getUserDevices(user.email);
       setDevices(data || []);
     } catch (err) {
       console.error("Không thể tải danh sách thiết bị:", err);
       setDevices([]);
+      toast({
+        title: "Lỗi",
+        description: "Không thể tải danh sách thiết bị. Vui lòng thử lại.",
+        variant: "destructive",
+      });
     } finally {
       setLoadingDevices(false);
     }
@@ -288,19 +299,17 @@ const Security = () => {
     }
 
     try {
-      await apiService.delete(
-        `/auth/devices/${deviceId}`,
-        { params: { email: user.email } }
-      );
+      await deviceService.removeDevice(deviceId, user.email);
       toast({
         title: "Thành công",
         description: "Thiết bị đã được xóa",
       });
       await loadDevices();
     } catch (err: any) {
+      const errorMessage = err?.response?.data?.message || err?.message || "Không thể xóa thiết bị";
       toast({
         title: "Lỗi",
-        description: err.message || "Không thể xóa thiết bị",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -315,19 +324,17 @@ const Security = () => {
     }
 
     try {
-      await apiService.delete(
-        "/auth/devices/all",
-        { params: { email: user.email } }
-      );
+      await deviceService.removeAllDevices(user.email);
       toast({
         title: "Thành công",
         description: "Tất cả thiết bị đã được xóa",
       });
       await loadDevices();
     } catch (err: any) {
+      const errorMessage = err?.response?.data?.message || err?.message || "Không thể xóa thiết bị";
       toast({
         title: "Lỗi",
-        description: err.message || "Không thể xóa thiết bị",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -339,16 +346,13 @@ const Security = () => {
     
     // Tạo danh sách cảnh báo từ dữ liệu thiết bị
     try {
-      const deviceData = await apiService.get<any[]>(
-        "/auth/devices",
-        { params: { email: user.email } }
-      );
+      const deviceData = await deviceService.getUserDevices(user.email);
       
       const alerts: any[] = [];
       const now = new Date();
       
       // Kiểm tra thiết bị mới (đăng nhập trong 24h qua)
-      deviceData?.forEach((device: any) => {
+      deviceData?.forEach((device: TrustedDevice) => {
         if (device.lastLogin) {
           const lastLogin = new Date(device.lastLogin);
           const hoursAgo = (now.getTime() - lastLogin.getTime()) / (1000 * 60 * 60);
@@ -388,7 +392,7 @@ const Security = () => {
   };
 
   // Parse user agent để lấy tên thiết bị
-  const parseUserAgent = (userAgent: string | null) => {
+  const parseUserAgent = (userAgent?: string | null) => {
     if (!userAgent) return "Thiết bị không xác định";
     
     if (userAgent.includes("Windows")) return "Windows";
@@ -497,9 +501,15 @@ const Security = () => {
     try {
       setError(undefined);
       setVerifyingCode(true);
+      
+      // Lấy deviceId từ localStorage
+      const DEVICE_ID_STORAGE_KEY = 'cat_shop_device_id';
+      const deviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY) || crypto.randomUUID();
+      
       await apiService.post("/auth/mfa/verify", {
         email: user.email,
         code,
+        deviceId,
       });
       reset();
       toast({
@@ -980,13 +990,27 @@ const Security = () => {
           {/* Quản lý thiết bị đã đăng nhập Section */}
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Smartphone className="h-5 w-5" />
-                Thiết bị đã đăng nhập
-              </CardTitle>
-              <CardDescription>
-                Quản lý các thiết bị đã đăng nhập vào tài khoản của bạn
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Smartphone className="h-5 w-5" />
+                    Thiết bị đã đăng nhập
+                  </CardTitle>
+                  <CardDescription>
+                    Quản lý các thiết bị đã đăng nhập vào tài khoản của bạn
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadDevices}
+                  disabled={loadingDevices}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loadingDevices ? 'animate-spin' : ''}`} />
+                  Làm mới
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {loadingDevices ? (
@@ -1076,13 +1100,30 @@ const Security = () => {
           {/* Lịch sử đăng nhập Section */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Lịch sử đăng nhập
-              </CardTitle>
-              <CardDescription>
-                Xem lịch sử đăng nhập gần đây của bạn
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Lịch sử đăng nhập
+                  </CardTitle>
+                  <CardDescription>
+                    Xem lịch sử đăng nhập gần đây của bạn
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    loadDevices();
+                    loadSecurityAlerts();
+                  }}
+                  disabled={loadingDevices}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loadingDevices ? 'animate-spin' : ''}`} />
+                  Làm mới
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {loadingDevices ? (

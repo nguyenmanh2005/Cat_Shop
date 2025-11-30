@@ -30,18 +30,25 @@ export interface LoginResult {
   tokens?: TokenResponse;
 }
 
-const DEVICE_ID_STORAGE_KEY = 'cat_shop_device_id';
 const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_EMAIL_KEY = 'user_email';
 
-const getOrCreateDeviceId = (): string => {
-  let deviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
-  if (!deviceId) {
-    deviceId = crypto.randomUUID();
-    localStorage.setItem(DEVICE_ID_STORAGE_KEY, deviceId);
+// Import device fingerprint utility
+import { getOrCreateDeviceFingerprint, getDeviceFingerprintSync } from '@/utils/deviceFingerprint';
+
+/**
+ * Lấy deviceId - ưu tiên dùng FingerprintJS, fallback về sync method
+ */
+const getOrCreateDeviceId = async (): Promise<string> => {
+  // Thử lấy đồng bộ trước (nếu đã có trong cache/localStorage)
+  const syncId = getDeviceFingerprintSync();
+  if (syncId) {
+    return syncId;
   }
-  return deviceId;
+
+  // Nếu chưa có, dùng FingerprintJS (async)
+  return await getOrCreateDeviceFingerprint();
 };
 
 const storeTokens = (tokens: TokenResponse | undefined, email: string) => {
@@ -64,7 +71,7 @@ export const authService = {
       // Xóa token cũ trước khi đăng nhập để tránh xung đột
       clearTokens();
       
-      const deviceId = getOrCreateDeviceId();
+      const deviceId = await getOrCreateDeviceId();
       
       console.log('🔐 Attempting login:', {
         email: credentials.email,
@@ -271,7 +278,7 @@ export const authService = {
 
   async verifyOTP(email: string, otp: string): Promise<TokenResponse> {
     try {
-      const deviceId = getOrCreateDeviceId();
+      const deviceId = await getOrCreateDeviceId();
       
       console.log('🔐 Verifying OTP:', {
         email,

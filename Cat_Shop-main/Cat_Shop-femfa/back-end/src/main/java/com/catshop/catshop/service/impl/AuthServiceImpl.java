@@ -205,9 +205,11 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("Số điện thoại " + phone + " đã được sử dụng. Vui lòng sử dụng số điện thoại khác.");
         }
 
-        // Lấy role mặc định (USER - role ID = 1)
-        Role role = roleRepository.findById(1L)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Role mặc định (ID: 1)"));
+        // Lấy role mặc định: ưu tiên tìm "Customer" (role mặc định), nếu không có thì tìm theo ID = 2
+        Role role = roleRepository.findByRoleName("Customer")
+                .orElseGet(() -> roleRepository.findById(2L)
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "Không tìm thấy role mặc định 'Customer' hoặc role ID = 2. Vui lòng đảm bảo role đã được tạo.")));
 
         // Map từ UserRequest sang User entity
         User user = userMapper.FromUserRequestToUser(userRequest);

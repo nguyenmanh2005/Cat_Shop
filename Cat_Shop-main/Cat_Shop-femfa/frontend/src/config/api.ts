@@ -26,7 +26,11 @@ export const API_CONFIG = {
       MFA_VERIFY: '/auth/mfa/verify',
       // QR Code Login
       GENERATE_QR: '/auth/qr/generate',
-      QR_STATUS: '/auth/qr/status/:sessionId'
+      QR_STATUS: '/auth/qr/status/:sessionId',
+      // Device Management
+      DEVICES: '/auth/devices',
+      DEVICE_DELETE: '/auth/devices/:deviceId',
+      DEVICES_DELETE_ALL: '/auth/devices/all'
     },
     
     // Products

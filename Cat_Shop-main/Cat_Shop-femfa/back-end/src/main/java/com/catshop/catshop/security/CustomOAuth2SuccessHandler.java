@@ -56,11 +56,11 @@ public class CustomOAuth2SuccessHandler implements AuthenticationSuccessHandler 
             // Kiểm tra user
             User user = userRepository.findByEmail(email).orElseGet(() -> {
                 log.info("🆕 Người dùng mới, tạo tài khoản...");
-                // Tìm role mặc định: ưu tiên tìm "Customer" (role mặc định), nếu không có thì tìm theo ID = 1
+                // Tìm role mặc định: ưu tiên tìm "Customer" (role mặc định), nếu không có thì tìm theo ID = 2
                 Role defaultRole = roleRepository.findByRoleName("Customer")
-                        .orElseGet(() -> roleRepository.findById(1L)
+                        .orElseGet(() -> roleRepository.findById(2L)
                                 .orElseThrow(() -> new ResourceNotFoundException(
-                                        "Không tìm thấy role mặc định 'Customer' hoặc role ID = 1. Vui lòng đảm bảo role đã được tạo.")));
+                                        "Không tìm thấy role mặc định 'Customer' hoặc role ID = 2. Vui lòng đảm bảo role đã được tạo.")));
 
                 // Tạo user mới từ Google OAuth
                 // Set passwordHash là chuỗi rỗng hoặc một giá trị đặc biệt để đánh dấu là OAuth user
