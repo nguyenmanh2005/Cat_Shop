@@ -23,9 +23,9 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   pendingEmail: string | null;
-  login: (email: string, password: string) => Promise<LoginState>;
+  login: (email: string, password: string, captchaToken?: string | null) => Promise<LoginState>;
   loginWithOTP: (email: string, otp: string) => Promise<OtpState>;
-  register: (userData: { fullName: string; email: string; phone: string; password: string }) => Promise<boolean>;
+  register: (userData: { fullName: string; email: string; phone: string; password: string; captchaToken?: string | null }) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -104,8 +104,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     checkAuthStatus();
   }, []);
 
-  const login = async (email: string, password: string): Promise<LoginState> => {
-    const credentials: LoginRequest = { email, password };
+  const login = async (email: string, password: string, captchaToken?: string | null): Promise<LoginState> => {
+    const credentials: LoginRequest = { email, password, captchaToken: captchaToken ?? undefined };
     const result = await authService.login(credentials);
 
     if (result.success && result.tokens?.accessToken) {
@@ -121,13 +121,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return result;
   };
 
-  const register = async (userData: { fullName: string; email: string; phone: string; password: string }): Promise<boolean> => {
+  const register = async (userData: { fullName: string; email: string; phone: string; password: string; captchaToken?: string | null }): Promise<boolean> => {
     const payload: RegisterRequest = {
       username: userData.fullName,
       email: userData.email,
       password: userData.password,
       phone: userData.phone,
       address: "",
+      captchaToken: userData.captchaToken ?? undefined,
     };
     await authService.register(payload);
     return true;

@@ -7,6 +7,7 @@ import { decodeJwtPayload } from '@/utils/jwt';
 export interface LoginRequest {
   email: string;
   password: string;
+  captchaToken?: string;
 }
 
 export interface RegisterRequest {
@@ -15,6 +16,7 @@ export interface RegisterRequest {
   password: string;
   phone?: string;
   address?: string;
+  captchaToken?: string;
 }
 
 export interface TokenResponse {
@@ -83,6 +85,7 @@ export const authService = {
         email: credentials.email,
         password: credentials.password,
         deviceId,
+        captchaToken: credentials.captchaToken,
       });
 
       console.log('✅ Login response:', response.data);
@@ -158,6 +161,7 @@ export const authService = {
         password: userData.password,
         phone: userData.phone || '',
         address: userData.address || '',
+        captchaToken: userData.captchaToken,
       });
     } catch (error: any) {
       console.error('Register error:', error);
@@ -207,11 +211,26 @@ export const authService = {
     );
   },
 
-  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
-    return apiService.post<{ message: string }>(
-      API_CONFIG.ENDPOINTS.AUTH.RESET_PASSWORD,
-      { token, newPassword }
-    );
+  // Đặt lại mật khẩu bằng OTP gửi qua email
+  async resetPassword(email: string, otp: string, newPassword: string): Promise<{ message: string }> {
+    try {
+      return await apiService.post<{ message: string }>(
+        API_CONFIG.ENDPOINTS.AUTH.RESET_PASSWORD,
+        { email, otp, newPassword }
+      );
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+
+      // Lấy message rõ ràng từ backend nếu có
+      const backendMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        "Không thể đặt lại mật khẩu. Vui lòng thử lại.";
+
+      // Thay thế message mặc định của Axios
+      throw new Error(backendMessage);
+    }
   },
 
   async getProfile(email?: string): Promise<UserProfile> {

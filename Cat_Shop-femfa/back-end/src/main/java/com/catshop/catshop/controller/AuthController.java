@@ -43,6 +43,8 @@ public class AuthController {
     private final QrLoginService qrLoginService;
     private final com.catshop.catshop.service.BackupCodeService backupCodeService;
     private final com.catshop.catshop.security.JwtUtils jwtUtils;
+    private final com.catshop.catshop.service.CaptchaService captchaService;
+    private final com.catshop.catshop.service.EmailService emailService;
 
     // ✅ Bước 1: Login (gửi OTP nếu thiết bị lạ)
     @PostMapping("/login")
@@ -53,6 +55,12 @@ public class AuthController {
         log.info("🔐 Login request received for email: {}", loginRequest.getEmail());
         String email = loginRequest.getEmail();
         String deviceId = loginRequest.getDeviceId();
+        String captchaToken = loginRequest.getCaptchaToken();
+
+        // Kiểm tra captcha đăng nhập
+        if (!captchaService.verify(captchaToken)) {
+            throw new BadRequestException("Captcha không hợp lệ");
+        }
         
         // Xử lý trường hợp deviceId null hoặc empty
         if (deviceId == null || deviceId.isBlank()) {
@@ -62,10 +70,10 @@ public class AuthController {
         
         // 1️⃣ Kiểm tra email + password
         // Nếu email/password sai → throw exception ngay
-        try {
-            authService.validateCredentials(loginRequest);
-            log.info("✅ Credentials validated for: {}", email);
-        } catch (com.catshop.catshop.exception.ResourceNotFoundException e) {
+            try {
+                authService.validateCredentials(loginRequest);
+                log.info("✅ Credentials validated for: {}", email);
+            } catch (com.catshop.catshop.exception.ResourceNotFoundException e) {
             // Email không tồn tại
             log.error("❌ Email not found: {}", email);
             throw e; // Re-throw để GlobalExceptionHandler xử lý
@@ -80,9 +88,14 @@ public class AuthController {
 
         // 2️⃣ Sau khi email/password đúng → cấp token ngay và cho phép đăng nhập
         // Không kiểm tra device trust - OTP là phương thức đăng nhập riêng, không phải bước bắt buộc
-        try {
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new BadRequestException("Không tìm thấy người dùng"));
+            try {
+                User user = userRepository.findByEmail(email)
+                        .orElseThrow(() -> new BadRequestException("Không tìm thấy người dùng"));
+
+                // Không cho login nếu email chưa được xác thực
+                if (Boolean.FALSE.equals(user.getEmailVerified())) {
+                    throw new BadRequestException("Email chưa được xác thực. Vui lòng kiểm tra email để xác thực tài khoản.");
+                }
 
             // 🔒 Kiểm tra IP address - gửi email cảnh báo nếu là IP mới
             try {
@@ -92,10 +105,8 @@ public class AuthController {
                 
                 if (isNewIp) {
                     log.warn("⚠️ [IP-SECURITY] New IP detected for {}: {}", email, ip);
-                    // Tạo reset password token để gửi trong email cảnh báo
-                    String resetPasswordToken = jwtUtils.generateResetPasswordToken(email);
-                    // Gửi email cảnh báo
-                    ipSecurityService.sendSecurityAlertEmail(email, ip, agent, resetPasswordToken);
+                    // Gửi email cảnh báo (không kèm link đổi mật khẩu)
+                    ipSecurityService.sendSecurityAlertEmail(email, ip, agent);
                     log.info("✅ [IP-SECURITY] Security alert email sent to: {}", email);
                 } else {
                     // IP đã biết, lưu lại để cập nhật thống kê
@@ -302,12 +313,17 @@ public class AuthController {
 
 
 
-    // ✅ Đăng ký tài khoản mới
+    // ✅ Đăng ký tài khoản mới + Captcha + gửi email xác thực
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<String>> register(@Valid @RequestBody UserRequest request) {
         log.info("📝 Register request received for email: {}", request.getEmail());
         
         try {
+            // Kiểm tra captcha
+            if (!captchaService.verify(request.getCaptchaToken())) {
+                throw new BadRequestException("Captcha không hợp lệ");
+            }
+
             boolean created = authService.register(request);
             if (!created) {
                 log.error("❌ Failed to create user for email: {}", request.getEmail());
@@ -315,7 +331,17 @@ public class AuthController {
                         .body(ApiResponse.error(400, "Không thể tạo tài khoản"));
             }
             log.info("✅ User registered successfully: {}", request.getEmail());
-            return ResponseEntity.ok(ApiResponse.success("Tạo tài khoản thành công", "User created successfully"));
+
+            // Gửi lại email xác thực (phòng trường hợp user chưa nhận được)
+            try {
+                authService.sendEmailVerification(request.getEmail());
+            } catch (Exception e) {
+                log.warn("⚠️ Không thể gửi email xác thực cho {}: {}", request.getEmail(), e.getMessage());
+            }
+
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Tạo tài khoản thành công. Vui lòng kiểm tra email để xác thực tài khoản.",
+                    "User created successfully"));
         } catch (BadRequestException e) {
             // Email đã tồn tại, số điện thoại đã tồn tại, etc.
             log.error("❌ Registration failed for {}: {}", request.getEmail(), e.getMessage());
@@ -336,6 +362,15 @@ public class AuthController {
 
         String newAccessToken = authService.refreshAccessToken(refreshToken);
         return ResponseEntity.ok(ApiResponse.success(newAccessToken, "Access token refreshed successfully"));
+    }
+
+    // ✅ Xác thực email đăng ký
+    @GetMapping("/verify-email")
+    public ResponseEntity<ApiResponse<String>> verifyEmail(@RequestParam("token") String token) {
+        authService.verifyEmail(token);
+        return ResponseEntity.ok(ApiResponse.success(
+                "Xác thực email thành công. Bạn có thể đăng nhập.",
+                "Email verified successfully"));
     }
 
     // ✅ Gửi SMS OTP khi user click nút "Gửi mã OTP"
@@ -570,66 +605,39 @@ public class AuthController {
         }
     }
 
-    // ✅ Đổi mật khẩu khi có cảnh báo xâm nhập
-    @PostMapping("/reset-password-security")
-    public ResponseEntity<ApiResponse<String>> resetPasswordFromSecurityAlert(
-            @RequestBody Map<String, String> request) {
-        try {
-            String token = request.get("token");
-            String newPassword = request.get("newPassword");
-            
-            if (token == null || token.isBlank()) {
-                throw new BadRequestException("Token không được để trống");
-            }
-            
-            if (newPassword == null || newPassword.isBlank()) {
-                throw new BadRequestException("Mật khẩu mới không được để trống");
-            }
-            
-            if (newPassword.length() < 6) {
-                throw new BadRequestException("Mật khẩu phải có ít nhất 6 ký tự");
-            }
-            
-            // Validate reset password token
-            if (!jwtUtils.validateResetPasswordToken(token)) {
-                throw new BadRequestException("Token không hợp lệ hoặc đã hết hạn");
-            }
-            
-            // Lấy email từ token
-            String email = jwtUtils.getEmailFromToken(token);
-            
-            // Tìm user
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
-            
-            // Mã hóa mật khẩu mới (sử dụng PasswordEncoder từ Spring Security)
-            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder = 
-                new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
-            String encodedPassword = passwordEncoder.encode(newPassword);
-            
-            // Cập nhật mật khẩu
-            user.setPasswordHash(encodedPassword);
-            userRepository.save(user);
-            
-            // Xóa tất cả refresh token của user (đăng xuất tất cả thiết bị)
-            try {
-                authService.logout(email);
-            } catch (Exception e) {
-                log.warn("⚠️ Failed to logout all devices for {}: {}", email, e.getMessage());
-            }
-            
-            log.info("✅ [SECURITY] Password reset successfully for: {}", email);
-            return ResponseEntity.ok(ApiResponse.success(
-                    "Đổi mật khẩu thành công. Vui lòng đăng nhập lại với mật khẩu mới.",
-                    "Password reset successfully"));
-                    
-        } catch (BadRequestException | ResourceNotFoundException e) {
-            log.error("❌ [SECURITY] Reset password failed: {}", e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            log.error("❌ [SECURITY] Unexpected error resetting password: {}", e.getMessage(), e);
-            throw new BadRequestException("Đã xảy ra lỗi khi đổi mật khẩu. Vui lòng thử lại sau.");
+    // ✅ Quên mật khẩu: gửi OTP đặt lại mật khẩu về email
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<String>> forgotPassword(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        if (email == null || email.isBlank()) {
+            throw new BadRequestException("Email không được để trống");
         }
+
+        authService.sendPasswordResetOtp(email);
+        return ResponseEntity.ok(ApiResponse.success(
+                "Nếu email tồn tại trong hệ thống, mã OTP đặt lại mật khẩu đã được gửi.",
+                "Password reset OTP sent (if account exists)"));
+    }
+
+    // ✅ Đặt lại mật khẩu bằng OTP gửi qua email
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<String>> resetPassword(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        String otp = request.get("otp");
+        String newPassword = request.get("newPassword");
+
+        if (email == null || email.isBlank()) {
+            throw new BadRequestException("Email không được để trống");
+        }
+        if (otp == null || otp.isBlank()) {
+            throw new BadRequestException("OTP không được để trống");
+        }
+
+        authService.resetPassword(email, otp, newPassword);
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại với mật khẩu mới.",
+                "Password reset successfully"));
     }
 
 }

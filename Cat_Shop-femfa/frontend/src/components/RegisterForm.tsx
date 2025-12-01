@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,7 @@ import { Eye, EyeOff, Mail, Lock, User, Phone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { calculatePasswordStrength, getStrengthColor, getStrengthLabel, type PasswordStrength } from "@/utils/passwordStrength";
+import GoogleReCaptcha from "./GoogleReCaptcha";
 
 interface RegisterFormProps {
   onSwitchToLogin: () => void;
@@ -28,6 +29,7 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(calculatePasswordStrength(""));
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
 
   // Redirect trực tiếp trong cùng tab để đăng ký Google
   const handleGoogleRegister = () => {
@@ -61,6 +63,15 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
       return;
     }
 
+    if (!recaptchaToken) {
+      toast({
+        title: "Thiếu xác minh bảo mật",
+        description: "Vui lòng hoàn thành captcha trước khi đăng ký.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     
     try {
@@ -69,6 +80,7 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
         email: formData.email,
         phone: formData.phone,
         password: formData.password,
+        captchaToken: recaptchaToken,
       });
       
       toast({
@@ -253,10 +265,16 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
             </Label>
           </div>
 
+          <GoogleReCaptcha
+            onVerify={setRecaptchaToken}
+            onExpire={() => setRecaptchaToken(null)}
+            className="mt-2"
+          />
+
           <Button
             type="submit"
             className="w-full"
-            disabled={isLoading}
+            disabled={isLoading || !recaptchaToken}
           >
             {isLoading ? "Đang đăng ký..." : "Đăng ký"}
           </Button>

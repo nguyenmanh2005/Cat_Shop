@@ -26,5 +26,8 @@ public class UserRequest {
     @Size(max = 255, message = "Address too long")
     private String address;
 
+    // Captcha token từ frontend (reCAPTCHA hoặc tương tự)
+    private String captchaToken;
+
 }
 

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { authService } from "../api/authService";
 import type { RegisterPayload } from "../api/authService";
+import GoogleReCaptcha from "@/components/GoogleReCaptcha";
 import ErrorAlert from "./ErrorAlert";
 import { calculatePasswordStrength, getStrengthLabel } from "@/utils/passwordStrength";
 
@@ -19,13 +20,22 @@ const RegisterForm = () => {
   const [successMessage, setSuccessMessage] = useState<string | undefined>();
   const password = watch("password");
   const passwordStrength = calculatePasswordStrength(password || "");
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
 
   // Xử lý gửi form đăng ký lên server
   const onSubmit = async (formValues: RegisterFormValues) => {
+    if (!recaptchaToken) {
+      setError("Vui lòng xác thực reCAPTCHA để tiếp tục");
+      return;
+    }
+
     try {
       setError(undefined);
       setSuccessMessage(undefined);
-      const { message } = await authService.register(formValues);
+      const { message } = await authService.register({
+        ...formValues,
+        captchaToken: recaptchaToken,
+      });
       setSuccessMessage(message || "Đăng ký tài khoản thành công.");
       reset();
     } catch (err) {
@@ -53,6 +63,11 @@ const RegisterForm = () => {
           />
           {errors.fullName && <p className="mt-1 text-xs text-red-600">{errors.fullName.message}</p>}
         </div>
+
+        <GoogleReCaptcha
+          onVerify={setRecaptchaToken}
+          onExpire={() => setRecaptchaToken(null)}
+        />
 
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Email</label>
@@ -132,7 +147,7 @@ const RegisterForm = () => {
 
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !recaptchaToken}
           className="inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           {isSubmitting ? "Đang xử lý..." : "Tạo tài khoản"}

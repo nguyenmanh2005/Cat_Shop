@@ -13,6 +13,7 @@ import com.catshop.catshop.repository.RoleRepository;
 import com.catshop.catshop.repository.UserRepository;
 import com.catshop.catshop.security.JwtUtils;
 import com.catshop.catshop.service.AuthService;
+import com.catshop.catshop.service.CaptchaService;
 import com.catshop.catshop.service.EmailService;
 import com.catshop.catshop.service.OtpService;
 import com.catshop.catshop.service.SmsService;
@@ -41,6 +42,10 @@ public class AuthServiceImpl implements AuthService {
     private final OtpService otpService;
     private final SmsService smsService;
     private final RedisTemplate<String, String> redisTemplate;
+    private final CaptchaService captchaService;
+
+    @org.springframework.beans.factory.annotation.Value("${frontend.url:http://localhost:5173}")
+    private String frontendUrl;
 
     // ------------------------- LOGIN STEP 1 (Gửi OTP) -------------------------
     @Override
@@ -131,14 +136,14 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("Email " + email + " không tồn tại"));
         
         // Kiểm tra số điện thoại có khớp với user không (nếu user đã đăng ký số điện thoại)
-        if (user.getPhoneNumber() != null && !user.getPhoneNumber().isBlank()) {
+        if (user.getPhone() != null && !user.getPhone().isBlank()) {
             // Normalize phone numbers để so sánh
-            String normalizedUserPhone = user.getPhoneNumber().replaceAll("\\s+", "").replace("+84", "0");
+            String normalizedUserPhone = user.getPhone().replaceAll("\\s+", "").replace("+84", "0");
             String normalizedInputPhone = phoneNumber.replaceAll("\\s+", "").replace("+84", "0");
             
             if (!normalizedUserPhone.equals(normalizedInputPhone)) {
                 log.warn("⚠️ [VERIFY-SMS-OTP] Phone number mismatch. User phone: {}, Input phone: {}", 
-                        user.getPhoneNumber(), phoneNumber);
+                        user.getPhone(), phoneNumber);
                 // Không throw exception - cho phép verify với số điện thoại mới
             }
         }
@@ -291,6 +296,11 @@ public class AuthServiceImpl implements AuthService {
     // ------------------------- REGISTER -------------------------
     @Override
     public boolean register(UserRequest userRequest) {
+        // Xác thực captcha
+        if (!captchaService.verify(userRequest.getCaptchaToken())) {
+            throw new BadRequestException("Captcha không hợp lệ");
+        }
+
         String email = userRequest.getEmail();
         String phone = userRequest.getPhone();
         
@@ -314,12 +324,73 @@ public class AuthServiceImpl implements AuthService {
         // Map từ UserRequest sang User entity
         User user = userMapper.FromUserRequestToUser(userRequest);
         user.setRole(role);
+        user.setEmailVerified(false);
         
         // Mã hóa password trước khi lưu vào database
         user.setPasswordHash(passwordEncoder.encode(userRequest.getPassword()));
 
         // Lưu user vào database
         userRepository.save(user);
+
+        // Gửi email xác thực
+        sendEmailVerification(email);
+
         return true;
+    }
+
+    @Override
+    public void sendEmailVerification(String email) {
+        String token = jwtUtils.generateEmailVerificationToken(email);
+        String verifyUrl = frontendUrl + "/verify-email?token=" + token;
+        emailService.sendVerificationEmail(email, verifyUrl);
+    }
+
+    @Override
+    public void verifyEmail(String token) {
+        if (!jwtUtils.validateEmailVerificationToken(token)) {
+            throw new BadRequestException("Token xác thực email không hợp lệ hoặc đã hết hạn");
+        }
+
+        String email = jwtUtils.getEmailFromToken(token);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+
+        user.setEmailVerified(true);
+        userRepository.save(user);
+    }
+
+    @Override
+    public void sendPasswordResetOtp(String email) {
+        // Nếu email không tồn tại, không tiết lộ cho client (tránh lộ danh sách email)
+        userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với email: " + email));
+
+        // Dùng lại OtpService để gửi mã OTP về email
+        otpService.generateAndSendOtp(email);
+    }
+
+    @Override
+    public void resetPassword(String email, String otp, String newPassword) {
+        // Xác thực OTP
+        boolean valid = otpService.verifyOtp(email, otp);
+        if (!valid) {
+            throw new BadRequestException("OTP không hợp lệ hoặc đã hết hạn");
+        }
+
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new BadRequestException("Mật khẩu mới không được để trống");
+        }
+        if (newPassword.length() < 6) {
+            throw new BadRequestException("Mật khẩu mới phải có ít nhất 6 ký tự");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // Xóa refresh token trong Redis để đăng xuất tất cả thiết bị
+        logout(email);
     }
 }

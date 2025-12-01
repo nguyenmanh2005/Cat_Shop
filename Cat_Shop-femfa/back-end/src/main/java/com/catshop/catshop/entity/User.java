@@ -35,6 +35,9 @@ public class User implements UserDetails {
     @Column(length = 20, unique = true)
     private String phone;
 
+    @Column(name = "email_verified")
+    private Boolean emailVerified = false;
+
     @Column(length = 255)
     private String address;
 

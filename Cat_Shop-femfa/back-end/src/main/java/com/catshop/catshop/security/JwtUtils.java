@@ -160,4 +160,29 @@ public class JwtUtils {
             return false;
         }
     }
+
+    // ----------------------------------------------------
+    // 🔹 Email Verification Token (24 giờ)
+    // ----------------------------------------------------
+    public String generateEmailVerificationToken(String email) {
+        long verifyTokenExpirationMs = 24 * 60 * 60 * 1000; // 24 giờ
+        return Jwts.builder()
+                .setSubject(email)
+                .claim("type", "verify-email")
+                .setIssuer("CatShop Admin")
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + verifyTokenExpirationMs))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public boolean validateEmailVerificationToken(String token) {
+        try {
+            Claims claims = getAllClaims(token);
+            String type = claims.get("type", String.class);
+            return "verify-email".equals(type) && validateToken(token);
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }

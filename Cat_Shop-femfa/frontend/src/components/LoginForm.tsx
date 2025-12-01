@@ -211,7 +211,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
 
     try {
       setIsLoading(true);
-      const result = await login(email, password);
+      const result = await login(email, password, recaptchaToken);
 
       // LUÔN LUÔN yêu cầu xác minh sau khi đăng nhập email/password thành công
       // Đây là yêu cầu bảo mật - luôn cần xác minh 2 bước (OTP hoặc QR Code)

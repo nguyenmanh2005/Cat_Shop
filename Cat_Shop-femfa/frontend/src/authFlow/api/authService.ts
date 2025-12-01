@@ -6,12 +6,14 @@ export type RegisterPayload = {
   password: string;
   fullName: string;
   phone: string;
+  captchaToken?: string;
 };
 
 export type LoginPayload = {
   email: string;
   password: string;
   deviceId?: string;
+  captchaToken?: string;
 };
 
 export type VerifyOtpPayload = {
