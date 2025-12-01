@@ -21,6 +21,8 @@ const createApiInstance = (): AxiosInstance => {
         '/auth/register',
         '/auth/verify-otp',
         '/auth/send-otp',
+        '/auth/send-sms-otp',
+        '/auth/verify-sms-otp',
         '/auth/mfa/verify',
         '/auth/forgot-password',
         '/auth/reset-password',
@@ -31,6 +33,8 @@ const createApiInstance = (): AxiosInstance => {
         '/api/auth/register',
         '/api/auth/verify-otp',
         '/api/auth/send-otp',
+        '/api/auth/send-sms-otp',
+        '/api/auth/verify-sms-otp',
         '/api/auth/mfa/verify',
         '/api/auth/forgot-password',
         '/api/auth/reset-password',
@@ -38,10 +42,8 @@ const createApiInstance = (): AxiosInstance => {
         '/api/auth/qr/confirm',
         '/api/auth/qr/status',
         // Public customer endpoints - không cần authentication
-        '/customer/products',
         '/customer/categories',
         '/categories/customer',
-        '/api/customer/products',
         '/api/customer/categories',
         '/api/categories/customer',
       ];
@@ -67,18 +69,17 @@ const createApiInstance = (): AxiosInstance => {
       
       // Thêm API key và X-USER-EMAIL cho các request đến /api/users
       if (config.url?.includes('/users')) {
-        // Loại trừ POST /api/users (đăng ký) và GET /api/users/email/{email} (login)
+        // Loại trừ POST /api/users (đăng ký)
         const isRegister = config.method?.toLowerCase() === 'post' && config.url === '/users';
-        const isLogin = config.url?.includes('/users/email/');
         
-        if (!isRegister && !isLogin && !isPublicEndpoint) {
-          // Các request GET/PUT/DELETE đến /api/users (trừ login) cần API key và email
+        if (!isRegister && !isPublicEndpoint) {
+          // Các request GET/PUT/DELETE đến /api/users (trừ đăng ký) cần API key và email
           config.headers['X-API-KEY'] = 'secret123';
           if (userEmail) {
             config.headers['X-USER-EMAIL'] = userEmail;
           }
         }
-        // POST /api/users (đăng ký) và GET /api/users/email/{email} (login) không cần header này
+        // POST /api/users (đăng ký) không cần header này
       } else if (userEmail && !isPublicEndpoint) {
         // Các request khác cần X-USER-EMAIL nếu user đã đăng nhập (trừ public endpoints)
         config.headers['X-USER-EMAIL'] = userEmail;
@@ -119,6 +120,8 @@ const createApiInstance = (): AxiosInstance => {
         '/auth/register',
         '/auth/verify-otp',
         '/auth/send-otp',
+        '/auth/send-sms-otp',
+        '/auth/verify-sms-otp',
         '/auth/mfa/verify',
         '/auth/forgot-password',
         '/auth/reset-password',
@@ -126,14 +129,14 @@ const createApiInstance = (): AxiosInstance => {
         '/api/auth/register',
         '/api/auth/verify-otp',
         '/api/auth/send-otp',
+        '/api/auth/send-sms-otp',
+        '/api/auth/verify-sms-otp',
         '/api/auth/mfa/verify',
         '/api/auth/forgot-password',
         '/api/auth/reset-password',
         // Public customer endpoints - không cần authentication
-        '/customer/products',
         '/customer/categories',
         '/categories/customer',
-        '/api/customer/products',
         '/api/customer/categories',
         '/api/categories/customer',
       ];
@@ -170,8 +173,8 @@ const createApiInstance = (): AxiosInstance => {
           localStorage.removeItem('refresh_token');
           localStorage.removeItem('user_email');
           // Không redirect nếu đang ở trang login
-          if (!window.location.pathname.includes('/login')) {
-            window.location.href = '/login';
+          if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/auth-flow')) {
+            window.location.href = '/auth-flow/login';
           }
         }
       }

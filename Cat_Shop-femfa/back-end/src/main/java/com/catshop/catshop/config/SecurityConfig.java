@@ -94,8 +94,7 @@ public class SecurityConfig {
                                 "/api/admin/food-details/**",
                                 "/api/admin/cleaning-details/**",
                                 "/api/admin/cat-details/**",
-                                "/api/admin/cage-details/**",
-                                "/api/admin/mfa/**"
+                                "/api/admin/cage-details/**"
                         ).hasRole("ADMIN")
                         // ✅ PUT và DELETE yêu cầu ADMIN
                         .requestMatchers(HttpMethod.PUT, "/api/**").hasRole("ADMIN")

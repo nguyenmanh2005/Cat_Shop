@@ -10,7 +10,7 @@ export const reviewService = {
     return apiService.get<Review[]>(url);
   },
 
-  // Lấy tất cả đánh giá
+  // Lấy tất cả đánh giá (admin)
   async getAllReviews(): Promise<Review[]> {
     return apiService.get<Review[]>(API_CONFIG.ENDPOINTS.REVIEWS.LIST);
   },

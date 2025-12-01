@@ -24,7 +24,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { 
   Search, 
@@ -36,8 +35,10 @@ import {
   Download,
   MoreHorizontal,
   Image as ImageIcon,
-  Filter
+  Upload
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,206 +47,683 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import { productService, categoryService } from "@/services/productService";
+import type { Product, ProductType, Category } from "@/types";
+import { formatCurrencyVND } from "@/lib/utils";
 
-interface ProductType {
-  type_id: number;
-  type_name: string;
-}
-
-interface Category {
-  category_id: number;
-  category_name: string;
-  description: string;
-  type_id: number;
-}
-
-interface Product {
-  product_id: number;
-  product_name: string;
-  type_id: number;
-  category_id?: number;
+interface AdminProduct {
+  id: number;
+  name: string;
+  typeId?: number;
+  typeName?: string;
+  categoryId?: number;
+  categoryName?: string;
   price: number;
-  stock_quantity: number;
-  description: string;
-  image_url?: string;
-  type_name?: string;
-  category_name?: string;
+  stockQuantity: number;
+  description?: string;
+  _originalData?: any; // Lưu data gốc từ backend để lấy ID khi cần
 }
 
-interface CatDetail {
-  cat_id: number;
-  breed: string;
-  age: number;
-  gender: string;
-  vaccinated: boolean;
-}
-
-interface FoodDetail {
-  food_id: number;
-  weight_kg: number;
-  ingredients: string;
-  expiry_date: string;
-}
+// Map typeName từ database (tiếng Anh) sang tiếng Việt để hiển thị
+const TYPE_NAME_MAP: Record<string, string> = {
+  "Cat": "Mèo cảnh",
+  "Food": "Thức ăn",
+  "Cage": "Lồng chuồng",
+  "Cleaning": "Vệ sinh",
+  "Toy": "Đồ chơi",
+};
 
 const ProductManagement = () => {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<AdminProduct[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<AdminProduct[]>([]);
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<AdminProduct | null>(null);
+  // Lưu mapping từ unique key -> productId để dùng khi edit (vì backend không trả về productId)
+  const [productIdMap, setProductIdMap] = useState<Map<string, number>>(new Map());
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [formData, setFormData] = useState({
+    productName: "",
+    typeId: "",
+    categoryId: "",
+    price: "",
+    stockQuantity: "",
+    description: "",
+  });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  // Load mock data
+  const normalizeProduct = (
+    product: Partial<Product> & Record<string, any>,
+    categoryLookup: Map<number, string>
+  ): AdminProduct => {
+    // Tìm productId từ nhiều nguồn khác nhau
+    const productId =
+      product.productId ??
+      product.product_id ??
+      product.id ??
+      product._originalData?.productId ??
+      product._originalData?.product_id ??
+      product._originalData?.id ??
+      null;
+    
+    // Nếu không tìm thấy ID, log warning và throw error thay vì default về 0
+    if (!productId || productId === 0) {
+      console.warn("⚠️ ProductManagement: Không tìm thấy productId cho product:", {
+        product,
+        availableKeys: Object.keys(product),
+        productId,
+      });
+    }
+    const typeId =
+      product.typeId ??
+      product.type_id ??
+      product.type?.typeId ??
+      product.type?.type_id;
+    const categoryId =
+      product.categoryId ??
+      product.category_id ??
+      product.category?.categoryId ??
+      product.category?.category_id;
+
+    return {
+      id: productId || 0, // Giữ 0 để hiển thị, nhưng sẽ validate khi update/delete
+      name: product.productName ?? product.product_name ?? product.name ?? `Sản phẩm #${productId}`,
+      typeId: typeId ? Number(typeId) : undefined,
+      typeName: (() => {
+        const rawTypeName = product.typeName ?? product.type_name ?? product.type?.typeName;
+        if (rawTypeName) {
+          // Nếu có typeName từ response, map sang tiếng Việt
+          return TYPE_NAME_MAP[rawTypeName] ?? rawTypeName;
+        }
+        return "Không xác định";
+      })(),
+      categoryId: categoryId ? Number(categoryId) : undefined,
+      categoryName:
+        product.categoryName ??
+        product.category_name ??
+        product.category?.categoryName ??
+        categoryLookup.get(Number(categoryId)) ??
+        "Chưa phân loại",
+      price: Number(product.price ?? 0),
+      stockQuantity: Number(product.stockQuantity ?? product.stock_quantity ?? 0),
+      description: product.description || "",
+      _originalData: product, // Lưu data gốc để có thể lấy ID khi cần
+    };
+  };
+
   useEffect(() => {
-    const loadData = () => {
+    let ignore = false;
+
+    const loadData = async () => {
       try {
-        // Mock Product Types
-        const mockTypes: ProductType[] = [
-          { type_id: 1, type_name: "Mèo cảnh" },
-          { type_id: 2, type_name: "Thức ăn" },
-          { type_id: 3, type_name: "Lồng chuồng" },
-          { type_id: 4, type_name: "Vệ sinh" }
-        ];
+        setIsLoading(true);
+        const [categoriesResponse, productsResponse] = await Promise.all([
+          categoryService.getAllCategoriesAdmin().catch(() => []),
+          productService.getAllProductsCustomer(),
+        ]);
 
-        // Mock Categories
-        const mockCategories: Category[] = [
-          { category_id: 1, category_name: "Mèo thuần chủng", description: "Các giống mèo thuần chủng", type_id: 1 },
-          { category_id: 2, category_name: "Thức ăn khô", description: "Thức ăn khô cho mèo", type_id: 2 },
-          { category_id: 3, category_name: "Lồng vận chuyển", description: "Lồng để vận chuyển mèo", type_id: 3 },
-          { category_id: 4, category_name: "Cát vệ sinh", description: "Cát vệ sinh cho mèo", type_id: 4 }
-        ];
+        if (ignore) return;
 
-        // Mock Products
-        const mockProducts: Product[] = [
-          {
-            product_id: 1,
-            product_name: "Mèo Bengal",
-            type_id: 1,
-            category_id: 1,
-            price: 15000000,
-            stock_quantity: 5,
-            description: "Mèo Bengal thuần chủng, khỏe mạnh, đã tiêm phòng",
-            type_name: "Mèo cảnh",
-            category_name: "Mèo thuần chủng"
-          },
-          {
-            product_id: 2,
-            product_name: "Royal Canin Adult",
-            type_id: 2,
-            category_id: 2,
-            price: 450000,
-            stock_quantity: 50,
-            description: "Thức ăn khô cho mèo trưởng thành",
-            type_name: "Thức ăn",
-            category_name: "Thức ăn khô"
-          },
-          {
-            product_id: 3,
-            product_name: "Lồng vận chuyển nhựa",
-            type_id: 3,
-            category_id: 3,
-            price: 350000,
-            stock_quantity: 20,
-            description: "Lồng vận chuyển an toàn cho mèo",
-            type_name: "Lồng chuồng",
-            category_name: "Lồng vận chuyển"
-          },
-          {
-            product_id: 4,
-            product_name: "Cát vệ sinh Ever Clean",
-            type_id: 4,
-            category_id: 4,
-            price: 120000,
-            stock_quantity: 100,
-            description: "Cát vệ sinh khử mùi tốt",
-            type_name: "Vệ sinh",
-            category_name: "Cát vệ sinh"
-          },
-          {
-            product_id: 5,
-            product_name: "Mèo Persian",
-            type_id: 1,
-            category_id: 1,
-            price: 8000000,
-            stock_quantity: 3,
-            description: "Mèo Persian lông dài, hiền lành",
-            type_name: "Mèo cảnh",
-            category_name: "Mèo thuần chủng"
+        // Tạo mapping categoryName + typeId -> categoryId từ products (giống CategoryManagement)
+        const categoryIdMap = new Map<string, number>();
+        const productStats = new Map<number, number>();
+        
+        (productsResponse || []).forEach((product: Partial<Product> & Record<string, any>) => {
+          const rawCategoryId =
+            product.categoryId ??
+            product.category_id ??
+            product.category?.categoryId ??
+            product.category?.category_id;
+          const categoryId = rawCategoryId ? Number(rawCategoryId) : undefined;
+          
+          if (categoryId) {
+            // Tạo key từ categoryName + typeId để map
+            const categoryName = product.categoryName ?? product.category_name ?? product.category?.categoryName;
+            const typeId = product.typeId ?? product.type_id ?? product.type?.typeId;
+            if (categoryName && typeId) {
+              const mapKey = `${categoryName}|${typeId}`;
+              if (!categoryIdMap.has(mapKey)) {
+                categoryIdMap.set(mapKey, categoryId);
+              }
+            }
+            
+            // Count products per category
+            const current = productStats.get(categoryId) ?? 0;
+            productStats.set(categoryId, current + 1);
           }
-        ];
+        });
 
-        setProductTypes(mockTypes);
-        setCategories(mockCategories);
-        setProducts(mockProducts);
-        setFilteredProducts(mockProducts);
-      } catch (error) {
-        console.error("Error loading data:", error);
+        // Enrich categories với ID từ mapping (giống CategoryManagement)
+        const enrichedCategories = (categoriesResponse || []).map((category: any) => {
+          const categoryName = category.categoryName ?? category.category_name;
+          const typeId = category.typeId ?? category.type_id;
+          
+          // Nếu chưa có ID, thử lấy từ mapping
+          if (!category.categoryId && !category.category_id && !category.id) {
+            if (categoryName && typeId) {
+              const mapKey = `${categoryName}|${typeId}`;
+              const mappedId = categoryIdMap.get(mapKey);
+              if (mappedId) {
+                return { ...category, categoryId: mappedId, _mappedId: true };
+              }
+            }
+          }
+          return category;
+        });
+
+        // Tạo categoryLookup với ID đã được enrich
+        const categoryLookup = new Map<number, string>();
+        enrichedCategories.forEach((category: any) => {
+          const categoryId = category.categoryId ?? category.category_id ?? category.id;
+          const categoryName = category.categoryName ?? category.category_name;
+          if (categoryId && categoryName) {
+            categoryLookup.set(Number(categoryId), categoryName);
+          }
+        });
+
+        // Set categories state (để dùng trong form)
+        // Log để debug
+        console.log("📦 ProductManagement - Categories response:", categoriesResponse);
+        console.log("🗺️  ProductManagement - Category ID mapping:", Array.from(categoryIdMap.entries()));
+        console.log("✨ ProductManagement - Enriched categories:", enrichedCategories);
+        
+        setCategories(enrichedCategories as Category[]);
+
+        // Log để kiểm tra response từ API có productId không
+        console.log("🔍 ProductManagement: Kiểm tra productsResponse:", {
+          totalProducts: productsResponse?.length || 0,
+          firstProduct: productsResponse?.[0] ? {
+            keys: Object.keys(productsResponse[0]),
+            hasProductId: 'productId' in (productsResponse[0] || {}),
+            productId: (productsResponse[0] as any)?.productId,
+            sample: productsResponse[0]
+          } : null
+        });
+        
+        const normalizedProducts = (productsResponse || []).map((product) =>
+          normalizeProduct(product, categoryLookup)
+        );
+
+        // Derive productTypes từ categories (giống CategoryManagement)
+        const derivedTypes: ProductType[] = Array.from(
+          new Map(
+            enrichedCategories
+              .filter((category: any) => {
+                const typeId = category.typeId ?? category.type_id;
+                return typeId != null;
+              })
+              .map((category: any) => {
+                const typeId = category.typeId ?? category.type_id;
+                const rawTypeName = category.type?.typeName ?? category.type_name;
+                // Map typeId -> typeName nếu không có từ response
+                const typeIdToName: Record<number, string> = {
+                  1: "Cat",
+                  2: "Food",
+                  3: "Cage",
+                  4: "Cleaning",
+                };
+                const typeName = rawTypeName ?? typeIdToName[Number(typeId)];
+                return [Number(typeId), typeName ? (TYPE_NAME_MAP[typeName] ?? typeName) : "Không xác định"];
+              })
+          )
+        ).map(([typeId, typeName]) => ({
+          typeId: typeId as number,
+          typeName: typeName as string,
+        }));
+
+        // Log sau khi derivedTypes được khai báo
+        console.log("📊 ProductManagement - ProductTypes derived:", derivedTypes);
+
+        setProductTypes(derivedTypes);
+        setProducts(normalizedProducts);
+        setFilteredProducts(normalizedProducts);
+      } catch (error: any) {
+        if (ignore) return;
+        console.error("Error loading products:", error);
+        toast({
+          title: "Không thể tải sản phẩm",
+          description: error?.message || "Vui lòng thử lại sau.",
+          variant: "destructive",
+        });
       } finally {
-        setIsLoading(false);
+        if (!ignore) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadData();
-  }, []);
+    return () => {
+      ignore = true;
+    };
+  }, [toast]);
 
   // Filter products
   useEffect(() => {
     let filtered = products;
 
-    // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(product =>
-        product.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.type_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.category_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      const keyword = searchTerm.toLowerCase();
+      filtered = filtered.filter((product) =>
+        product.name.toLowerCase().includes(keyword) ||
+        product.description?.toLowerCase().includes(keyword) ||
+        product.typeName?.toLowerCase().includes(keyword) ||
+        product.categoryName?.toLowerCase().includes(keyword)
       );
     }
 
-    // Type filter
     if (typeFilter !== "all") {
-      filtered = filtered.filter(product => product.type_id.toString() === typeFilter);
+      filtered = filtered.filter((product) => product.typeId?.toString() === typeFilter);
     }
 
-    // Category filter
     if (categoryFilter !== "all") {
-      filtered = filtered.filter(product => product.category_id?.toString() === categoryFilter);
+      filtered = filtered.filter((product) => product.categoryId?.toString() === categoryFilter);
     }
 
     setFilteredProducts(filtered);
   }, [products, searchTerm, typeFilter, categoryFilter]);
 
-  const handleDeleteProduct = (productId: number) => {
-    if (confirm("Bạn có chắc chắn muốn xóa sản phẩm này?")) {
-      const updatedProducts = products.filter(product => product.product_id !== productId);
-      setProducts(updatedProducts);
+  const handleDeleteProduct = async (productId: number) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa sản phẩm này?")) {
+      return;
+    }
+    try {
+      await productService.deleteProduct(productId);
+      setProducts((prev) => prev.filter((product) => product.id !== productId));
+      setFilteredProducts((prev) => prev.filter((product) => product.id !== productId));
+      toast({
+        title: "Đã xóa sản phẩm",
+        description: `Sản phẩm #${productId} đã được xóa.`,
+      });
+    } catch (error: any) {
+      console.error("Delete product error:", error);
+      toast({
+        title: "Xóa sản phẩm thất bại",
+        description: error?.message || "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleViewDetails = (product: Product) => {
+  const handleViewDetails = (product: AdminProduct) => {
     setSelectedProduct(product);
     setIsDetailOpen(true);
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(amount);
+  const handleOpenAddForm = () => {
+    setIsEditMode(false);
+    setFormData({
+      productName: "",
+      typeId: "",
+      categoryId: "none",
+      price: "",
+      stockQuantity: "",
+      description: "",
+    });
+    setSelectedFile(null);
+    setImagePreview(null);
+    setIsFormOpen(true);
+  };
+
+  const handleOpenEditForm = (product: AdminProduct) => {
+    setIsEditMode(true);
+    setSelectedProduct(product);
+    setFormData({
+      productName: product.name,
+      typeId: product.typeId?.toString() || "",
+      categoryId: product.categoryId?.toString() || "none",
+      price: product.price.toString(),
+      stockQuantity: product.stockQuantity.toString(),
+      description: product.description || "",
+    });
+    setSelectedFile(null);
+    setImagePreview(null);
+    setIsFormOpen(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSubmitForm = async () => {
+    try {
+      if (!formData.productName || !formData.typeId || !formData.price || !formData.stockQuantity) {
+        toast({
+          title: "Vui lòng điền đầy đủ thông tin",
+          description: "Tên sản phẩm, loại, giá và số lượng là bắt buộc.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Format data theo ProductRequest của backend
+      // Backend yêu cầu: productName (String), typeId (Long), categoryId (Long, optional), 
+      // price (BigDecimal), stockQuantity (Integer), description (String, optional)
+      const productPayload: any = {
+        productName: formData.productName,
+        typeId: parseInt(formData.typeId),
+        price: parseFloat(formData.price), // Backend sẽ convert sang BigDecimal
+        stockQuantity: parseInt(formData.stockQuantity) || 0,
+        description: formData.description || null, // Backend có thể nhận null
+      };
+
+      // categoryId là optional trong ProductRequest
+      // Nếu categoryId là ID tạm thời (>= 2000000), không gửi lên backend
+      if (formData.categoryId && formData.categoryId !== "none") {
+        const categoryIdNum = parseInt(formData.categoryId);
+        if (categoryIdNum < 2000000) {
+          // Chỉ gửi nếu là ID thực (< 2000000)
+          productPayload.categoryId = categoryIdNum;
+        }
+        // Nếu là ID tạm thời (>= 2000000), bỏ qua (không gửi categoryId)
+      }
+
+      if (isEditMode && selectedProduct) {
+        // Lấy ID từ nhiều nguồn: id field, _originalData, hoặc query lại từ API
+        let productId = selectedProduct.id;
+        
+        console.log("🔍 ProductManagement: Bắt đầu tìm ID cho update:", {
+          selectedProductId: selectedProduct.id,
+          selectedProductName: selectedProduct.name,
+          _originalData: selectedProduct._originalData,
+          _originalDataKeys: selectedProduct._originalData ? Object.keys(selectedProduct._originalData) : []
+        });
+        
+        // Nếu id = 0, thử lấy từ _originalData
+        if (!productId || productId === 0) {
+          const originalData = selectedProduct._originalData;
+          if (originalData) {
+            // Thử nhiều cách để lấy ID
+            productId = originalData.productId ?? 
+                       originalData.product_id ?? 
+                       originalData.id ??
+                       (originalData as any).data?.productId ??
+                       null;
+            console.log("🔄 Lấy ID từ _originalData:", { 
+              productId, 
+              originalData,
+              availableKeys: Object.keys(originalData),
+              hasProductId: 'productId' in originalData,
+              hasProduct_id: 'product_id' in originalData,
+              hasId: 'id' in originalData
+            });
+          }
+        }
+        
+        // Nếu vẫn không có ID, query lại từ API để lấy data mới nhất
+        if (!productId || productId === 0) {
+          console.log("🔄 Query lại products từ API để tìm ID...");
+          try {
+            const freshProductsResponse = await productService.getAllProductsCustomer();
+            const originalData = selectedProduct._originalData || selectedProduct;
+            
+            // Tìm product match dựa trên unique fields
+            const matchedProduct = freshProductsResponse.find((p: any) => {
+              const nameMatch = (p.productName ?? p.product_name ?? p.name) === selectedProduct.name;
+              const priceMatch = Number(p.price) === Number(selectedProduct.price);
+              const stockMatch = Number(p.stockQuantity ?? p.stock_quantity) === Number(selectedProduct.stockQuantity);
+              const descMatch = (p.description || '') === (selectedProduct.description || '');
+              
+              return nameMatch && priceMatch && stockMatch && descMatch;
+            });
+            
+            if (matchedProduct) {
+              // Lấy ID từ matched product
+              productId = matchedProduct.productId ?? matchedProduct.product_id ?? matchedProduct.id ?? null;
+              console.log("✅ Tìm thấy product match từ fresh API response:", {
+                productId,
+                matchedProduct,
+                hasProductId: 'productId' in matchedProduct,
+                availableKeys: Object.keys(matchedProduct)
+              });
+              
+              // Nếu vẫn không có ID, backend có thể chưa restart
+              if (!productId || productId === 0) {
+                console.error("❌ Backend vẫn chưa trả về productId. Có thể backend chưa được restart sau khi sửa code.");
+              }
+            } else {
+              console.warn("⚠️ Không tìm thấy product match trong fresh API response");
+            }
+          } catch (error) {
+            console.error("❌ Lỗi khi query fresh products:", error);
+          }
+        }
+        
+        // Nếu vẫn không có ID, thử tìm trong productIdMap bằng unique key
+        if (!productId || productId === 0) {
+          console.log("🔍 Không tìm thấy ID, đang tìm trong productIdMap...");
+          const uniqueKey = `${selectedProduct.name}|${selectedProduct.price}|${selectedProduct.stockQuantity}|${selectedProduct.description || ''}`;
+          const mappedId = productIdMap.get(uniqueKey);
+          
+          if (mappedId && mappedId >= 1000000) {
+            // Nếu là mapped ID (>= 1000000), query lại products và dùng index để lấy product
+            try {
+              const productsResponse = await productService.getAllProductsCustomer();
+              const index = mappedId - 1000000;
+              
+              if (productsResponse && productsResponse[index]) {
+                const productAtIndex = productsResponse[index];
+                
+                // Query backend để lấy productId bằng cách search theo name và match các field khác
+                // Nhưng vì backend không có endpoint search với đủ thông tin, ta cần một cách khác
+                // Cách tốt nhất: Query tất cả products và tìm exact match
+                const matchedProduct = productsResponse.find((p: any) => {
+                  const nameMatch = (p.productName ?? p.product_name ?? p.name) === selectedProduct.name;
+                  const priceMatch = Number(p.price) === Number(selectedProduct.price);
+                  const stockMatch = Number(p.stockQuantity ?? p.stock_quantity) === Number(selectedProduct.stockQuantity);
+                  const descMatch = (p.description || '') === (selectedProduct.description || '');
+                  return nameMatch && priceMatch && stockMatch && descMatch;
+                });
+                
+                if (matchedProduct) {
+                  // Vẫn không có ID từ matched product vì backend không trả về
+                  // Nhưng ta có thể thử search API để lấy ID
+                  console.log("✅ Tìm thấy product match:", matchedProduct);
+                  
+                  // Thử search theo productName để lấy list và tìm exact match
+                  const searchResults = await productService.searchProducts(selectedProduct.name);
+                  const exactMatch = searchResults.find((p: Product) => {
+                    return p.productName === selectedProduct.name &&
+                           p.price === selectedProduct.price &&
+                           p.stockQuantity === selectedProduct.stockQuantity;
+                  });
+                  
+                  if (exactMatch && exactMatch.productId) {
+                    productId = exactMatch.productId;
+                    console.log("✅ Tìm thấy ID từ search:", productId);
+                  }
+                }
+              }
+            } catch (error) {
+              console.error("❌ Lỗi khi query products để tìm ID:", error);
+            }
+          }
+        }
+        
+        // Nếu vẫn không có ID hợp lệ, báo lỗi và hướng dẫn
+        if (!productId || productId === 0) {
+          console.error("❌ Invalid product ID for update:", {
+            selectedProduct,
+            id: selectedProduct.id,
+            _originalData: selectedProduct._originalData,
+          });
+          
+          // Kiểm tra xem backend có trả về productId không
+          try {
+            const testResponse = await productService.getAllProductsCustomer();
+            const firstProduct = testResponse?.[0];
+            const hasProductId = firstProduct && ('productId' in firstProduct || 'product_id' in firstProduct);
+            
+            const errorMessage = hasProductId 
+              ? "Không tìm thấy ID sản phẩm. Vui lòng reload trang và thử lại."
+              : "Backend không trả về productId. Vui lòng:\n1. Kiểm tra backend đã được restart chưa\n2. Kiểm tra ProductResponse.java có field productId\n3. Kiểm tra ProductMapper.java có mapping productId\n4. Rebuild và restart backend";
+            
+            toast({
+              title: "Lỗi",
+              description: errorMessage,
+              variant: "destructive",
+            });
+          } catch (error) {
+            toast({
+              title: "Lỗi",
+              description: "Không thể cập nhật sản phẩm: Không tìm thấy ID. Vui lòng kiểm tra backend và thử lại.",
+              variant: "destructive",
+            });
+          }
+          return;
+        }
+        
+        // Update product
+        console.log("🔄 Updating product with ID:", productId);
+        await productService.updateProduct(productId, productPayload, selectedFile || undefined);
+        toast({
+          title: "Cập nhật thành công",
+          description: `Sản phẩm "${formData.productName}" đã được cập nhật.`,
+        });
+      } else {
+        // Create product
+        if (!selectedFile) {
+          toast({
+            title: "Vui lòng chọn hình ảnh",
+            description: "Hình ảnh sản phẩm là bắt buộc khi tạo mới.",
+            variant: "destructive",
+          });
+          return;
+        }
+        await productService.createProduct(productPayload, selectedFile);
+        toast({
+          title: "Tạo thành công",
+          description: `Sản phẩm "${formData.productName}" đã được tạo.`,
+        });
+      }
+
+      // Reload products (giống logic trong useEffect)
+      const [categoriesResponse, productsResponse] = await Promise.all([
+        categoryService.getAllCategoriesAdmin().catch(() => []),
+        productService.getAllProductsCustomer(),
+      ]);
+
+      // Tạo mapping categoryName + typeId -> categoryId từ products
+      const categoryIdMap = new Map<string, number>();
+      (productsResponse || []).forEach((product: Partial<Product> & Record<string, any>) => {
+        const rawCategoryId =
+          product.categoryId ??
+          product.category_id ??
+          product.category?.categoryId ??
+          product.category?.category_id;
+        const categoryId = rawCategoryId ? Number(rawCategoryId) : undefined;
+        
+        if (categoryId) {
+          const categoryName = product.categoryName ?? product.category_name ?? product.category?.categoryName;
+          const typeId = product.typeId ?? product.type_id ?? product.type?.typeId;
+          if (categoryName && typeId) {
+            const mapKey = `${categoryName}|${typeId}`;
+            if (!categoryIdMap.has(mapKey)) {
+              categoryIdMap.set(mapKey, categoryId);
+            }
+          }
+        }
+      });
+
+      // Enrich categories với ID từ mapping
+      const enrichedCategories = (categoriesResponse || []).map((category: any) => {
+        const categoryName = category.categoryName ?? category.category_name;
+        const typeId = category.typeId ?? category.type_id;
+        
+        if (!category.categoryId && !category.category_id && !category.id) {
+          if (categoryName && typeId) {
+            const mapKey = `${categoryName}|${typeId}`;
+            const mappedId = categoryIdMap.get(mapKey);
+            if (mappedId) {
+              return { ...category, categoryId: mappedId, _mappedId: true };
+            }
+          }
+        }
+        return category;
+      });
+
+      // Tạo categoryLookup với ID đã được enrich
+      const categoryLookup = new Map<number, string>();
+      enrichedCategories.forEach((category: any) => {
+        const categoryId = category.categoryId ?? category.category_id ?? category.id;
+        const categoryName = category.categoryName ?? category.category_name;
+        if (categoryId && categoryName) {
+          categoryLookup.set(Number(categoryId), categoryName);
+        }
+      });
+
+      // Set categories state
+      setCategories(enrichedCategories as Category[]);
+
+      const normalizedProducts = (productsResponse || []).map((product) =>
+        normalizeProduct(product, categoryLookup)
+      );
+
+      // Derive productTypes từ categories
+      const derivedTypes: ProductType[] = Array.from(
+        new Map(
+          enrichedCategories
+            .filter((category: any) => {
+              const typeId = category.typeId ?? category.type_id;
+              return typeId != null;
+            })
+            .map((category: any) => {
+              const typeId = category.typeId ?? category.type_id;
+              const rawTypeName = category.type?.typeName ?? category.type_name;
+              const typeIdToName: Record<number, string> = {
+                1: "Cat",
+                2: "Food",
+                3: "Cage",
+                4: "Cleaning",
+              };
+              const typeName = rawTypeName ?? typeIdToName[Number(typeId)];
+              return [Number(typeId), typeName ? (TYPE_NAME_MAP[typeName] ?? typeName) : "Không xác định"];
+            })
+        )
+      ).map(([typeId, typeName]) => ({
+        typeId: typeId as number,
+        typeName: typeName as string,
+      }));
+
+      setProductTypes(derivedTypes);
+      setProducts(normalizedProducts);
+      setFilteredProducts(normalizedProducts);
+      setIsFormOpen(false);
+    } catch (error: any) {
+      console.error("Submit product error:", error);
+      toast({
+        title: isEditMode ? "Cập nhật thất bại" : "Tạo thất bại",
+        description: error?.response?.data?.message || error?.message || "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getStockBadge = (quantity: number) => {
     if (quantity === 0) {
       return <Badge variant="destructive">Hết hàng</Badge>;
-    } else if (quantity < 10) {
-      return <Badge variant="secondary">Sắp hết</Badge>;
-    } else {
-      return <Badge variant="default">Còn hàng</Badge>;
     }
+    if (quantity < 10) {
+      return <Badge variant="secondary">Sắp hết</Badge>;
+    }
+    return <Badge variant="default">Còn hàng</Badge>;
   };
 
   if (isLoading) {
@@ -271,7 +749,7 @@ const ProductManagement = () => {
             <Download className="h-4 w-4 mr-2" />
             Xuất CSV
           </Button>
-          <Button>
+          <Button onClick={handleOpenAddForm}>
             <Plus className="h-4 w-4 mr-2" />
             Thêm sản phẩm
           </Button>
@@ -294,7 +772,7 @@ const ProductManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {products.filter(p => p.type_id === 1).length}
+              {products.filter(p => p.typeId === 1).length}
             </div>
           </CardContent>
         </Card>
@@ -304,7 +782,7 @@ const ProductManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {products.filter(p => p.type_id === 2).length}
+              {products.filter(p => p.typeId === 2).length}
             </div>
           </CardContent>
         </Card>
@@ -314,7 +792,7 @@ const ProductManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              {products.filter(p => p.type_id === 3 || p.type_id === 4).length}
+              {products.filter(p => p.typeId === 3 || p.typeId === 4).length}
             </div>
           </CardContent>
         </Card>
@@ -344,11 +822,18 @@ const ProductManagement = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả loại</SelectItem>
-                {productTypes.map(type => (
-                  <SelectItem key={type.type_id} value={type.type_id.toString()}>
-                    {type.type_name}
-                  </SelectItem>
-                ))}
+                {productTypes.map((type) => {
+                  const typeId = type.typeId ?? type.type_id;
+                  const typeName = type.typeName ?? type.type_name;
+                  if (typeId == null) {
+                    return null;
+                  }
+                  return (
+                    <SelectItem key={`type-${typeId}`} value={typeId.toString()}>
+                      {typeName || "Không xác định"}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -357,11 +842,37 @@ const ProductManagement = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả danh mục</SelectItem>
-                {categories.map(category => (
-                  <SelectItem key={category.category_id} value={category.category_id.toString()}>
-                    {category.category_name}
-                  </SelectItem>
-                ))}
+                    {categories.map((category: any, index: number) => {
+                      // Lấy ID từ nhiều nguồn (giống normalizeCategory)
+                      const categoryId = category.categoryId ?? 
+                                        category.category_id ?? 
+                                        category.id;
+                      const categoryName = category.categoryName ?? category.category_name;
+                      const typeId = category.typeId ?? category.type_id;
+                      
+                      // Nếu không có ID hợp lệ, dùng index tạm thời nhưng vẫn hiển thị
+                      // Vì backend có thể không trả về ID, nhưng vẫn cần hiển thị category
+                      if (!categoryName) {
+                        return null; // Bỏ qua nếu không có tên
+                      }
+                      
+                      // Nếu có ID hợp lệ (< 1000000), dùng ID đó
+                      // Nếu không, dùng index + offset để tạo unique key
+                      const displayId = (categoryId != null && categoryId < 1000000) 
+                        ? categoryId 
+                        : (index + 2000000); // Offset khác với CategoryManagement để tránh conflict
+                      
+                      // Tạo unique key từ name + typeId nếu không có ID
+                      const uniqueKey = categoryId && categoryId < 1000000
+                        ? `category-${categoryId}`
+                        : `category-${categoryName}-${typeId}-${index}`;
+                      
+                      return (
+                        <SelectItem key={uniqueKey} value={displayId.toString()}>
+                          {categoryName || "Không có tên"}
+                        </SelectItem>
+                      );
+                    })}
               </SelectContent>
             </Select>
           </div>
@@ -399,19 +910,24 @@ const ProductManagement = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredProducts.map((product) => (
-                    <TableRow key={product.product_id}>
-                      <TableCell className="font-mono text-sm">{product.product_id}</TableCell>
-                      <TableCell className="font-medium">{product.product_name}</TableCell>
+                  filteredProducts.map((product, index) => {
+                    const rowKey =
+                      product.id && product.id !== 0
+                        ? `product-${product.id}`
+                        : `product-index-${index}`;
+                    return (
+                      <TableRow key={rowKey}>
+                      <TableCell className="font-mono text-sm">{product.id}</TableCell>
+                      <TableCell className="font-medium">{product.name}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{product.type_name}</Badge>
+                        <Badge variant="outline">{product.typeName}</Badge>
                       </TableCell>
-                      <TableCell>{product.category_name}</TableCell>
+                      <TableCell>{product.categoryName}</TableCell>
                       <TableCell className="font-medium text-green-600">
-                        {formatCurrency(product.price)}
+                        {formatCurrencyVND(product.price)}
                       </TableCell>
-                      <TableCell>{product.stock_quantity}</TableCell>
-                      <TableCell>{getStockBadge(product.stock_quantity)}</TableCell>
+                      <TableCell>{product.stockQuantity}</TableCell>
+                      <TableCell>{getStockBadge(product.stockQuantity)}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -425,14 +941,14 @@ const ProductManagement = () => {
                               <Eye className="mr-2 h-4 w-4" />
                               Xem chi tiết
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenEditForm(product)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Chỉnh sửa
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="text-red-600"
-                              onClick={() => handleDeleteProduct(product.product_id)}
+                              onClick={() => product.id && handleDeleteProduct(product.id)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Xóa
@@ -441,7 +957,8 @@ const ProductManagement = () => {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))
+                  );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -463,48 +980,209 @@ const ProductManagement = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Tên sản phẩm</label>
-                  <p className="text-lg font-semibold">{selectedProduct.product_name}</p>
+                  <p className="text-lg font-semibold">{selectedProduct.name}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">ID</label>
-                  <p className="font-mono">{selectedProduct.product_id}</p>
+                  <p className="font-mono">{selectedProduct.id}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Loại</label>
-                  <p>{selectedProduct.type_name}</p>
+                  <p>{selectedProduct.typeName}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Danh mục</label>
-                  <p>{selectedProduct.category_name}</p>
+                  <p>{selectedProduct.categoryName}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Giá</label>
                   <p className="text-lg font-semibold text-green-600">
-                    {formatCurrency(selectedProduct.price)}
+                    {formatCurrencyVND(selectedProduct.price)}
                   </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Tồn kho</label>
-                  <p>{selectedProduct.stock_quantity}</p>
+                  <p>{selectedProduct.stockQuantity}</p>
                 </div>
               </div>
               <div>
                 <label className="text-sm font-medium">Mô tả</label>
-                <p className="text-muted-foreground">{selectedProduct.description}</p>
+                <p className="text-muted-foreground">{selectedProduct.description || "—"}</p>
               </div>
-              {selectedProduct.type_id === 1 && (
-                <div className="border-t pt-4">
-                  <h4 className="font-medium mb-2">Thông tin mèo</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>Giống: <span className="font-medium">Bengal</span></div>
-                    <div>Tuổi: <span className="font-medium">3 tháng</span></div>
-                    <div>Giới tính: <span className="font-medium">Đực</span></div>
-                    <div>Đã tiêm phòng: <span className="font-medium">Có</span></div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Product Form Dialog */}
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{isEditMode ? "Chỉnh sửa sản phẩm" : "Thêm sản phẩm mới"}</DialogTitle>
+            <DialogDescription>
+              {isEditMode ? "Cập nhật thông tin sản phẩm" : "Điền thông tin để tạo sản phẩm mới"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="productName">Tên sản phẩm *</Label>
+              <Input
+                id="productName"
+                value={formData.productName}
+                onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
+                placeholder="Nhập tên sản phẩm"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="typeId">Loại sản phẩm *</Label>
+                <Select value={formData.typeId} onValueChange={(value) => setFormData({ ...formData, typeId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn loại" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {productTypes.map((type) => {
+                      const typeId = type.typeId ?? type.type_id;
+                      const rawTypeName = type.typeName ?? type.type_name;
+                      const typeName = rawTypeName ? (TYPE_NAME_MAP[rawTypeName] ?? rawTypeName) : "Không xác định";
+                      if (typeId == null) return null;
+                      return (
+                        <SelectItem key={`type-${typeId}`} value={typeId.toString()}>
+                          {typeName}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="categoryId">Danh mục</Label>
+                <Select
+                  value={formData.categoryId}
+                  onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn danh mục (tùy chọn)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Không có</SelectItem>
+                    {categories.length === 0 ? (
+                      <SelectItem value="loading" disabled>
+                        Đang tải danh mục... (có {categories.length} danh mục)
+                      </SelectItem>
+                    ) : (
+                      categories.map((category: any, index: number) => {
+                        // Lấy ID từ nhiều nguồn (giống normalizeCategory)
+                        const categoryId = category.categoryId ?? 
+                                          category.category_id ?? 
+                                          category.id;
+                        const categoryName = category.categoryName ?? category.category_name;
+                        const typeId = category.typeId ?? category.type_id;
+                        
+                        // Nếu không có tên, bỏ qua
+                        if (!categoryName) {
+                          return null;
+                        }
+                        
+                        // Nếu có ID hợp lệ (< 2000000), dùng ID đó
+                        // Nếu không, dùng index + offset để tạo unique key
+                        const displayId = (categoryId != null && categoryId < 2000000) 
+                          ? categoryId 
+                          : (index + 2000000); // Offset khác với CategoryManagement để tránh conflict
+                        
+                        // Tạo unique key từ name + typeId nếu không có ID
+                        const uniqueKey = categoryId && categoryId < 2000000
+                          ? `category-${categoryId}`
+                          : `category-${categoryName}-${typeId}-${index}`;
+                        
+                        return (
+                          <SelectItem key={uniqueKey} value={displayId.toString()}>
+                            {categoryName || "Không có tên"}
+                          </SelectItem>
+                        );
+                      })
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="price">Giá (VNĐ) *</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="stockQuantity">Số lượng tồn kho *</Label>
+                <Input
+                  id="stockQuantity"
+                  type="number"
+                  min="0"
+                  value={formData.stockQuantity}
+                  onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="description">Mô tả</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Nhập mô tả sản phẩm"
+                rows={4}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="image">Hình ảnh {!isEditMode && "*"}</Label>
+              <div className="mt-2">
+                <Input
+                  id="image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="cursor-pointer"
+                />
+                {imagePreview && (
+                  <div className="mt-4">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-48 object-cover rounded-md border"
+                    />
+                  </div>
+                )}
+                {isEditMode && !imagePreview && selectedProduct && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Để trống nếu không muốn thay đổi hình ảnh
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setIsFormOpen(false)}>
+                Hủy
+              </Button>
+              <Button onClick={handleSubmitForm}>
+                {isEditMode ? "Cập nhật" : "Tạo mới"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

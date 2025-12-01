@@ -98,17 +98,19 @@ public class QrLoginServiceImpl implements QrLoginService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Email không tồn tại"));
 
+        // ⛔ Chặn Admin đăng nhập qua QR - QR login chỉ dành cho Customer
+        if (user.getRole() != null && "Admin".equalsIgnoreCase(user.getRole().getRoleName())) {
+            log.warn("⛔ [QR-LOGIN] Admin không được phép đăng nhập qua QR: {}", email);
+            saveSessionStatus(sessionId, "REJECTED", null);
+            throw new BadRequestException("Tài khoản Admin không được phép đăng nhập qua QR code. Vui lòng sử dụng email và mật khẩu.");
+        }
+
+        // Validate password
         boolean passwordMatches = passwordEncoder.matches(password, user.getPasswordHash());
         if (!passwordMatches) {
-            // Kiểm tra plain text password (backward compatibility)
-            if (user.getPasswordHash() != null && user.getPasswordHash().equals(password)) {
-                user.setPasswordHash(passwordEncoder.encode(password));
-                userRepository.save(user);
-            } else {
-                log.error("❌ [QR-LOGIN] Invalid password for: {}", email);
-                saveSessionStatus(sessionId, "REJECTED", null);
-                throw new BadRequestException("Mật khẩu không chính xác");
-            }
+            log.error("❌ [QR-LOGIN] Invalid password for: {}", email);
+            saveSessionStatus(sessionId, "REJECTED", null);
+            throw new BadRequestException("Mật khẩu không chính xác");
         }
 
         // Generate tokens
@@ -182,7 +184,8 @@ public class QrLoginServiceImpl implements QrLoginService {
     // ==================== PRIVATE HELPER METHODS ====================
 
     private String generateSessionId() {
-        return "qr_" + System.currentTimeMillis() + "_" + Math.abs(RANDOM.nextInt(10000));
+        // Sử dụng UUID để tạo session ID an toàn hơn, tránh bị đoán
+        return "qr_" + java.util.UUID.randomUUID().toString().replace("-", "");
     }
 
     private String createQrData(String sessionId) {

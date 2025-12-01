@@ -1,13 +1,11 @@
 package com.catshop.catshop.controller;
 
 import com.catshop.catshop.dto.response.ApiResponse;
-import com.catshop.catshop.entity.MfaAttempt;
 import com.catshop.catshop.entity.User;
 import com.catshop.catshop.exception.ResourceNotFoundException;
 import com.catshop.catshop.repository.UserRepository;
 import com.catshop.catshop.service.BackupCodeService;
 import com.catshop.catshop.service.MfaService;
-import com.catshop.catshop.service.MfaSecurityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,7 +22,6 @@ public class MfaController {
     private final UserRepository userRepository;
     private final MfaService mfaService;
     private final BackupCodeService backupCodeService;
-    private final MfaSecurityService mfaSecurityService;
 
     @GetMapping(value = "/qr", produces = "image/png")
     public @ResponseBody byte[] getQrCode(@RequestParam String email) {
@@ -171,51 +168,5 @@ public class MfaController {
         return ResponseEntity.ok(ApiResponse.success(
                 "MFA đã được tắt thành công",
                 "MFA disabled successfully"));
-    }
-
-    /**
-     * Lấy lịch sử các lần thử MFA gần đây của user
-     */
-    @GetMapping("/attempts")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getMfaAttempts(
-            @RequestParam String email,
-            @RequestParam(defaultValue = "10") int limit) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Email không tồn tại"));
-
-        List<MfaAttempt> attempts = mfaSecurityService.getRecentAttempts(email, limit);
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("attempts", attempts);
-        response.put("count", attempts.size());
-        
-        return ResponseEntity.ok(ApiResponse.success(
-                response,
-                "Lịch sử MFA attempts đã được lấy thành công"));
-    }
-
-    /**
-     * Lấy thống kê bảo mật MFA của user
-     */
-    @GetMapping("/security-stats")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getSecurityStats(@RequestParam String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Email không tồn tại"));
-
-        List<MfaAttempt> recentAttempts = mfaSecurityService.getRecentAttempts(email, 50);
-        
-        long successCount = recentAttempts.stream().filter(MfaAttempt::isSuccess).count();
-        long failedCount = recentAttempts.stream().filter(a -> !a.isSuccess()).count();
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("totalAttempts", recentAttempts.size());
-        response.put("successCount", successCount);
-        response.put("failedCount", failedCount);
-        response.put("successRate", recentAttempts.isEmpty() ? 0 : 
-                (double) successCount / recentAttempts.size() * 100);
-        
-        return ResponseEntity.ok(ApiResponse.success(
-                response,
-                "Thống kê bảo mật MFA đã được lấy thành công"));
     }
 }

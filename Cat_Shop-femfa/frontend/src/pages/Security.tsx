@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { useAuth } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
@@ -8,10 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Key, Download, RefreshCw, Eye, EyeOff, Lock, Smartphone, Trash2, AlertTriangle, Clock, Globe } from "lucide-react";
+import { Shield, Key, Download, RefreshCw, Eye, EyeOff, Lock, Smartphone, Trash2, AlertTriangle, Clock, Globe, Phone, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { apiService } from "@/services/api";
 import { userService } from "@/services/userService";
+import { deviceService } from "@/services/deviceService";
+import { authService } from "@/services/authService";
+import { TrustedDevice } from "@/types";
 
 type GoogleAuthenticatorFormValues = {
   code: string;
@@ -43,12 +46,22 @@ const Security = () => {
   const [changingPassword, setChangingPassword] = useState(false);
   
   // Quản lý thiết bị states
-  const [devices, setDevices] = useState<any[]>([]);
+  const [devices, setDevices] = useState<TrustedDevice[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(false);
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   
   // Cảnh báo bảo mật states
   const [securityAlerts, setSecurityAlerts] = useState<any[]>([]);
+  
+  // Đăng ký số điện thoại states
+  const [userProfile, setUserProfile] = useState<{ username?: string; email?: string; phone?: string; address?: string; userId?: number } | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneOtp, setPhoneOtp] = useState("");
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [phoneOtpCountdown, setPhoneOtpCountdown] = useState(0);
+  const [registeringPhone, setRegisteringPhone] = useState(false);
+  const phoneOtpCountdownRef = useRef<NodeJS.Timeout | null>(null);
 
   const {
     register,
@@ -64,8 +77,53 @@ const Security = () => {
     }
     if (user?.email) {
       checkMfaStatus();
+      loadDevices();
+      loadSecurityAlerts();
+      loadUserProfile();
+      
+      // Lấy deviceId hiện tại từ localStorage
+      const DEVICE_ID_STORAGE_KEY = 'cat_shop_device_id';
+      const deviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+      setCurrentDeviceId(deviceId);
     }
   }, [isAuthenticated, user, navigate]);
+
+  // Countdown timer cho Phone OTP (2 phút = 120 giây)
+  useEffect(() => {
+    if (phoneOtpCountdown > 0) {
+      phoneOtpCountdownRef.current = setInterval(() => {
+        setPhoneOtpCountdown((prev) => {
+          if (prev <= 1) {
+            if (phoneOtpCountdownRef.current) {
+              clearInterval(phoneOtpCountdownRef.current);
+              phoneOtpCountdownRef.current = null;
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (phoneOtpCountdownRef.current) {
+        clearInterval(phoneOtpCountdownRef.current);
+        phoneOtpCountdownRef.current = null;
+      }
+    }
+
+    return () => {
+      if (phoneOtpCountdownRef.current) {
+        clearInterval(phoneOtpCountdownRef.current);
+        phoneOtpCountdownRef.current = null;
+      }
+    };
+  }, [phoneOtpCountdown]);
+
+  // Debug: Log khi userProfile thay đổi
+  useEffect(() => {
+    console.log("🔄 userProfile state changed:", userProfile);
+    console.log("🔄 userProfile?.phone:", userProfile?.phone);
+    console.log("🔄 Should show phone:", userProfile && userProfile.phone && userProfile.phone.trim() !== '');
+  }, [userProfile]);
 
   // Kiểm tra trạng thái MFA
   const checkMfaStatus = async () => {
@@ -266,14 +324,16 @@ const Security = () => {
     if (!user?.email) return;
     try {
       setLoadingDevices(true);
-      const data = await apiService.get<any[]>(
-        "/auth/devices",
-        { params: { email: user.email } }
-      );
+      const data = await deviceService.getUserDevices(user.email);
       setDevices(data || []);
     } catch (err) {
       console.error("Không thể tải danh sách thiết bị:", err);
       setDevices([]);
+      toast({
+        title: "Lỗi",
+        description: "Không thể tải danh sách thiết bị. Vui lòng thử lại.",
+        variant: "destructive",
+      });
     } finally {
       setLoadingDevices(false);
     }
@@ -288,19 +348,17 @@ const Security = () => {
     }
 
     try {
-      await apiService.delete(
-        `/auth/devices/${deviceId}`,
-        { params: { email: user.email } }
-      );
+      await deviceService.removeDevice(deviceId, user.email);
       toast({
         title: "Thành công",
         description: "Thiết bị đã được xóa",
       });
       await loadDevices();
     } catch (err: any) {
+      const errorMessage = err?.response?.data?.message || err?.message || "Không thể xóa thiết bị";
       toast({
         title: "Lỗi",
-        description: err.message || "Không thể xóa thiết bị",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -315,19 +373,17 @@ const Security = () => {
     }
 
     try {
-      await apiService.delete(
-        "/auth/devices/all",
-        { params: { email: user.email } }
-      );
+      await deviceService.removeAllDevices(user.email);
       toast({
         title: "Thành công",
         description: "Tất cả thiết bị đã được xóa",
       });
       await loadDevices();
     } catch (err: any) {
+      const errorMessage = err?.response?.data?.message || err?.message || "Không thể xóa thiết bị";
       toast({
         title: "Lỗi",
-        description: err.message || "Không thể xóa thiết bị",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -339,16 +395,13 @@ const Security = () => {
     
     // Tạo danh sách cảnh báo từ dữ liệu thiết bị
     try {
-      const deviceData = await apiService.get<any[]>(
-        "/auth/devices",
-        { params: { email: user.email } }
-      );
+      const deviceData = await deviceService.getUserDevices(user.email);
       
       const alerts: any[] = [];
       const now = new Date();
       
       // Kiểm tra thiết bị mới (đăng nhập trong 24h qua)
-      deviceData?.forEach((device: any) => {
+      deviceData?.forEach((device: TrustedDevice) => {
         if (device.lastLogin) {
           const lastLogin = new Date(device.lastLogin);
           const hoursAgo = (now.getTime() - lastLogin.getTime()) / (1000 * 60 * 60);
@@ -388,7 +441,7 @@ const Security = () => {
   };
 
   // Parse user agent để lấy tên thiết bị
-  const parseUserAgent = (userAgent: string | null) => {
+  const parseUserAgent = (userAgent?: string | null) => {
     if (!userAgent) return "Thiết bị không xác định";
     
     if (userAgent.includes("Windows")) return "Windows";
@@ -398,6 +451,174 @@ const Security = () => {
     if (userAgent.includes("iPhone") || userAgent.includes("iPad")) return "iOS";
     
     return userAgent.substring(0, 50) + (userAgent.length > 50 ? "..." : "");
+  };
+
+  // Load user profile để lấy số điện thoại
+  const loadUserProfile = async () => {
+    if (!user?.email) return;
+    try {
+      setLoadingProfile(true);
+      const profile = await authService.getProfile(user.email);
+      console.log("📱 User profile loaded:", profile);
+      console.log("📱 Profile phone field:", profile?.phone);
+      console.log("📱 Phone type:", typeof profile?.phone);
+      console.log("📱 Phone trimmed:", profile?.phone?.trim());
+      
+      // Set userProfile state
+      setUserProfile(profile);
+      
+      // Kiểm tra phone - có thể là null, undefined, hoặc empty string
+      if (profile && profile.phone && profile.phone.trim() !== '') {
+        setPhoneNumber(profile.phone);
+        console.log("✅ Phone number found and set:", profile.phone);
+      } else {
+        console.log("⚠️ No phone number found in profile");
+        setPhoneNumber("");
+      }
+    } catch (err: any) {
+      console.error("Không thể tải thông tin người dùng:", err);
+      // Nếu lỗi 401, có thể do chưa đăng nhập hoặc token hết hạn
+      if (err?.response?.status === 401) {
+        toast({
+          title: "Lỗi xác thực",
+          description: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  // Debug: Log khi userProfile thay đổi
+  useEffect(() => {
+    console.log("🔄 userProfile state changed:", userProfile);
+    console.log("🔄 userProfile.phone:", userProfile?.phone);
+    console.log("🔄 Should show phone:", userProfile && userProfile.phone && userProfile.phone.trim() !== '');
+  }, [userProfile]);
+
+  // Gửi OTP để xác minh số điện thoại
+  const handleSendPhoneOtp = async () => {
+    // Validate phone number format (Vietnamese format: 10 digits starting with 0, or +84)
+    const phoneRegex = /^(\+84|0)[0-9]{9,10}$/;
+    const cleanPhone = phoneNumber.replace(/\s+/g, '');
+    
+    if (!cleanPhone || !phoneRegex.test(cleanPhone)) {
+      toast({
+        title: "Số điện thoại không hợp lệ",
+        description: "Vui lòng nhập số điện thoại đúng định dạng (VD: 0912345678 hoặc +84912345678)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setRegisteringPhone(true);
+      console.log("📱 [Security] Sending SMS OTP to:", cleanPhone);
+      const result = await authService.sendSmsOtp(cleanPhone);
+      console.log("✅ [Security] SMS OTP sent successfully:", result);
+      setPhoneOtpSent(true);
+      setPhoneOtpCountdown(120); // Bắt đầu countdown 2 phút (120 giây)
+      
+      // Hiển thị OTP trong toast nếu có (DEV MODE)
+      // Response từ backend là string message có dạng: "Mã OTP đã được gửi đến số điện thoại của bạn. (DEV MODE - OTP: 123456 - Vui lòng kiểm tra console backend để lấy mã)"
+      const otpMessage = result || "";
+      const otpMatch = otpMessage.match(/OTP:\s*(\d{6})/);
+      const otp = otpMatch ? otpMatch[1] : null;
+      
+      toast({
+        title: "OTP đã được gửi",
+        description: otp 
+          ? `Mã OTP đã được gửi đến số điện thoại ${cleanPhone}.\n\n🔑 Mã OTP: ${otp}\n\n⚠️ DEV MODE - Mã có hiệu lực trong 2 phút`
+          : `Mã OTP đã được gửi đến số điện thoại ${cleanPhone}. Mã có hiệu lực trong 2 phút. Vui lòng kiểm tra console backend để lấy mã OTP (DEV MODE).`,
+        duration: 15000, // Hiển thị lâu hơn để người dùng có thể thấy OTP
+      });
+    } catch (error: any) {
+      console.error("❌ [Security] Error sending SMS OTP:", error);
+      toast({
+        title: "Lỗi gửi OTP",
+        description: error.message || "Không thể gửi mã OTP qua SMS",
+        variant: "destructive",
+      });
+    } finally {
+      setRegisteringPhone(false);
+    }
+  };
+
+  // Xác minh OTP và lưu số điện thoại
+  const handleVerifyPhoneOtp = async () => {
+    if (!phoneOtp || phoneOtp.length !== 6) {
+      toast({
+        title: "OTP không hợp lệ",
+        description: "Vui lòng nhập mã OTP 6 chữ số",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!user?.email || !userProfile) {
+      toast({
+        title: "Lỗi",
+        description: "Không tìm thấy thông tin người dùng",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const cleanPhone = phoneNumber.replace(/\s+/g, '');
+
+    try {
+      setRegisteringPhone(true);
+      
+      // Verify OTP cho đăng ký số điện thoại
+      // Backend cần có API: POST /auth/verify-sms-otp-register { phoneNumber, otp }
+      try {
+        await authService.verifySmsOtpForRegistration(cleanPhone, phoneOtp);
+      } catch (verifyError: any) {
+        // Nếu verify thất bại, throw error để hiển thị thông báo
+        throw verifyError;
+      }
+      
+      // Update phone number sau khi verify thành công
+      await userService.updateUser(userProfile.userId, {
+        phone: cleanPhone
+      });
+      
+      // Reload profile
+      await loadUserProfile();
+      
+      // Reset form
+      setPhoneOtp("");
+      setPhoneOtpSent(false);
+      setPhoneOtpCountdown(0);
+      
+      toast({
+        title: "Thành công",
+        description: "Số điện thoại đã được đăng ký và xác minh thành công!",
+      });
+    } catch (error: any) {
+      // Nếu update phone number thất bại, có thể do OTP chưa được verify
+      // Hoặc có lỗi khác
+      const errorMessage = error?.response?.data?.message || error?.message || "Mã OTP không chính xác hoặc đã hết hạn";
+      toast({
+        title: "Lỗi xác thực",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setRegisteringPhone(false);
+    }
+  };
+
+  // Gửi lại OTP
+  const handleResendPhoneOtp = async () => {
+    setPhoneOtpCountdown(0);
+    if (phoneOtpCountdownRef.current) {
+      clearInterval(phoneOtpCountdownRef.current);
+      phoneOtpCountdownRef.current = null;
+    }
+    setPhoneOtp("");
+    await handleSendPhoneOtp();
   };
 
   // Tắt MFA
@@ -497,9 +718,15 @@ const Security = () => {
     try {
       setError(undefined);
       setVerifyingCode(true);
+      
+      // Lấy deviceId từ localStorage
+      const DEVICE_ID_STORAGE_KEY = 'cat_shop_device_id';
+      const deviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY) || crypto.randomUUID();
+      
       await apiService.post("/auth/mfa/verify", {
         email: user.email,
         code,
+        deviceId,
       });
       reset();
       toast({
@@ -545,6 +772,156 @@ const Security = () => {
               <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
+
+          {/* Đăng ký số điện thoại Section */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Phone className="h-5 w-5" />
+                Đăng ký số điện thoại
+              </CardTitle>
+              <CardDescription>
+                Đăng ký số điện thoại để sử dụng phương thức xác minh SMS OTP khi đăng nhập
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                // Debug logging
+                console.log("🔄 Render - loadingProfile:", loadingProfile);
+                console.log("🔄 Render - userProfile:", userProfile);
+                console.log("🔄 Render - userProfile?.phone:", userProfile?.phone);
+                console.log("🔄 Render - phone check:", userProfile && userProfile.phone && userProfile.phone.trim() !== '');
+                return null;
+              })()}
+              {loadingProfile ? (
+                <div className="text-center py-8">
+                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent"></div>
+                  <p className="mt-4 text-sm text-muted-foreground">Đang tải thông tin...</p>
+                </div>
+              ) : userProfile && userProfile.phone && userProfile.phone.trim() !== '' ? (
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      <div>
+                        <p className="text-sm font-semibold text-green-800">Số điện thoại đã được đăng ký</p>
+                        <p className="text-sm text-green-700 mt-1">Số điện thoại: <strong>{userProfile.phone}</strong></p>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Bạn có thể sử dụng số điện thoại này để xác minh bằng SMS OTP khi đăng nhập.
+                  </p>
+                </div>
+              ) : !phoneOtpSent ? (
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-sm text-amber-800">
+                      Bạn chưa đăng ký số điện thoại. Vui lòng nhập số điện thoại và xác minh bằng mã OTP.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber">Số điện thoại</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="phoneNumber"
+                        type="tel"
+                        placeholder="Nhập số điện thoại (VD: 0912345678)"
+                        value={phoneNumber}
+                        onChange={(e) => {
+                          // Chỉ cho phép số và dấu +
+                          const value = e.target.value.replace(/[^0-9+]/g, '');
+                          setPhoneNumber(value);
+                        }}
+                        className="pl-10"
+                        disabled={registeringPhone}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Định dạng: 0912345678 hoặc +84912345678
+                    </p>
+                  </div>
+                  <Button 
+                    type="button" 
+                    onClick={handleSendPhoneOtp} 
+                    className="w-full" 
+                    disabled={registeringPhone || !phoneNumber}
+                  >
+                    {registeringPhone ? "Đang gửi..." : "Gửi mã OTP xác minh"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="phoneOtp">Mã OTP xác minh</Label>
+                      {phoneOtpCountdown > 0 && (
+                        <span className="text-sm text-muted-foreground">
+                          Còn lại: <span className="font-semibold text-primary">{Math.floor(phoneOtpCountdown / 60)}:{(phoneOtpCountdown % 60).toString().padStart(2, '0')}</span>
+                        </span>
+                      )}
+                      {phoneOtpCountdown === 0 && phoneOtpSent && (
+                        <span className="text-sm text-red-500 font-medium">
+                          Mã OTP đã hết hạn
+                        </span>
+                      )}
+                    </div>
+                    <Input
+                      id="phoneOtp"
+                      type="text"
+                      placeholder="Nhập mã 6 chữ số"
+                      value={phoneOtp}
+                      onChange={(e) => setPhoneOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                      maxLength={6}
+                      className={`text-center text-2xl tracking-[0.6rem] ${phoneOtpCountdown === 0 ? 'border-red-300' : ''}`}
+                      disabled={registeringPhone}
+                    />
+                    <p className="text-xs text-muted-foreground text-center">
+                      Mã OTP đã được gửi đến: <strong>{phoneNumber}</strong>
+                    </p>
+                    {phoneOtpCountdown === 0 && phoneOtpSent && (
+                      <p className="text-xs text-red-500 text-center">
+                        ⚠️ Mã OTP đã hết hạn. Vui lòng gửi lại mã mới.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handleVerifyPhoneOtp} 
+                      className="flex-1" 
+                      disabled={registeringPhone || phoneOtp.length !== 6}
+                    >
+                      {registeringPhone ? "Đang xác thực..." : "Xác thực và đăng ký"}
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={handleResendPhoneOtp} 
+                      disabled={registeringPhone}
+                    >
+                      {phoneOtpCountdown > 0 ? `Gửi lại (${Math.floor(phoneOtpCountdown / 60)}:${(phoneOtpCountdown % 60).toString().padStart(2, '0')})` : "Gửi lại mã"}
+                    </Button>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setPhoneOtpSent(false);
+                      setPhoneOtp("");
+                      setPhoneOtpCountdown(0);
+                    }}
+                    className="w-full"
+                    disabled={registeringPhone}
+                  >
+                    Quay lại
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Đổi mật khẩu Section */}
           <Card className="mb-6">
@@ -980,13 +1357,27 @@ const Security = () => {
           {/* Quản lý thiết bị đã đăng nhập Section */}
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Smartphone className="h-5 w-5" />
-                Thiết bị đã đăng nhập
-              </CardTitle>
-              <CardDescription>
-                Quản lý các thiết bị đã đăng nhập vào tài khoản của bạn
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Smartphone className="h-5 w-5" />
+                    Thiết bị đã đăng nhập
+                  </CardTitle>
+                  <CardDescription>
+                    Quản lý các thiết bị đã đăng nhập vào tài khoản của bạn
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadDevices}
+                  disabled={loadingDevices}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loadingDevices ? 'animate-spin' : ''}`} />
+                  Làm mới
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {loadingDevices ? (
@@ -1076,13 +1467,30 @@ const Security = () => {
           {/* Lịch sử đăng nhập Section */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Lịch sử đăng nhập
-              </CardTitle>
-              <CardDescription>
-                Xem lịch sử đăng nhập gần đây của bạn
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Lịch sử đăng nhập
+                  </CardTitle>
+                  <CardDescription>
+                    Xem lịch sử đăng nhập gần đây của bạn
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    loadDevices();
+                    loadSecurityAlerts();
+                  }}
+                  disabled={loadingDevices}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loadingDevices ? 'animate-spin' : ''}`} />
+                  Làm mới
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {loadingDevices ? (

@@ -62,10 +62,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const hydrateUser = async (email: string) => {
-    const profile = await authService.getProfile(email);
-    const tokenInfo = authService.parseAccessToken();
-    const authUser = buildAuthUser(profile, tokenInfo);
-    setUser(authUser);
+    try {
+      // Thử lấy profile từ API (có thể fail nếu không có quyền ADMIN)
+      const profile = await authService.getProfile(email);
+      const tokenInfo = authService.parseAccessToken();
+      const authUser = buildAuthUser(profile, tokenInfo);
+      setUser(authUser);
+    } catch (error) {
+      // Nếu không thể lấy profile từ API (403 Forbidden), tạo user từ token
+      console.warn('Không thể lấy profile từ API, sử dụng thông tin từ token:', error);
+      const tokenInfo = authService.parseAccessToken();
+      if (tokenInfo) {
+        // Tạo user object từ thông tin trong token
+        const authUser: AuthUser = {
+          email: email,
+          fullName: email.split('@')[0], // Dùng phần trước @ làm tên tạm
+          role: tokenInfo.role?.toLowerCase() === "admin" ? "admin" : "user",
+        };
+        setUser(authUser);
+      }
+    }
   };
 
   useEffect(() => {
@@ -75,9 +91,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         const storedEmail = tokenInfo?.email || localStorage.getItem("user_email");
         if (authService.isAuthenticated() && storedEmail) {
           await hydrateUser(storedEmail);
-        } else if (!authService.isAuthenticated()) {
-          // Nếu không có token, clear user
-          setUser(null);
         }
       } catch (error) {
         console.error("Error checking auth status:", error);
@@ -89,51 +102,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
 
     checkAuthStatus();
-
-    // Listen for storage changes (khi tokens được lưu từ OAuth)
-    const handleStorageChange = async () => {
-      // Check lại auth status khi có storage event
-      try {
-        const tokenInfo = authService.parseAccessToken();
-        const storedEmail = tokenInfo?.email || localStorage.getItem("user_email");
-        if (authService.isAuthenticated() && storedEmail) {
-          // Hydrate user khi có tokens mới
-          await hydrateUser(storedEmail);
-        } else if (!authService.isAuthenticated()) {
-          // Nếu không còn token, clear user
-          setUser(null);
-        }
-      } catch (error) {
-        console.error("Error handling storage change:", error);
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also listen for custom event (trigger từ LoginSuccess)
-    window.addEventListener('auth-tokens-updated', handleStorageChange);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('auth-tokens-updated', handleStorageChange);
-    };
-  }, []); // Empty dependency - chỉ chạy một lần khi mount
+  }, []);
 
   const login = async (email: string, password: string): Promise<LoginState> => {
     const credentials: LoginRequest = { email, password };
     const result = await authService.login(credentials);
 
-    // QUAN TRỌNG: KHÔNG hydrate user ngay cả khi có token
-    // Bắt buộc phải xác minh trước khi cho phép truy cập
-    // Chỉ hydrate user sau khi xác minh thành công (OTP, QR, hoặc Google Authenticator)
     if (result.success && result.tokens?.accessToken) {
-      // Không hydrate user ở đây - vẫn yêu cầu xác minh
-      setPendingEmail(email);
-      return {
-        ...result,
-        success: false,
-        requiresOtp: true,
-      };
+      await hydrateUser(email);
+      setPendingEmail(null);
+      return result;
     }
 
     if (result.requiresOtp) {

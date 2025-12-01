@@ -14,15 +14,17 @@ import ProfileMenu from "./ProfileMenu";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCart } from "@/contexts/CartContext";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCategories } from "@/hooks/useApi";
 import { getCategoryDisplayName } from "@/utils/categoryMapping"; // 🔧 Import mapping utility
 
 const Header = () => {
   const { isAuthenticated, isAdmin } = useAuth();
   const { getTotalItems } = useCart();
+  const navigate = useNavigate();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [searchTerm, setSearchTerm] = useState("");
   const { categories, loading: categoriesLoading } = useCategories();
 
   const handleOpenLogin = () => {
@@ -33,6 +35,21 @@ const Header = () => {
   const handleOpenRegister = () => {
     setAuthMode("register");
     setIsAuthModalOpen(true);
+  };
+
+  const handleSearch = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (searchTerm.trim()) {
+      // Navigate to pets page with search query
+      navigate(`/pets?search=${encodeURIComponent(searchTerm.trim())}`);
+      setSearchTerm(""); // Clear search after navigating
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
   };
 
   return (
@@ -82,22 +99,27 @@ const Header = () => {
           </Link>
 
           {/* Search bar */}
-          <div className="flex-1 max-w-md mx-8">
+          <form onSubmit={handleSearch} className="flex-1 max-w-md mx-8">
             <div className="relative">
               <Input
                 type="text"
                 placeholder="Tìm kiếm..."
                 className="pr-10 bg-muted/30 border-border"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyPress={handleKeyPress}
               />
               <Button
+                type="submit"
                 size="sm"
                 className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
                 variant="ghost"
+                onClick={handleSearch}
               >
                 <Search className="h-4 w-4" />
               </Button>
             </div>
-          </div>
+          </form>
 
           {/* Cart and Auth buttons or Profile menu */}
           <div className="flex items-center gap-2">

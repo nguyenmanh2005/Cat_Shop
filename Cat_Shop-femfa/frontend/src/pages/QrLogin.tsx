@@ -99,6 +99,11 @@ const QrLogin = () => {
       // Stop scanning
       await stopScanning();
 
+      // Validate input length để tránh DoS
+      if (qrData.length > 1000) {
+        throw new Error("QR code data quá dài, có thể không hợp lệ");
+      }
+
       // Parse QR data (có thể là JSON, URL, hoặc chỉ sessionId)
       let sessionId: string;
       
@@ -120,11 +125,18 @@ const QrLogin = () => {
         }
       }
 
-      if (!sessionId) {
-        throw new Error("Không tìm thấy sessionId trong QR code");
+      // Validate sessionId format (phải bắt đầu bằng "qr_")
+      if (!sessionId || !sessionId.startsWith("qr_")) {
+        throw new Error("SessionId không hợp lệ hoặc QR code không đúng định dạng");
       }
 
-      setScannedSessionId(sessionId);
+      // Sanitize sessionId - chỉ cho phép alphanumeric và underscore
+      const sanitizedSessionId = sessionId.replace(/[^a-zA-Z0-9_]/g, "");
+      if (!sanitizedSessionId || sanitizedSessionId !== sessionId) {
+        throw new Error("SessionId chứa ký tự không hợp lệ");
+      }
+
+      setScannedSessionId(sanitizedSessionId);
       setStatus("login");
       
       toast({
@@ -166,21 +178,33 @@ const QrLogin = () => {
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        title: "Email không hợp lệ",
+        description: "Vui lòng nhập đúng định dạng email",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate password length
+    if (password.length < 6) {
+      toast({
+        title: "Mật khẩu quá ngắn",
+        description: "Mật khẩu phải có ít nhất 6 ký tự",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
 
-      // Get device ID
-      const getOrCreateDeviceId = (): string => {
-        const DEVICE_ID_STORAGE_KEY = 'cat_shop_device_id';
-        let deviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
-        if (!deviceId) {
-          deviceId = crypto.randomUUID();
-          localStorage.setItem(DEVICE_ID_STORAGE_KEY, deviceId);
-        }
-        return deviceId;
-      };
-
-      const deviceId = getOrCreateDeviceId();
+      // Get device ID using FingerprintJS
+      const { getOrCreateDeviceFingerprint } = await import('@/utils/deviceFingerprint');
+      const deviceId = await getOrCreateDeviceFingerprint();
 
       // Call confirm endpoint
       const response = await apiService.post<{ message: string }>(

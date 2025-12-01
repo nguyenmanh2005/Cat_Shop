@@ -15,6 +15,7 @@ import com.catshop.catshop.exception.ResourceNotFoundException;
 import com.catshop.catshop.repository.UserRepository;
 import com.catshop.catshop.service.AuthService;
 import com.catshop.catshop.service.DeviceService;
+import com.catshop.catshop.service.IpSecurityService;
 import com.catshop.catshop.service.MfaService;
 import com.catshop.catshop.service.QrLoginService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,11 +39,12 @@ public class AuthController {
     private final UserRepository userRepository;
     private final MfaService mfaService;
     private final DeviceService deviceService;
+    private final IpSecurityService ipSecurityService;
     private final QrLoginService qrLoginService;
     private final com.catshop.catshop.service.BackupCodeService backupCodeService;
-    private final com.catshop.catshop.service.MfaSecurityService mfaSecurityService;
+    private final com.catshop.catshop.security.JwtUtils jwtUtils;
 
-    // ✅ Bước 1: Login (bỏ qua OTP nếu thiết bị đã được tin cậy)
+    // ✅ Bước 1: Login (gửi OTP nếu thiết bị lạ)
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<?>> login(
             @Valid @RequestBody LoginRequest loginRequest,
@@ -51,8 +53,6 @@ public class AuthController {
         log.info("🔐 Login request received for email: {}", loginRequest.getEmail());
         String email = loginRequest.getEmail();
         String deviceId = loginRequest.getDeviceId();
-        String ip = request.getRemoteAddr();
-        String agent = request.getHeader("User-Agent");
         
         // Xử lý trường hợp deviceId null hoặc empty
         if (deviceId == null || deviceId.isBlank()) {
@@ -78,68 +78,93 @@ public class AuthController {
             throw new BadRequestException("Email hoặc mật khẩu không chính xác");
         }
 
+        // 2️⃣ Sau khi email/password đúng → cấp token ngay và cho phép đăng nhập
+        // Không kiểm tra device trust - OTP là phương thức đăng nhập riêng, không phải bước bắt buộc
         try {
             User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new BadRequestException("Không tìm thấy người dùng"));
 
-            // 2️⃣ Kiểm tra xem thiết bị đã được tin cậy chưa
-            boolean isTrustedDevice = false;
+            // 🔒 Kiểm tra IP address - gửi email cảnh báo nếu là IP mới
             try {
-                isTrustedDevice = deviceService.isTrusted(email, deviceId);
-                log.info("🔍 Device trust check for {}: trusted={}", email, isTrustedDevice);
+                boolean isNewIp = ipSecurityService.isNewIp(email, request);
+                String ip = request.getRemoteAddr();
+                String agent = request.getHeader("User-Agent");
+                
+                if (isNewIp) {
+                    log.warn("⚠️ [IP-SECURITY] New IP detected for {}: {}", email, ip);
+                    // Tạo reset password token để gửi trong email cảnh báo
+                    String resetPasswordToken = jwtUtils.generateResetPasswordToken(email);
+                    // Gửi email cảnh báo
+                    ipSecurityService.sendSecurityAlertEmail(email, ip, agent, resetPasswordToken);
+                    log.info("✅ [IP-SECURITY] Security alert email sent to: {}", email);
+                } else {
+                    // IP đã biết, lưu lại để cập nhật thống kê
+                    ipSecurityService.saveKnownIp(email, request);
+                }
             } catch (Exception e) {
-                log.warn("⚠️ Failed to check device trust for {}: {}. Treating as untrusted device.", 
-                        email, e.getMessage());
-                // Nếu lỗi khi check device trust, coi như thiết bị chưa được tin cậy
-                isTrustedDevice = false;
+                log.warn("⚠️ [IP-SECURITY] Failed to check IP security for {}: {}", email, e.getMessage());
+                // Không chặn đăng nhập nếu không thể check IP security
             }
-            
-            // 3️⃣ Nếu thiết bị đã được tin cậy → cấp token ngay, bỏ qua OTP
-            if (isTrustedDevice) {
-                log.info("✅ Trusted device detected - skipping OTP verification for: {}", email);
-                
-                try {
-                    // Cập nhật lastLogin
-                    deviceService.markTrusted(email, deviceId, ip, agent);
-                } catch (Exception e) {
-                    log.warn("⚠️ Failed to mark device as trusted for {}: {}. Continuing with login.", 
-                            email, e.getMessage());
-                    // Không chặn đăng nhập nếu không thể mark device
-                }
-                
-                // Cấp token ngay
-                String accessToken = authService.generateAccessTokenForUser(user);
-                String refreshToken = authService.generateRefreshTokenForUser(user);
-                
-                try {
-                    authService.saveRefreshToken(email, refreshToken);
-                } catch (Exception e) {
-                    log.warn("⚠️ Failed to save refresh token for {}: {}", email, e.getMessage());
-                }
 
-                TokenResponse tokens = new TokenResponse(accessToken, refreshToken, false);
-                log.info("✅ Login successful (trusted device) for: {}", email);
-                return ResponseEntity.ok(ApiResponse.success(tokens, 
-                        "Đăng nhập thành công (thiết bị đã được tin cậy)"));
+            // Cập nhật lastLogin mỗi lần đăng nhập thành công (dù thiết bị đã trusted hay chưa)
+            try {
+                boolean trusted = deviceService.isTrusted(email, deviceId);
+                log.info("🔍 Device trust check for {}: trusted={}", email, trusted);
+                
+                String ip = request.getRemoteAddr();
+                String agent = request.getHeader("User-Agent");
+                
+                if (!trusted) {
+                    log.info("⚠️ New device detected for: {} - Device will be marked as trusted after successful login", email);
+                    // Đánh dấu thiết bị là trusted sau khi đăng nhập thành công
+                    try {
+                        deviceService.markTrusted(email, deviceId, ip, agent);
+                    } catch (Exception e) {
+                        log.warn("⚠️ Failed to mark device as trusted for {}: {}", email, e.getMessage());
+                        // Không chặn đăng nhập nếu không thể mark device as trusted
+                    }
+                } else {
+                    // Thiết bị đã trusted, chỉ cập nhật lastLogin
+                    try {
+                        deviceService.updateLastLogin(email, deviceId, ip, agent);
+                        log.info("✅ Updated lastLogin for trusted device: {}", deviceId);
+                    } catch (Exception e) {
+                        log.warn("⚠️ Failed to update lastLogin for {}: {}", email, e.getMessage());
+                        // Không chặn đăng nhập nếu không thể update lastLogin
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ Failed to check device trust for {}: {}", email, e.getMessage());
+                // Không chặn đăng nhập nếu không thể check device trust
             }
             
-            // 4️⃣ Nếu thiết bị chưa được tin cậy → yêu cầu OTP
-            log.info("⚠️ New/untrusted device detected for: {} - OTP verification required", email);
+            // Lưu IP đã biết sau khi đăng nhập thành công
+            try {
+                ipSecurityService.saveKnownIp(email, request);
+            } catch (Exception e) {
+                log.warn("⚠️ [IP-SECURITY] Failed to save known IP for {}: {}", email, e.getMessage());
+            }
+
+            // Cấp token ngay sau khi credentials đúng
+            String accessToken = authService.generateAccessTokenForUser(user);
+            String refreshToken = authService.generateRefreshTokenForUser(user);
             
-            // Trả về response yêu cầu OTP
-            Map<String, Object> response = new HashMap<>();
-            response.put("requiresOtp", true);
-            response.put("message", "Vui lòng xác thực OTP để đăng nhập");
-            
-            return ResponseEntity.ok(ApiResponse.success(response, 
-                    "Thiết bị chưa được tin cậy. Vui lòng xác thực OTP."));
-            
+            // Lưu refresh token (có thể fail nếu Redis không chạy, nhưng không chặn đăng nhập)
+            try {
+                authService.saveRefreshToken(email, refreshToken);
+            } catch (Exception e) {
+                log.warn("⚠️ Failed to save refresh token for {}: {}. User can still login but may need to login again after token expires.", email, e.getMessage());
+                // Không chặn đăng nhập nếu không thể lưu refresh token
+            }
+
+            TokenResponse tokens = new TokenResponse(accessToken, refreshToken, false);
+            log.info("✅ Login successful for: {}", email);
+            return ResponseEntity.ok(ApiResponse.success(tokens, "Đăng nhập thành công"));
         } catch (BadRequestException e) {
             log.error("❌ Bad request during login for {}: {}", email, e.getMessage());
             throw e;
         } catch (Exception e) {
             log.error("❌ Unexpected error during login for {}: {}", email, e.getMessage(), e);
-            log.error("❌ Stack trace: ", e);
             throw new BadRequestException("Đã xảy ra lỗi khi đăng nhập. Vui lòng thử lại sau.");
         }
     }
@@ -153,8 +178,6 @@ public class AuthController {
 
         String email = otpRequest.getEmail();
         String deviceId = otpRequest.getDeviceId();
-        String ip = request.getRemoteAddr();
-        String agent = request.getHeader("User-Agent");
 
         if (deviceId == null || deviceId.isBlank()) {
             throw new BadRequestException("Thiết bị ID không được để trống");
@@ -163,13 +186,23 @@ public class AuthController {
         // ✅ Kiểm tra + xác thực OTP
         TokenResponse tokenResponse = authService.verifyOtp(otpRequest);
 
-        // ✅ Nếu OTP đúng → đánh dấu thiết bị là trusted (30 ngày)
-        deviceService.markTrusted(email, deviceId, ip, agent);
-        log.info("✅ Device marked as trusted for: {} (expires in 30 days)", email);
+        // ✅ Nếu OTP đúng → cập nhật lastLogin (thiết bị đã trusted hoặc mới)
+        String ip = request.getRemoteAddr();
+        String agent = request.getHeader("User-Agent");
+        
+        // Kiểm tra xem thiết bị đã trusted chưa
+        boolean trusted = deviceService.isTrusted(email, deviceId);
+        if (trusted) {
+            // Thiết bị đã trusted, chỉ cập nhật lastLogin
+            deviceService.updateLastLogin(email, deviceId, ip, agent);
+        } else {
+            // Thiết bị mới, markTrusted (sẽ tự động cập nhật lastLogin)
+            deviceService.markTrusted(email, deviceId, ip, agent);
+        }
 
         // ✅ OTP verification hoàn tất - OTP và MFA là 2 phương thức xác thực độc lập
         return ResponseEntity.ok(ApiResponse.success(tokenResponse,
-                "OTP xác thực thành công. Thiết bị đã được đánh dấu là tin cậy trong 30 ngày."));
+                "OTP xác thực thành công. Thiết bị đã được đánh dấu là tin cậy."));
     }
 
     @PostMapping("/mfa/verify")
@@ -177,79 +210,57 @@ public class AuthController {
             @RequestBody @Valid MfaVerifyRequest request,
             HttpServletRequest httpRequest) {
 
-        String email = request.getEmail();
-        String code = request.getCode();
-        String deviceId = request.getDeviceId();
-        String ip = httpRequest.getRemoteAddr();
-        String agent = httpRequest.getHeader("User-Agent");
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new BadRequestException("Không tìm thấy user với email: " + email));
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy user với email: " + request.getEmail()));
 
         if (user.getMfaSecret() == null) {
             throw new BadRequestException("User chưa kích hoạt MFA");
         }
 
-        // ✅ Kiểm tra bảo mật MFA: rate limiting và account lockout
-        try {
-            mfaSecurityService.checkAccountLockout(email);
-            mfaSecurityService.checkRateLimit(email, ip);
-        } catch (BadRequestException e) {
-            // Log attempt thất bại
-            mfaSecurityService.logMfaAttempt(email, ip, agent, false, 
-                    "Security check failed: " + e.getMessage(), deviceId);
-            throw e;
-        }
-
+        String code = request.getCode();
         boolean ok = false;
         String verificationMethod = "";
-        String failureReason = "";
 
         // Kiểm tra xem code có phải là backup code không (format: XXXX-XXXX)
         if (code != null && code.matches("^[A-Z0-9]{4}-[A-Z0-9]{4}$")) {
             // Thử verify bằng backup code
             ok = backupCodeService.verifyBackupCode(user, code);
             verificationMethod = "backup code";
-            if (!ok) {
-                failureReason = "Invalid backup code";
-            }
         } else {
             // Thử verify bằng Google Authenticator code (6 số)
             try {
                 int mfaCode = Integer.parseInt(code);
                 ok = mfaService.verifyCode(user.getMfaSecret(), mfaCode);
                 verificationMethod = "Google Authenticator";
-                if (!ok) {
-                    failureReason = "Invalid TOTP code";
-                }
             } catch (NumberFormatException e) {
                 ok = false;
-                failureReason = "Invalid code format";
             }
         }
-
-        // ✅ Log attempt
-        mfaSecurityService.logMfaAttempt(email, ip, agent, ok, 
-                ok ? "Success" : failureReason, deviceId);
 
         if (!ok) {
-            // ✅ Kiểm tra hoạt động đáng ngờ
-            mfaSecurityService.checkSuspiciousActivity(email, ip);
             throw new BadRequestException("Mã xác thực không hợp lệ. Vui lòng kiểm tra lại mã Google Authenticator hoặc backup code.");
-        }
-
-        // ✅ Đánh dấu thiết bị là trusted sau khi MFA thành công
-        if (deviceId != null && !deviceId.isBlank()) {
-            try {
-                deviceService.markTrusted(email, deviceId, ip, agent);
-            } catch (Exception e) {
-                log.warn("⚠️ Failed to mark device as trusted: {}", e.getMessage());
-            }
         }
 
         String accessToken = authService.generateAccessTokenForUser(user);
         String refreshToken = authService.generateRefreshTokenForUser(user);
         authService.saveRefreshToken(user.getEmail(), refreshToken);
+        
+        // ✅ Cập nhật lastLogin sau khi verify MFA thành công
+        String deviceId = request.getDeviceId();
+        if (deviceId != null && !deviceId.isBlank()) {
+            try {
+                String ip = httpRequest.getRemoteAddr();
+                String agent = httpRequest.getHeader("User-Agent");
+                boolean trusted = deviceService.isTrusted(user.getEmail(), deviceId);
+                if (trusted) {
+                    deviceService.updateLastLogin(user.getEmail(), deviceId, ip, agent);
+                } else {
+                    deviceService.markTrusted(user.getEmail(), deviceId, ip, agent);
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ Failed to update lastLogin for MFA login {}: {}", user.getEmail(), e.getMessage());
+            }
+        }
 
         TokenResponse tokenResponse = new TokenResponse(accessToken, refreshToken, false);
         String message = verificationMethod.equals("backup code") 
@@ -325,6 +336,95 @@ public class AuthController {
 
         String newAccessToken = authService.refreshAccessToken(refreshToken);
         return ResponseEntity.ok(ApiResponse.success(newAccessToken, "Access token refreshed successfully"));
+    }
+
+    // ✅ Gửi SMS OTP khi user click nút "Gửi mã OTP"
+    @PostMapping("/send-sms-otp")
+    public ResponseEntity<ApiResponse<String>> sendSmsOtp(@RequestBody Map<String, String> request) {
+        log.info("═══════════════════════════════════════════════════════════");
+        log.info("📱 [SEND-SMS-OTP] Request received: {}", request);
+        String phoneNumber = request.get("phoneNumber");
+        if (phoneNumber == null || phoneNumber.isBlank()) {
+            log.error("❌ [SEND-SMS-OTP] Phone number is null or blank");
+            throw new BadRequestException("Số điện thoại không được để trống");
+        }
+        
+        log.info("📱 [SEND-SMS-OTP] Processing SMS OTP request for phone: {}", phoneNumber);
+        
+        try {
+            // Trong dev mode, lấy OTP để trả về trong response
+            String otp = authService.sendSmsOtp(phoneNumber);
+            log.info("✅ [SEND-SMS-OTP] SMS OTP sent successfully to: {}", phoneNumber);
+            log.info("═══════════════════════════════════════════════════════════");
+            
+            // Trong dev mode, trả về OTP trong message để dễ test
+            String message = "Mã OTP đã được gửi đến số điện thoại của bạn. " +
+                    "(DEV MODE - OTP: " + otp + " - Vui lòng kiểm tra console backend để lấy mã)";
+            return ResponseEntity.ok(ApiResponse.success(
+                    message,
+                    "SMS OTP sent successfully"));
+        } catch (Exception e) {
+            log.error("❌ [SEND-SMS-OTP] Failed to send SMS OTP to {}: {}", phoneNumber, e.getMessage());
+            log.error("❌ [SEND-SMS-OTP] Exception type: {}", e.getClass().getName());
+            log.error("❌ [SEND-SMS-OTP] Full exception: ", e);
+            log.info("═══════════════════════════════════════════════════════════");
+            throw new BadRequestException("Không thể gửi mã OTP qua SMS: " + e.getMessage());
+        }
+    }
+
+    // ✅ Xác thực SMS OTP
+    @PostMapping("/verify-sms-otp")
+    public ResponseEntity<ApiResponse<TokenResponse>> verifySmsOtp(
+            @RequestBody Map<String, String> request,
+            HttpServletRequest httpRequest) {
+        
+        log.info("📱 [VERIFY-SMS-OTP] Request received: {}", request);
+        
+        String email = request.get("email");
+        String phoneNumber = request.get("phoneNumber");
+        String otp = request.get("otp");
+        String deviceId = request.get("deviceId");
+        
+        if (email == null || email.isBlank()) {
+            throw new BadRequestException("Email không được để trống");
+        }
+        if (phoneNumber == null || phoneNumber.isBlank()) {
+            throw new BadRequestException("Số điện thoại không được để trống");
+        }
+        if (otp == null || otp.isBlank()) {
+            throw new BadRequestException("OTP không được để trống");
+        }
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new BadRequestException("Thiết bị ID không được để trống");
+        }
+        
+        try {
+            TokenResponse tokenResponse = authService.verifySmsOtp(email, phoneNumber, otp, deviceId);
+            
+            // Cập nhật lastLogin sau khi verify SMS OTP thành công
+            try {
+                String ip = httpRequest.getRemoteAddr();
+                String agent = httpRequest.getHeader("User-Agent");
+                boolean trusted = deviceService.isTrusted(email, deviceId);
+                if (trusted) {
+                    deviceService.updateLastLogin(email, deviceId, ip, agent);
+                } else {
+                    deviceService.markTrusted(email, deviceId, ip, agent);
+                }
+            } catch (Exception e) {
+                log.warn("⚠️ Failed to update lastLogin for SMS OTP login {}: {}", email, e.getMessage());
+            }
+            
+            log.info("✅ [VERIFY-SMS-OTP] SMS OTP verified successfully for: {}", email);
+            return ResponseEntity.ok(ApiResponse.success(tokenResponse,
+                    "Xác thực SMS OTP thành công. Thiết bị đã được đánh dấu là tin cậy."));
+        } catch (BadRequestException | ResourceNotFoundException e) {
+            log.error("❌ [VERIFY-SMS-OTP] Verification failed: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("❌ [VERIFY-SMS-OTP] Unexpected error: {}", e.getMessage(), e);
+            throw new BadRequestException("Lỗi khi xác thực SMS OTP: " + e.getMessage());
+        }
     }
 
     // ✅ Gửi OTP khi user click nút "Nhận OTP"
@@ -467,6 +567,68 @@ public class AuthController {
             log.error("❌ [QR-LOGIN] Failed to check status: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(ApiResponse.error(500, 
                     "Không thể kiểm tra trạng thái: " + e.getMessage()));
+        }
+    }
+
+    // ✅ Đổi mật khẩu khi có cảnh báo xâm nhập
+    @PostMapping("/reset-password-security")
+    public ResponseEntity<ApiResponse<String>> resetPasswordFromSecurityAlert(
+            @RequestBody Map<String, String> request) {
+        try {
+            String token = request.get("token");
+            String newPassword = request.get("newPassword");
+            
+            if (token == null || token.isBlank()) {
+                throw new BadRequestException("Token không được để trống");
+            }
+            
+            if (newPassword == null || newPassword.isBlank()) {
+                throw new BadRequestException("Mật khẩu mới không được để trống");
+            }
+            
+            if (newPassword.length() < 6) {
+                throw new BadRequestException("Mật khẩu phải có ít nhất 6 ký tự");
+            }
+            
+            // Validate reset password token
+            if (!jwtUtils.validateResetPasswordToken(token)) {
+                throw new BadRequestException("Token không hợp lệ hoặc đã hết hạn");
+            }
+            
+            // Lấy email từ token
+            String email = jwtUtils.getEmailFromToken(token);
+            
+            // Tìm user
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+            
+            // Mã hóa mật khẩu mới (sử dụng PasswordEncoder từ Spring Security)
+            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder = 
+                new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder();
+            String encodedPassword = passwordEncoder.encode(newPassword);
+            
+            // Cập nhật mật khẩu
+            user.setPasswordHash(encodedPassword);
+            userRepository.save(user);
+            
+            // Xóa tất cả refresh token của user (đăng xuất tất cả thiết bị)
+            try {
+                authService.logout(email);
+            } catch (Exception e) {
+                log.warn("⚠️ Failed to logout all devices for {}: {}", email, e.getMessage());
+            }
+            
+            log.info("✅ [SECURITY] Password reset successfully for: {}", email);
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Đổi mật khẩu thành công. Vui lòng đăng nhập lại với mật khẩu mới.",
+                    "Password reset successfully"));
+                    
+        } catch (BadRequestException | ResourceNotFoundException e) {
+            log.error("❌ [SECURITY] Reset password failed: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("❌ [SECURITY] Unexpected error resetting password: {}", e.getMessage(), e);
+            throw new BadRequestException("Đã xảy ra lỗi khi đổi mật khẩu. Vui lòng thử lại sau.");
         }
     }
 

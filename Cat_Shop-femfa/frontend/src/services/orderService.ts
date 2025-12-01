@@ -21,9 +21,10 @@ export const orderService = {
     return apiService.get<Order[]>(url);
   },
 
-  // Lấy chi tiết đơn hàng
+  // Lấy chi tiết đơn hàng (order details)
   async getOrderDetails(orderId: number): Promise<OrderDetail[]> {
-    return apiService.get<OrderDetail[]>(`${API_CONFIG.ENDPOINTS.ORDERS.DETAIL}/${orderId}/details`);
+    const url = buildUrl('/order-details/order/:orderId', { orderId });
+    return apiService.get<OrderDetail[]>(url);
   },
 
   // Tạo đơn hàng mới
@@ -31,15 +32,21 @@ export const orderService = {
     return apiService.post<Order>(API_CONFIG.ENDPOINTS.ORDERS.CREATE, orderData);
   },
 
-  // Cập nhật trạng thái đơn hàng
-  async updateOrderStatus(id: number, status: string): Promise<Order> {
-    const url = buildUrl(API_CONFIG.ENDPOINTS.ORDERS.UPDATE, { id });
-    return apiService.patch<Order>(url, { status });
+  // Cập nhật đơn hàng (sử dụng orderId)
+  async updateOrder(orderId: number, orderData: Partial<Order>): Promise<Order> {
+    const url = buildUrl(API_CONFIG.ENDPOINTS.ORDERS.UPDATE, { orderId });
+    return apiService.put<Order>(url, orderData);
   },
 
-  // Cập nhật đơn hàng
-  async updateOrder(id: number, orderData: Partial<Order>): Promise<Order> {
-    const url = buildUrl(API_CONFIG.ENDPOINTS.ORDERS.UPDATE, { id });
-    return apiService.put<Order>(url, orderData);
+  // Xóa đơn hàng (sử dụng orderId)
+  async deleteOrder(orderId: number): Promise<void> {
+    const url = buildUrl(API_CONFIG.ENDPOINTS.ORDERS.DELETE, { orderId });
+    return apiService.delete<void>(url);
+  },
+
+  // Lấy đơn hàng theo email
+  async getOrdersByEmail(email: string): Promise<Order[]> {
+    const url = buildUrl(API_CONFIG.ENDPOINTS.ORDERS.USER_ORDERS_BY_EMAIL, { email });
+    return apiService.get<Order[]>(url);
   }
 };

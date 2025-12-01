@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { authService, tokenStorage } from "../api/authService";
 import type { LoginPayload } from "../api/authService";
 import ErrorAlert from "./ErrorAlert";
+import GoogleReCaptcha from "@/components/GoogleReCaptcha";
 
 type LoginFormValues = Omit<LoginPayload, "deviceId">;
 
@@ -15,15 +16,22 @@ const LoginForm = () => {
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>();
   const [error, setError] = useState<string | undefined>();
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
 
-  // Mở popup OAuth2 tới backend Google
+  // Redirect trực tiếp trong cùng tab để đăng nhập Google
   const handleGoogleLogin = () => {
     const oauthUrl = "http://localhost:8080/oauth2/authorization/google";
-    window.open(oauthUrl, "oauth2Popup", "width=500,height=600,status=1");
+    // Redirect trong cùng tab thay vì mở popup
+    window.location.href = oauthUrl;
   };
 
   // Gửi thông tin đăng nhập kèm deviceId và xử lý các nhánh phản hồi
   const onSubmit = async (formValues: LoginFormValues) => {
+    if (!recaptchaToken) {
+      setError("Vui lòng xác thực reCAPTCHA để tiếp tục");
+      return;
+    }
+
     try {
       setError(undefined);
       const result = await authService.login(formValues);
@@ -95,9 +103,14 @@ const LoginForm = () => {
           {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>}
         </div>
 
+        <GoogleReCaptcha 
+          onVerify={setRecaptchaToken}
+          onExpire={() => setRecaptchaToken(null)}
+        />
+
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !recaptchaToken}
           className="inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           {isSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}

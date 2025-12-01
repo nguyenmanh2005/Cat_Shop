@@ -13,7 +13,7 @@ import { User as UserType } from "@/types";
 import { useNavigate } from "react-router-dom";
 
 const Profile = () => {
-  const { user: authUser, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user: authUser, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [user, setUser] = useState<UserType | null>(null);
@@ -27,19 +27,14 @@ const Profile = () => {
   });
 
   useEffect(() => {
-    // Đợi AuthContext hoàn tất loading trước
-    if (authLoading) {
-      return;
-    }
-
-    // Redirect nếu chưa đăng nhập (sau khi AuthContext đã check xong)
+    // Redirect nếu chưa đăng nhập
     if (!isAuthenticated) {
       navigate("/");
       return;
     }
 
     loadUserProfile();
-  }, [isAuthenticated, authLoading, navigate]);
+  }, [isAuthenticated, navigate]);
 
   const loadUserProfile = async () => {
     try {
@@ -104,8 +99,11 @@ const Profile = () => {
     setIsEditing(false);
   };
 
-  // Hiển thị loading nếu AuthContext đang check hoặc đang load profile
-  if (authLoading || loading) {
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <Header />

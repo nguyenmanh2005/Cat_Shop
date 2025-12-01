@@ -30,18 +30,25 @@ export interface LoginResult {
   tokens?: TokenResponse;
 }
 
-const DEVICE_ID_STORAGE_KEY = 'cat_shop_device_id';
 const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_EMAIL_KEY = 'user_email';
 
-const getOrCreateDeviceId = (): string => {
-  let deviceId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
-  if (!deviceId) {
-    deviceId = crypto.randomUUID();
-    localStorage.setItem(DEVICE_ID_STORAGE_KEY, deviceId);
+// Import device fingerprint utility
+import { getOrCreateDeviceFingerprint, getDeviceFingerprintSync } from '@/utils/deviceFingerprint';
+
+/**
+ * Lấy deviceId - ưu tiên dùng FingerprintJS, fallback về sync method
+ */
+const getOrCreateDeviceId = async (): Promise<string> => {
+  // Thử lấy đồng bộ trước (nếu đã có trong cache/localStorage)
+  const syncId = getDeviceFingerprintSync();
+  if (syncId) {
+    return syncId;
   }
-  return deviceId;
+
+  // Nếu chưa có, dùng FingerprintJS (async)
+  return await getOrCreateDeviceFingerprint();
 };
 
 const storeTokens = (tokens: TokenResponse | undefined, email: string) => {
@@ -64,7 +71,7 @@ export const authService = {
       // Xóa token cũ trước khi đăng nhập để tránh xung đột
       clearTokens();
       
-      const deviceId = getOrCreateDeviceId();
+      const deviceId = await getOrCreateDeviceId();
       
       console.log('🔐 Attempting login:', {
         email: credentials.email,
@@ -215,6 +222,8 @@ export const authService = {
       }
 
       const user = await apiService.get<UserProfile>(`/users/email/${encodeURIComponent(storedEmail)}`);
+      console.log('📱 getProfile response:', user);
+      console.log('📱 Phone field:', user?.phone);
       return user;
     } catch (error: any) {
       console.error('Get profile error:', error);
@@ -271,7 +280,7 @@ export const authService = {
 
   async verifyOTP(email: string, otp: string): Promise<TokenResponse> {
     try {
-      const deviceId = getOrCreateDeviceId();
+      const deviceId = await getOrCreateDeviceId();
       
       console.log('🔐 Verifying OTP:', {
         email,
@@ -410,6 +419,179 @@ export const authService = {
           errorMessage = error.response.data.message;
         } else if (typeof error.response.data === 'string') {
           errorMessage = error.response.data;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  },
+
+  // SMS OTP methods
+  async sendSmsOtp(phoneNumber: string): Promise<string> {
+    try {
+      // Backend trả về string message (trong ApiResponse.data)
+      const response = await apiService.post<string>(
+        API_CONFIG.ENDPOINTS.AUTH.SEND_SMS_OTP,
+        { phoneNumber }
+      );
+      return response;
+    } catch (error: any) {
+      console.error('Send SMS OTP error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Không thể gửi OTP qua SMS';
+      throw new Error(errorMessage);
+    }
+  },
+
+  async verifySmsOtp(email: string, phoneNumber: string, otp: string): Promise<{ success: boolean; message?: string; tokens?: TokenResponse }> {
+    try {
+      const deviceId = await getOrCreateDeviceId();
+      
+      console.log('🔐 Verifying SMS OTP:', {
+        email,
+        phoneNumber,
+        otpLength: otp.length,
+        deviceId
+      });
+      
+      const response = await apiService.post<TokenResponse>(
+        API_CONFIG.ENDPOINTS.AUTH.VERIFY_SMS_OTP,
+        { email, phoneNumber, otp, deviceId }
+      );
+
+      console.log('✅ Verify SMS OTP response:', response);
+
+      // Nếu có accessToken, lưu token
+      if (response.accessToken) {
+        storeTokens(response, email);
+        return {
+          success: true,
+          tokens: response
+        };
+      }
+
+      // Nếu có mfaRequired, OTP đã đúng nhưng cần thêm bước Google Authenticator
+      if (response.mfaRequired && !response.accessToken) {
+        return {
+          success: false,
+          message: 'OTP đúng nhưng cần xác minh Google Authenticator',
+          tokens: response
+        };
+      }
+
+      return {
+        success: true,
+        tokens: response
+      };
+    } catch (error: any) {
+      console.error('❌ Verify SMS OTP error:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+      });
+      
+      // Lấy thông báo lỗi từ backend
+      let errorMessage = 'Xác thực OTP SMS thất bại';
+      
+      if (error.response?.data) {
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else if (error.response.status === 400) {
+          errorMessage = error.response.data.message || 
+                        error.response.data.error || 
+                        'Mã OTP không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.';
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Verify SMS OTP cho đăng ký số điện thoại (không cần email)
+  async verifySmsOtpForRegistration(phoneNumber: string, otp: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      console.log('🔐 Verifying SMS OTP for registration:', {
+        phoneNumber,
+        otpLength: otp.length,
+      });
+      
+      // Backend cần có API: POST /auth/verify-sms-otp-register { phoneNumber, otp }
+      // Tạm thời, chúng ta sẽ dùng API verify SMS OTP hiện có
+      // TODO: Backend cần tạo API riêng cho registration
+      const response = await apiService.post<{ success: boolean; message?: string }>(
+        '/auth/verify-sms-otp-register', // Backend cần implement endpoint này
+        { phoneNumber, otp }
+      );
+
+      console.log('✅ Verify SMS OTP for registration response:', response);
+      return response;
+    } catch (error: any) {
+      console.error('❌ Verify SMS OTP for registration error:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+      
+      // Lấy thông báo lỗi từ backend
+      let errorMessage = 'Xác thực OTP SMS thất bại';
+      
+      if (error.response?.data) {
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else if (error.response.status === 400) {
+          errorMessage = error.response.data.message || 
+                        error.response.data.error || 
+                        'Mã OTP không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.';
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  },
+
+  /**
+   * Đổi mật khẩu từ email cảnh báo bảo mật
+   * @param token Token từ email cảnh báo
+   * @param newPassword Mật khẩu mới
+   */
+  async resetPasswordFromSecurityAlert(token: string, newPassword: string): Promise<void> {
+    try {
+      console.log('🔐 Resetting password from security alert');
+      
+      const response = await apiService.post<{ message: string }>(
+        '/auth/reset-password-security',
+        { token, newPassword }
+      );
+
+      console.log('✅ Reset password from security alert response:', response);
+    } catch (error: any) {
+      console.error('❌ Reset password from security alert error:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+      
+      let errorMessage = 'Không thể đổi mật khẩu';
+      
+      if (error.response?.data) {
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else if (error.response.status === 400) {
+          errorMessage = error.response.data.message || 
+                        error.response.data.error || 
+                        'Token không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.';
         }
       } else if (error.message) {
         errorMessage = error.message;

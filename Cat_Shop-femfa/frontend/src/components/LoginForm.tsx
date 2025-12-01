@@ -2,19 +2,21 @@ import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, Mail, Shield, Eye, EyeOff, QrCode, KeyRound } from "lucide-react";
+import { Lock, Mail, Shield, Eye, EyeOff, QrCode, KeyRound, Phone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/authService";
 import { QRCodeSVG } from "qrcode.react";
 import ForgotPasswordForm from "./ForgotPasswordForm";
+import GoogleReCaptcha from "./GoogleReCaptcha";
+import { ShieldCheck } from "lucide-react";
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
   onClose: () => void;
 }
 
-type VerificationMethod = "otp" | "qr" | "google-authenticator" | null;
+type VerificationMethod = "otp" | "sms" | "qr" | "google-authenticator" | null;
 
 const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   const { login, loginWithOTP, pendingEmail } = useAuth();
@@ -25,17 +27,25 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   
   // Verification states
   const [needsVerification, setNeedsVerification] = useState(false);
   const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>(null);
   const [verificationEmail, setVerificationEmail] = useState("");
   
-  // OTP states
+  // OTP states (Email)
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpCountdown, setOtpCountdown] = useState(0); // Thời gian còn lại (giây)
   const otpCountdownRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // SMS OTP states
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [smsOtp, setSmsOtp] = useState("");
+  const [smsOtpSent, setSmsOtpSent] = useState(false);
+  const [smsOtpCountdown, setSmsOtpCountdown] = useState(0);
+  const smsOtpCountdownRef = useRef<NodeJS.Timeout | null>(null);
   
   // QR Code states
   const [qrCodeData, setQrCodeData] = useState<string>("");
@@ -46,11 +56,16 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   
   // Google Authenticator states
   const [googleAuthCode, setGoogleAuthCode] = useState<string>("");
+  
+  // User phone number state (để check xem user đã đăng ký số điện thoại chưa)
+  const [userPhoneNumber, setUserPhoneNumber] = useState<string | null>(null);
+  const [checkingPhone, setCheckingPhone] = useState(false);
 
-  // Mở popup đăng nhập Google thông qua OAuth2 backend
+  // Redirect trực tiếp trong cùng tab để đăng nhập Google
   const handleGoogleLogin = () => {
     const googleOAuthUrl = "http://localhost:8080/oauth2/authorization/google";
-    window.open(googleOAuthUrl, "google-oauth", "width=500,height=600,status=1");
+    // Redirect trong cùng tab thay vì mở popup
+    window.location.href = googleOAuthUrl;
   };
 
   useEffect(() => {
@@ -119,6 +134,36 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     };
   }, [otpCountdown]);
 
+  // Countdown timer cho SMS OTP (2 phút = 120 giây)
+  useEffect(() => {
+    if (smsOtpCountdown > 0) {
+      smsOtpCountdownRef.current = setInterval(() => {
+        setSmsOtpCountdown((prev) => {
+          if (prev <= 1) {
+            if (smsOtpCountdownRef.current) {
+              clearInterval(smsOtpCountdownRef.current);
+              smsOtpCountdownRef.current = null;
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (smsOtpCountdownRef.current) {
+        clearInterval(smsOtpCountdownRef.current);
+        smsOtpCountdownRef.current = null;
+      }
+    }
+
+    return () => {
+      if (smsOtpCountdownRef.current) {
+        clearInterval(smsOtpCountdownRef.current);
+        smsOtpCountdownRef.current = null;
+      }
+    };
+  }, [smsOtpCountdown]);
+
   const resetOtpState = () => {
     setOtp("");
     setOtpSent(false);
@@ -126,6 +171,17 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     if (otpCountdownRef.current) {
       clearInterval(otpCountdownRef.current);
       otpCountdownRef.current = null;
+    }
+  };
+
+  const resetSmsOtpState = () => {
+    setSmsOtp("");
+    setSmsOtpSent(false);
+    setSmsOtpCountdown(0);
+    setPhoneNumber("");
+    if (smsOtpCountdownRef.current) {
+      clearInterval(smsOtpCountdownRef.current);
+      smsOtpCountdownRef.current = null;
     }
   };
 
@@ -141,24 +197,44 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       return;
     }
 
+    if (!recaptchaToken) {
+      toast({
+        title: "Xác thực reCAPTCHA",
+        description: "Vui lòng xác thực reCAPTCHA để tiếp tục",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
       const result = await login(email, password);
 
-      // QUAN TRỌNG: LUÔN LUÔN yêu cầu xác minh sau khi đăng nhập email/password thành công
-      // Đây là yêu cầu bảo mật - luôn cần xác minh 2 bước (OTP, QR Code, hoặc Google Authenticator)
-      // KHÔNG cho phép truy cập nếu chưa xác minh
+      // LUÔN LUÔN yêu cầu xác minh sau khi đăng nhập email/password thành công
+      // Đây là yêu cầu bảo mật - luôn cần xác minh 2 bước (OTP hoặc QR Code)
+      // Ngay cả khi backend trả về success, vẫn phải qua bước xác minh
       
-      // Đảm bảo xóa mọi token cũ để tránh truy cập không được phép
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user_email');
+      // Kiểm tra số điện thoại của user - chỉ gọi nếu có token
+      // Lưu ý: authService.login không lưu token, nên có thể không có token ở đây
+      // Nếu không có token, checkUserPhoneNumber sẽ bị lỗi 401 nhưng đã được xử lý gracefully
+      const hasToken = !!localStorage.getItem('access_token');
+      if (hasToken) {
+        await checkUserPhoneNumber(email);
+      }
+      
+      if (result.success) {
+        // Nếu backend đã lưu token, xóa đi để đảm bảo phải xác minh trước
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user_email');
+      }
 
-      // Luôn chuyển sang màn hình xác minh, bất kể kết quả từ backend
+      // Luôn chuyển sang màn hình xác minh
       setVerificationEmail(email);
       setNeedsVerification(true);
       setVerificationMethod(null); // Reset về màn hình chọn phương thức
       resetOtpState();
+      
       toast({
         title: "Xác minh tài khoản",
         description: result.message || "Vui lòng chọn phương thức xác minh để tiếp tục đăng nhập",
@@ -214,6 +290,148 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     }
     setOtp(""); // Xóa OTP cũ
     await handleRequestOtp();
+  };
+
+  // Kiểm tra số điện thoại của user
+  const checkUserPhoneNumber = async (userEmail: string) => {
+    try {
+      setCheckingPhone(true);
+      const profile = await authService.getProfile(userEmail);
+      console.log("📱 LoginForm - User profile loaded:", profile);
+      // Kiểm tra phone - có thể là null, undefined, hoặc empty string
+      if (profile && profile.phone && profile.phone.trim() !== '') {
+        setUserPhoneNumber(profile.phone);
+        // Tự động set phone number nếu user đã có
+        setPhoneNumber(profile.phone);
+        console.log("✅ LoginForm - Phone number found:", profile.phone);
+      } else {
+        console.log("⚠️ LoginForm - No phone number found");
+        setUserPhoneNumber(null);
+        setPhoneNumber("");
+      }
+    } catch (error: any) {
+      console.error("Error checking user phone:", error);
+      // Nếu lỗi 401, có thể do chưa đăng nhập hoặc token hết hạn
+      // Không cần hiển thị toast vì đây là trong quá trình đăng nhập
+      setUserPhoneNumber(null);
+      setPhoneNumber("");
+    } finally {
+      setCheckingPhone(false);
+    }
+  };
+
+  const handleRequestSmsOtp = async () => {
+    // Validate phone number format (Vietnamese format: 10 digits starting with 0, or +84)
+    const phoneRegex = /^(\+84|0)[0-9]{9,10}$/;
+    const cleanPhone = phoneNumber.replace(/\s+/g, '');
+    
+    if (!cleanPhone || !phoneRegex.test(cleanPhone)) {
+      toast({
+        title: "Số điện thoại không hợp lệ",
+        description: "Vui lòng nhập số điện thoại đúng định dạng (VD: 0912345678 hoặc +84912345678)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Nếu user đã đăng ký số điện thoại, kiểm tra số nhập vào có khớp không
+    if (userPhoneNumber) {
+      const normalizedUserPhone = userPhoneNumber.replace(/\s+/g, '').replace(/^\+84/, '0');
+      const normalizedInputPhone = cleanPhone.replace(/^\+84/, '0');
+      
+      if (normalizedInputPhone !== normalizedUserPhone) {
+        toast({
+          title: "Số điện thoại không khớp",
+          description: `Số điện thoại bạn nhập không khớp với số điện thoại đã đăng ký (${userPhoneNumber}). Vui lòng sử dụng số điện thoại đã đăng ký hoặc nhập số điện thoại mới.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    try {
+      setIsLoading(true);
+      await authService.sendSmsOtp(cleanPhone);
+      setSmsOtpSent(true);
+      setSmsOtpCountdown(120); // Bắt đầu countdown 2 phút (120 giây)
+      toast({
+        title: "OTP đã được gửi",
+        description: `Mã OTP đã được gửi đến số điện thoại ${cleanPhone}. Mã có hiệu lực trong 2 phút.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Lỗi gửi OTP",
+        description: error.message || "Không thể gửi mã OTP qua SMS",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendSmsOtp = async () => {
+    // Reset countdown và gửi lại OTP
+    setSmsOtpCountdown(0);
+    if (smsOtpCountdownRef.current) {
+      clearInterval(smsOtpCountdownRef.current);
+      smsOtpCountdownRef.current = null;
+    }
+    setSmsOtp(""); // Xóa OTP cũ
+    await handleRequestSmsOtp();
+  };
+
+  const handleVerifySmsOtp = async () => {
+    if (!smsOtp || smsOtp.length !== 6) {
+      toast({
+        title: "OTP không hợp lệ",
+        description: "Vui lòng nhập mã OTP 6 chữ số",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!verificationEmail) {
+      toast({
+        title: "Email không hợp lệ",
+        description: "Vui lòng đăng nhập lại bằng email và mật khẩu",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const cleanPhone = phoneNumber.replace(/\s+/g, '');
+
+    try {
+      setIsLoading(true);
+      const result = await authService.verifySmsOtp(verificationEmail, cleanPhone, smsOtp);
+
+      if (result.success) {
+        toast({
+          title: "Đăng nhập thành công!",
+          description: "Chào mừng bạn quay trở lại với Cham Pets",
+        });
+        setNeedsVerification(false);
+        setVerificationMethod(null);
+        resetSmsOtpState();
+        onClose();
+        return;
+      }
+
+      // OTP từ SMS không chính xác
+      toast({
+        title: "Mã OTP không chính xác",
+        description: result.message || "Vui lòng kiểm tra lại mã OTP đã được gửi đến số điện thoại của bạn",
+        variant: "destructive",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Lỗi xác thực",
+        description: error.message || "Đã xảy ra lỗi khi xác thực OTP SMS",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGenerateQrCode = async () => {
@@ -388,14 +606,10 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   };
 
   const handleVerifyGoogleAuthenticator = async () => {
-    // Kiểm tra mã hợp lệ: 6 số (Google Authenticator) hoặc XXXX-XXXX (Backup Code)
-    const isGoogleAuthCode = /^\d{6}$/.test(googleAuthCode);
-    const isBackupCode = /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(googleAuthCode.toUpperCase());
-    
-    if (!googleAuthCode || (!isGoogleAuthCode && !isBackupCode)) {
+    if (!googleAuthCode || googleAuthCode.length !== 6) {
       toast({
         title: "Mã không hợp lệ",
-        description: "Vui lòng nhập mã 6 số từ Google Authenticator hoặc Backup Code (XXXX-XXXX)",
+        description: "Vui lòng nhập mã Google Authenticator 6 chữ số",
         variant: "destructive",
       });
       return;
@@ -412,9 +626,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
 
     try {
       setIsLoading(true);
-      // Chuyển backup code sang uppercase nếu là backup code
-      const codeToVerify = isBackupCode ? googleAuthCode.toUpperCase() : googleAuthCode;
-      const result = await authService.verifyGoogleAuthenticator(verificationEmail, codeToVerify);
+      const result = await authService.verifyGoogleAuthenticator(verificationEmail, googleAuthCode);
 
       if (result.accessToken && result.refreshToken) {
         // Lưu token
@@ -422,13 +634,9 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
         localStorage.setItem('refresh_token', result.refreshToken);
         localStorage.setItem('user_email', verificationEmail);
 
-        const successMessage = isBackupCode 
-          ? "Đăng nhập thành công bằng Backup Code! Mã này đã được sử dụng và không thể dùng lại."
-          : "Đăng nhập thành công!";
-
         toast({
           title: "Đăng nhập thành công!",
-          description: successMessage,
+          description: "Chào mừng bạn quay trở lại với Cham Pets",
         });
         setNeedsVerification(false);
         setVerificationMethod(null);
@@ -439,14 +647,14 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       }
 
       toast({
-        title: "Mã xác thực không chính xác",
-        description: "Vui lòng kiểm tra lại mã từ Google Authenticator hoặc Backup Code",
+        title: "Mã Google Authenticator không chính xác",
+        description: "Vui lòng kiểm tra lại mã từ ứng dụng Google Authenticator",
         variant: "destructive",
       });
     } catch (error: any) {
       toast({
         title: "Lỗi xác thực",
-        description: error.message || "Đã xảy ra lỗi khi xác thực",
+        description: error.message || "Đã xảy ra lỗi khi xác thực Google Authenticator",
         variant: "destructive",
       });
     } finally {
@@ -459,8 +667,10 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     setNeedsVerification(false);
     setVerificationMethod(null);
     resetOtpState();
+    resetSmsOtpState();
     setQrCodeData("");
     setQrStatus("pending");
+    setRecaptchaToken(null);
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
@@ -504,6 +714,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                 ? "Đăng nhập bằng Email & Mật khẩu"
                 : verificationMethod === "otp"
                 ? "Nhập mã OTP được gửi tới email của bạn"
+                : verificationMethod === "sms"
+                ? "Nhập mã OTP được gửi tới số điện thoại của bạn"
                 : verificationMethod === "qr"
                 ? "Quét mã QR để xác minh"
                 : verificationMethod === "google-authenticator"
@@ -570,7 +782,12 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <GoogleReCaptcha 
+                  onVerify={setRecaptchaToken} 
+                  onExpire={() => setRecaptchaToken(null)}
+                />
+
+                <Button type="submit" className="w-full" disabled={isLoading || !recaptchaToken}>
                   {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
                 </Button>
               </form>
@@ -641,18 +858,38 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                 <button
                   type="button"
                   onClick={() => {
-                    setVerificationMethod("qr");
-                    setQrCodeData("");
-                    setQrStatus("pending");
+                    setVerificationMethod("sms");
+                    setSmsOtpSent(false);
+                    // Tự động set số điện thoại nếu user đã đăng ký
+                    if (userPhoneNumber) {
+                      setPhoneNumber(userPhoneNumber);
+                    } else {
+                      setPhoneNumber(""); // Reset để người dùng nhập mới
+                    }
                   }}
-                  className="flex items-center gap-4 p-4 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+                  disabled={checkingPhone}
+                  className={`flex items-center gap-4 p-4 border-2 rounded-lg transition-colors ${
+                    checkingPhone
+                      ? "border-gray-200 bg-gray-50 cursor-not-allowed opacity-60"
+                      : "border-gray-200 hover:border-primary hover:bg-primary/5"
+                  }`}
                 >
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                    <QrCode className="h-6 w-6 text-green-600" />
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                    checkingPhone ? "bg-gray-100" : "bg-green-100"
+                  }`}>
+                    <Phone className={`h-6 w-6 ${
+                      checkingPhone ? "text-gray-400" : "text-green-600"
+                    }`} />
                   </div>
                   <div className="flex-1 text-left">
-                    <h4 className="font-semibold">Xác minh bằng QR Code</h4>
-                    <p className="text-sm text-muted-foreground">Quét mã QR bằng ứng dụng di động</p>
+                    <h4 className="font-semibold">Xác minh bằng SMS OTP</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {checkingPhone 
+                        ? "Đang kiểm tra..." 
+                        : userPhoneNumber 
+                        ? `Nhận mã OTP qua tin nhắn SMS (${userPhoneNumber})` 
+                        : "Nhận mã OTP qua tin nhắn SMS"}
+                    </p>
                   </div>
                 </button>
 
@@ -770,6 +1007,126 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
               </Button>
             </div>
             </>
+          ) : verificationMethod === "sms" ? (
+            <>
+              {/* Bước 3b: Xác minh SMS OTP */}
+              <div className="space-y-6">
+              <div className="text-center space-y-2">
+                <h3 className="text-xl font-semibold">Xác minh bằng SMS OTP</h3>
+                <p className="text-sm text-muted-foreground">
+                  Nhập số điện thoại để nhận mã OTP qua tin nhắn SMS
+                </p>
+              </div>
+
+              {!smsOtpSent ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber">Số điện thoại</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="phoneNumber"
+                        type="tel"
+                        placeholder="Nhập số điện thoại (VD: 0912345678)"
+                        value={phoneNumber}
+                        onChange={(e) => {
+                          // Chỉ cho phép số và dấu +
+                          const value = e.target.value.replace(/[^0-9+]/g, '');
+                          setPhoneNumber(value);
+                        }}
+                        className="pl-10"
+                        disabled={isLoading}
+                      />
+                    </div>
+                    {userPhoneNumber && (
+                      <p className="text-xs text-muted-foreground">
+                        Số điện thoại đã đăng ký: <strong>{userPhoneNumber}</strong>
+                      </p>
+                    )}
+                    {!userPhoneNumber && (
+                      <p className="text-xs text-muted-foreground">
+                        Nhập số điện thoại để nhận mã OTP qua SMS
+                      </p>
+                    )}
+                  </div>
+                  <Button 
+                    type="button" 
+                    onClick={handleRequestSmsOtp} 
+                    className="w-full" 
+                    disabled={isLoading || !phoneNumber}
+                  >
+                    {isLoading ? "Đang gửi..." : "Gửi mã OTP"}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="smsOtp">Mã OTP</Label>
+                      {smsOtpCountdown > 0 && (
+                        <span className="text-sm text-muted-foreground">
+                          Còn lại: <span className="font-semibold text-primary">{Math.floor(smsOtpCountdown / 60)}:{(smsOtpCountdown % 60).toString().padStart(2, '0')}</span>
+                        </span>
+                      )}
+                      {smsOtpCountdown === 0 && smsOtpSent && (
+                        <span className="text-sm text-red-500 font-medium">
+                          Mã OTP đã hết hạn
+                        </span>
+                      )}
+                    </div>
+                    <Input
+                      id="smsOtp"
+                      type="text"
+                      placeholder="Nhập mã 6 chữ số"
+                      value={smsOtp}
+                      onChange={(e) => setSmsOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                      maxLength={6}
+                      className={`text-center text-2xl tracking-[0.6rem] ${smsOtpCountdown === 0 ? 'border-red-300' : ''}`}
+                      disabled={isLoading}
+                    />
+                    <p className="text-xs text-muted-foreground text-center">
+                      Mã OTP đã được gửi đến: <strong>{phoneNumber}</strong>
+                    </p>
+                    {smsOtpCountdown === 0 && smsOtpSent && (
+                      <p className="text-xs text-red-500 text-center">
+                        ⚠️ Mã OTP đã hết hạn. Vui lòng gửi lại mã mới hoặc thử nhập mã hiện tại (có thể vẫn còn hiệu lực).
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handleVerifySmsOtp} 
+                      className="flex-1" 
+                      disabled={isLoading || smsOtp.length !== 6}
+                    >
+                      {isLoading ? "Đang xác thực..." : "Xác thực OTP"}
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={handleResendSmsOtp} 
+                      disabled={isLoading}
+                    >
+                      {smsOtpCountdown > 0 ? `Gửi lại (${Math.floor(smsOtpCountdown / 60)}:${(smsOtpCountdown % 60).toString().padStart(2, '0')})` : "Gửi lại mã mới"}
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setVerificationMethod(null);
+                  resetSmsOtpState();
+                }}
+                className="w-full"
+              >
+                Chọn phương thức khác
+              </Button>
+            </div>
+            </>
           ) : verificationMethod === "qr" ? (
             <>
               {/* Bước 3b: Xác minh QR Code */}
@@ -848,49 +1205,33 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
             </>
           ) : verificationMethod === "google-authenticator" ? (
             <>
-              {/* Bước 3c: Xác minh Google Authenticator hoặc Backup Code */}
+              {/* Bước 3c: Xác minh Google Authenticator */}
               <div className="space-y-6">
               <div className="text-center space-y-2">
                 <h3 className="text-xl font-semibold">Xác minh bằng Google Authenticator</h3>
                 <p className="text-sm text-muted-foreground">
-                  Nhập mã 6 số từ Google Authenticator hoặc Backup Code (XXXX-XXXX)
+                  Mở ứng dụng Google Authenticator và nhập mã 6 chữ số
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="googleAuthCode">Mã xác thực</Label>
+                <Label htmlFor="googleAuthCode">Mã Google Authenticator</Label>
                 <Input
                   id="googleAuthCode"
                   type="text"
-                  placeholder="123456 hoặc XXXX-XXXX"
+                  placeholder="Nhập mã 6 chữ số"
                   value={googleAuthCode}
-                  onChange={(e) => {
-                    let value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-                    // Tự động thêm dấu gạch ngang cho backup code
-                    if (value.length > 4 && !value.includes('-') && /^[A-Z0-9]+$/.test(value)) {
-                      value = value.slice(0, 4) + '-' + value.slice(4, 8);
-                    }
-                    // Giới hạn độ dài: 6 số hoặc 9 ký tự (XXXX-XXXX)
-                    if (/^\d+$/.test(value)) {
-                      value = value.slice(0, 6); // Chỉ 6 số cho Google Authenticator
-                    } else {
-                      value = value.slice(0, 9); // Tối đa 9 ký tự cho backup code (XXXX-XXXX)
-                    }
-                    setGoogleAuthCode(value);
-                  }}
-                  maxLength={9}
+                  onChange={(e) => setGoogleAuthCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                  maxLength={6}
                   className="text-center text-2xl tracking-[0.6rem]"
                   disabled={isLoading}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Nhập mã 6 số từ Google Authenticator hoặc Backup Code (XXXX-XXXX)
-                </p>
               </div>
 
               <Button
                 onClick={handleVerifyGoogleAuthenticator}
                 className="w-full"
-                disabled={isLoading || (!/^\d{6}$/.test(googleAuthCode) && !/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(googleAuthCode))}
+                disabled={isLoading || googleAuthCode.length !== 6}
               >
                 {isLoading ? "Đang xác thực..." : "Xác thực"}
               </Button>

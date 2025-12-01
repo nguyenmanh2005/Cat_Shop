@@ -132,4 +132,32 @@ public class JwtUtils {
         long exp = expirationDate.getTime();
         return Math.max(exp - now, 0);
     }
+
+    // ----------------------------------------------------
+    // 🔹 Sinh Reset Password Token (24 giờ)
+    // ----------------------------------------------------
+    public String generateResetPasswordToken(String email) {
+        long resetPasswordTokenExpirationMs = 24 * 60 * 60 * 1000; // 24 giờ
+        return Jwts.builder()
+                .setSubject(email)
+                .claim("type", "reset-password")
+                .setIssuer("CatShop Admin")
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + resetPasswordTokenExpirationMs))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    // ----------------------------------------------------
+    // 🔹 Validate Reset Password Token
+    // ----------------------------------------------------
+    public boolean validateResetPasswordToken(String token) {
+        try {
+            Claims claims = getAllClaims(token);
+            String type = claims.get("type", String.class);
+            return "reset-password".equals(type) && validateToken(token);
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }

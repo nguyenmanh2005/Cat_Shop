@@ -2,7 +2,8 @@
 export { apiService, api } from './api';
 export { authService } from './authService';
 export { userService } from './userService';
-export { productService, productTypeService, categoryService } from './productService';
+export { deviceService } from './deviceService';
+export { productService, categoryService } from './productService';
 export { orderService } from './orderService';
 export { reviewService } from './reviewService';
 export { catDetailService } from './catDetailService';

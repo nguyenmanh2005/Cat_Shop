@@ -15,6 +15,7 @@ import com.catshop.catshop.security.JwtUtils;
 import com.catshop.catshop.service.AuthService;
 import com.catshop.catshop.service.EmailService;
 import com.catshop.catshop.service.OtpService;
+import com.catshop.catshop.service.SmsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -38,6 +39,7 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService emailService;
     private final JwtUtils jwtUtils;
     private final OtpService otpService;
+    private final SmsService smsService;
     private final RedisTemplate<String, String> redisTemplate;
 
     // ------------------------- LOGIN STEP 1 (Gửi OTP) -------------------------
@@ -80,6 +82,104 @@ public class AuthServiceImpl implements AuthService {
 
         // OtpService.generateAndSendOtp() đã tự động gửi email rồi
         otpService.generateAndSendOtp(email);
+    }
+
+    // ------------------------- SMS OTP METHODS -------------------------
+    @Override
+    public String sendSmsOtp(String phoneNumber) {
+        log.info("📱 [SEND-SMS-OTP] Request received for phone: {}", phoneNumber);
+        
+        // Generate OTP
+        String otp = String.format("%06d", new java.security.SecureRandom().nextInt(1_000_000));
+        
+        // Lưu OTP vào Redis với key là "otp:sms:{phoneNumber}"
+        String otpKey = "otp:sms:" + phoneNumber;
+        try {
+            redisTemplate.opsForValue().set(otpKey, otp, 2, TimeUnit.MINUTES); // OTP có hiệu lực 2 phút
+            log.info("✅ [SEND-SMS-OTP] OTP saved to Redis for phone: {}", phoneNumber);
+        } catch (DataAccessException e) {
+            log.warn("⚠️ [SEND-SMS-OTP] Không thể lưu OTP vào Redis: {}", e.getMessage());
+            // Vẫn log OTP để dev có thể test
+        }
+        
+        // Gửi SMS qua SmsService (sẽ tự động xử lý dev/production mode)
+        boolean smsSent = smsService.sendSms(phoneNumber, otp);
+        
+        if (!smsSent) {
+            log.warn("⚠️ [SEND-SMS-OTP] Không thể gửi SMS, nhưng OTP vẫn được lưu vào Redis");
+        }
+        
+        // Log OTP để dev có thể test (trong production, cần tích hợp SMS gateway)
+        log.info("═══════════════════════════════════════════════════════════");
+        log.info("📱 [SEND-SMS-OTP] OTP cho số điện thoại {} = {}", phoneNumber, otp);
+        log.info("═══════════════════════════════════════════════════════════");
+        
+        // Trả về OTP để hiển thị trong dev mode
+        return otp;
+    }
+
+    @Override
+    public TokenResponse verifySmsOtp(String email, String phoneNumber, String otp, String deviceId) {
+        log.info("📱 [VERIFY-SMS-OTP] Verifying OTP for email: {}, phone: {}", email, phoneNumber);
+        
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new BadRequestException("Thiết bị ID không được để trống");
+        }
+        
+        // Kiểm tra email có tồn tại trong database
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Email " + email + " không tồn tại"));
+        
+        // Kiểm tra số điện thoại có khớp với user không (nếu user đã đăng ký số điện thoại)
+        if (user.getPhoneNumber() != null && !user.getPhoneNumber().isBlank()) {
+            // Normalize phone numbers để so sánh
+            String normalizedUserPhone = user.getPhoneNumber().replaceAll("\\s+", "").replace("+84", "0");
+            String normalizedInputPhone = phoneNumber.replaceAll("\\s+", "").replace("+84", "0");
+            
+            if (!normalizedUserPhone.equals(normalizedInputPhone)) {
+                log.warn("⚠️ [VERIFY-SMS-OTP] Phone number mismatch. User phone: {}, Input phone: {}", 
+                        user.getPhoneNumber(), phoneNumber);
+                // Không throw exception - cho phép verify với số điện thoại mới
+            }
+        }
+        
+        // Verify OTP từ Redis
+        String otpKey = "otp:sms:" + phoneNumber;
+        String storedOtp = null;
+        try {
+            storedOtp = redisTemplate.opsForValue().get(otpKey);
+        } catch (DataAccessException e) {
+            log.warn("⚠️ [VERIFY-SMS-OTP] Không thể lấy OTP từ Redis: {}", e.getMessage());
+            throw new BadRequestException("Không thể xác thực OTP. Vui lòng thử lại sau.");
+        }
+        
+        if (storedOtp == null || !storedOtp.equals(otp)) {
+            log.warn("❌ [VERIFY-SMS-OTP] OTP không hợp lệ hoặc đã hết hạn");
+            throw new BadRequestException("OTP không hợp lệ hoặc đã hết hạn");
+        }
+        
+        // Xóa OTP sau khi verify thành công
+        try {
+            redisTemplate.delete(otpKey);
+            log.info("✅ [VERIFY-SMS-OTP] OTP verified and deleted for phone: {}", phoneNumber);
+        } catch (DataAccessException e) {
+            log.warn("⚠️ [VERIFY-SMS-OTP] Không thể xóa OTP từ Redis: {}", e.getMessage());
+        }
+        
+        // Cấp token sau khi OTP được xác thực thành công
+        String accessToken = jwtUtils.generateAccessToken(user.getEmail(), user.getRole().getRoleName());
+        String refreshToken = jwtUtils.generateRefreshToken(user.getEmail());
+        
+        // Lưu refresh token vào Redis
+        try {
+            redisTemplate.opsForValue().set("refresh:" + user.getEmail(), refreshToken, 7, TimeUnit.DAYS);
+            log.info("✅ [VERIFY-SMS-OTP] Refresh token saved for: {}", user.getEmail());
+        } catch (DataAccessException e) {
+            log.warn("⚠️ [VERIFY-SMS-OTP] Không thể lưu refresh token vào Redis: {}", e.getMessage());
+        }
+        
+        log.info("✅ [VERIFY-SMS-OTP] SMS OTP verified successfully for: {}", email);
+        return new TokenResponse(accessToken, refreshToken, false);
     }
 
 
@@ -205,9 +305,11 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("Số điện thoại " + phone + " đã được sử dụng. Vui lòng sử dụng số điện thoại khác.");
         }
 
-        // Lấy role mặc định (USER - role ID = 1)
-        Role role = roleRepository.findById(1L)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy Role mặc định (ID: 1)"));
+        // Lấy role mặc định: ưu tiên tìm "Customer" (role mặc định), nếu không có thì tìm theo ID = 2
+        Role role = roleRepository.findByRoleName("Customer")
+                .orElseGet(() -> roleRepository.findById(2L)
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "Không tìm thấy role mặc định 'Customer' hoặc role ID = 2. Vui lòng đảm bảo role đã được tạo.")));
 
         // Map từ UserRequest sang User entity
         User user = userMapper.FromUserRequestToUser(userRequest);

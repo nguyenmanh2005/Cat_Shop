@@ -19,17 +19,20 @@ public class QrCodeGenerator {
         QRCodeWriter qrCodeWriter = new QRCodeWriter();
         BitMatrix bitMatrix = qrCodeWriter.encode(data, BarcodeFormat.QR_CODE, width, height);
 
-        ByteArrayOutputStream pngOutputStream = new ByteArrayOutputStream();
-        MatrixToImageWriter.writeToStream(bitMatrix, "PNG", pngOutputStream);
-
-        byte[] pngData = pngOutputStream.toByteArray();
-        return Base64.getEncoder().encodeToString(pngData);
+        // Sử dụng try-with-resources để tự động đóng stream, tránh memory leak
+        try (ByteArrayOutputStream pngOutputStream = new ByteArrayOutputStream()) {
+            MatrixToImageWriter.writeToStream(bitMatrix, "PNG", pngOutputStream);
+            byte[] pngData = pngOutputStream.toByteArray();
+            return Base64.getEncoder().encodeToString(pngData);
+        }
     }
 
     public byte[] generateQrCodeBytes(String data, int width, int height) throws IOException, WriterException {
         BitMatrix bitMatrix = new MultiFormatWriter().encode(data, BarcodeFormat.QR_CODE, width, height);
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        MatrixToImageWriter.writeToStream(bitMatrix, "PNG", outputStream);
-        return outputStream.toByteArray();
+        // Sử dụng try-with-resources để tự động đóng stream, tránh memory leak
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+            MatrixToImageWriter.writeToStream(bitMatrix, "PNG", outputStream);
+            return outputStream.toByteArray();
+        }
     }
 }

@@ -13,6 +13,7 @@ import {
   Menu
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 interface AdminHeaderProps {
   onToggleSidebar?: () => void;
@@ -21,6 +22,11 @@ interface AdminHeaderProps {
 const AdminHeader = ({ onToggleSidebar }: AdminHeaderProps) => {
   const { user, logout } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const navigate = useNavigate();
+  const handleOpenSettings = () => {
+    navigate("/settings");
+  };
+
 
   const handleToggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -95,7 +101,7 @@ const AdminHeader = ({ onToggleSidebar }: AdminHeaderProps) => {
           </Button>
 
           {/* Settings */}
-          <Button variant="ghost" size="sm">
+          <Button variant="ghost" size="sm" onClick={handleOpenSettings}>
             <Settings className="h-4 w-4" />
           </Button>
 
@@ -126,7 +132,10 @@ const AdminHeader = ({ onToggleSidebar }: AdminHeaderProps) => {
                     <User className="h-4 w-4 mr-2 inline" />
                     Hồ sơ
                   </button>
-                  <button className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-accent">
+                  <button
+                    onClick={handleOpenSettings}
+                    className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-accent"
+                  >
                     <Settings className="h-4 w-4 mr-2 inline" />
                     Cài đặt
                   </button>

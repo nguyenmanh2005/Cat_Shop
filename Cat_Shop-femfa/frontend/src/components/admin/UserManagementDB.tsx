@@ -26,21 +26,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { 
-  Search, 
-  Plus, 
-  Eye, 
-  Edit, 
-  Trash2, 
+import {
+  Search,
+  Plus,
+  Eye,
+  Edit,
+  Trash2,
   Users,
   Download,
   MoreHorizontal,
   Shield,
-  User,
   Mail,
   Phone,
   MapPin
 } from "lucide-react";
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,123 +49,139 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { userService } from "@/services/userService";
+import { orderService } from "@/services/orderService";
+import type { User } from "@/types";
+import { useToast } from "@/hooks/use-toast";
+import { formatCurrencyVND } from "@/lib/utils";
 
-interface Role {
-  role_id: number;
-  role_name: string;
+interface AdminRole {
+  id: string;
+  name: string;
 }
 
-interface User {
-  user_id: number;
+interface UserSummary {
+  userId: number;
   username: string;
-  password_hash: string;
   email: string;
   phone?: string;
   address?: string;
-  role_id: number;
-  role_name?: string;
-  order_count?: number;
-  total_spent?: number;
+  roleName: string;
+  orderCount: number;
+  totalSpent: number;
 }
 
 const UserManagementDB = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
+  const [users, setUsers] = useState<UserSummary[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<UserSummary[]>([]);
+  const [roles, setRoles] = useState<AdminRole[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserSummary | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const { toast } = useToast();
 
-  // Load mock data
+  const resolveRoleName = (user: Partial<User> & Record<string, any>): string => {
+    const rawRole =
+      user.role?.roleName ??
+      user.role?.roleName ??
+      user.roleName ??
+      user.role_name;
+    if (rawRole) {
+      return rawRole;
+    }
+    const roleId = user.roleId ?? user.role_id;
+    if (roleId === 1) return "Admin";
+    if (roleId === 3) return "Moderator";
+    return "User";
+  };
+
+  const normalizeUser = (
+    user: Partial<User> & Record<string, any>,
+    orderStats: Map<number, { count: number; total: number }>
+  ): UserSummary => {
+    const userId =
+      user.userId ??
+      user.user_id ??
+      user.id ??
+      Number(user.userID) ??
+      0;
+    const stats = orderStats.get(userId) || { count: 0, total: 0 };
+    return {
+      userId,
+      username: user.username || user.fullName || user.email || `user-${userId}`,
+      email: user.email || "",
+      phone: user.phone || "",
+      address: user.address || "",
+      roleName: resolveRoleName(user),
+      orderCount: stats.count,
+      totalSpent: stats.total,
+    };
+  };
+
   useEffect(() => {
-    const loadData = () => {
+    let ignore = false;
+
+    const fetchData = async () => {
       try {
-        // Mock Roles
-        const mockRoles: Role[] = [
-          { role_id: 1, role_name: "Admin" },
-          { role_id: 2, role_name: "User" },
-          { role_id: 3, role_name: "Moderator" }
-        ];
+        setIsLoading(true);
+        const [allUsers, allOrders] = await Promise.all([
+          userService.getAllUsers(),
+          orderService.getAllOrders().catch(() => []),
+        ]);
 
-        // Mock Users
-        const mockUsers: User[] = [
-          {
-            user_id: 1,
-            username: "admin",
-            password_hash: "hashed_password_123",
-            email: "admin@champets.com",
-            phone: "0123456789",
-            address: "123 Đường ABC, Quận 1, TP.HCM",
-            role_id: 1,
-            role_name: "Admin",
-            order_count: 0,
-            total_spent: 0
-          },
-          {
-            user_id: 2,
-            username: "nguyenvana",
-            password_hash: "hashed_password_456",
-            email: "nguyenvana@email.com",
-            phone: "0987654321",
-            address: "456 Đường XYZ, Quận 2, TP.HCM",
-            role_id: 2,
-            role_name: "User",
-            order_count: 3,
-            total_spent: 15700000
-          },
-          {
-            user_id: 3,
-            username: "tranthib",
-            password_hash: "hashed_password_789",
-            email: "tranthib@email.com",
-            phone: "0369852147",
-            address: "789 Đường DEF, Quận 3, TP.HCM",
-            role_id: 2,
-            role_name: "User",
-            order_count: 2,
-            total_spent: 800000
-          },
-          {
-            user_id: 4,
-            username: "levanc",
-            password_hash: "hashed_password_101",
-            email: "levanc@email.com",
-            phone: "0741852963",
-            address: "321 Đường GHI, Quận 4, TP.HCM",
-            role_id: 2,
-            role_name: "User",
-            order_count: 1,
-            total_spent: 120000
-          },
-          {
-            user_id: 5,
-            username: "moderator1",
-            password_hash: "hashed_password_202",
-            email: "moderator@champets.com",
-            phone: "0527419638",
-            address: "654 Đường JKL, Quận 5, TP.HCM",
-            role_id: 3,
-            role_name: "Moderator",
-            order_count: 0,
-            total_spent: 0
-          }
-        ];
+        if (ignore) return;
 
-        setRoles(mockRoles);
-        setUsers(mockUsers);
-        setFilteredUsers(mockUsers);
-      } catch (error) {
-        console.error("Error loading data:", error);
+        const orderStats = new Map<number, { count: number; total: number }>();
+        (allOrders || []).forEach((order: any) => {
+          const userId =
+            order.user_id ??
+            order.userId ??
+            order.user?.userId ??
+            order.user?.user_id;
+          if (!userId) return;
+          const bucket = orderStats.get(userId) || { count: 0, total: 0 };
+          bucket.count += 1;
+          bucket.total += Number(order.total_amount ?? order.totalAmount ?? 0);
+          orderStats.set(userId, bucket);
+        });
+
+        const normalizedUsers = (allUsers || []).map((user) =>
+          normalizeUser(user, orderStats)
+        );
+
+        const uniqueRoles = Array.from(
+          new Set(normalizedUsers.map((user) => user.roleName))
+        ).map((roleName) => ({
+          id: roleName.toLowerCase(),
+          name: roleName,
+        }));
+
+        setRoles(uniqueRoles);
+        setUsers(normalizedUsers);
+        setFilteredUsers(normalizedUsers);
+      } catch (error: any) {
+        if (ignore) return;
+        console.error("Failed to load user database view:", error);
+        toast({
+          title: "Không thể tải user từ API",
+          description: error?.message || "Vui lòng thử lại sau.",
+          variant: "destructive",
+        });
       } finally {
-        setIsLoading(false);
+        if (!ignore) {
+          setIsLoading(false);
+        }
       }
     };
 
-    loadData();
-  }, []);
+    fetchData();
+    return () => {
+      ignore = true;
+    };
+  }, [toast]);
 
   // Filter users
   useEffect(() => {
@@ -183,29 +199,35 @@ const UserManagementDB = () => {
 
     // Role filter
     if (roleFilter !== "all") {
-      filtered = filtered.filter(user => user.role_id.toString() === roleFilter);
+      filtered = filtered.filter(user => user.roleName === roleFilter);
     }
 
     setFilteredUsers(filtered);
   }, [users, searchTerm, roleFilter]);
 
-  const handleDeleteUser = (userId: number) => {
-    if (confirm("Bạn có chắc chắn muốn xóa user này?")) {
-      const updatedUsers = users.filter(user => user.user_id !== userId);
-      setUsers(updatedUsers);
+  const handleDeleteUser = async (userId: number) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa user này?")) return;
+    try {
+      await userService.deleteUser(userId);
+      setUsers(prev => prev.filter(user => user.userId !== userId));
+      setFilteredUsers(prev => prev.filter(user => user.userId !== userId));
+      toast({
+        title: "Đã xóa user",
+        description: `User #${userId} đã được xóa khỏi hệ thống.`,
+      });
+    } catch (error: any) {
+      console.error("Delete user error:", error);
+      toast({
+        title: "Xóa user thất bại",
+        description: error?.message || "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleViewDetails = (user: User) => {
+  const handleViewDetails = (user: UserSummary) => {
     setSelectedUser(user);
     setIsDetailOpen(true);
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(amount);
   };
 
   const getRoleBadge = (roleName: string) => {
@@ -224,23 +246,25 @@ const UserManagementDB = () => {
 
   const handleExportUsers = () => {
     const csvContent = [
-      ['ID', 'Username', 'Email', 'Số điện thoại', 'Địa chỉ', 'Vai trò', 'Số đơn hàng', 'Tổng chi tiêu'],
+      ["ID", "Username", "Email", "Số điện thoại", "Địa chỉ", "Vai trò", "Số đơn hàng", "Tổng chi tiêu"],
       ...filteredUsers.map(user => [
-        user.user_id,
+        user.userId,
         user.username,
         user.email,
-        user.phone || '',
-        user.address || '',
-        user.role_name,
-        user.order_count,
-        formatCurrency(user.total_spent || 0)
-      ])
-    ].map(row => row.join(',')).join('\n');
+        user.phone || "",
+        user.address || "",
+        user.roleName,
+        user.orderCount,
+        user.totalSpent,
+      ]),
+    ]
+      .map(row => row.join(","))
+      .join("\n");
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `users_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `users_${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
   };
 
@@ -309,9 +333,9 @@ const UserManagementDB = () => {
                       <SelectValue placeholder="Chọn vai trò" />
                     </SelectTrigger>
                     <SelectContent>
-                      {roles.map(role => (
-                        <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                          {role.role_name}
+                      {roles.map((role) => (
+                        <SelectItem key={role.id} value={role.id}>
+                          {role.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -347,7 +371,7 @@ const UserManagementDB = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              {users.filter(u => u.role_name === 'Admin').length}
+              {users.filter(u => u.roleName === 'Admin').length}
             </div>
           </CardContent>
         </Card>
@@ -357,7 +381,7 @@ const UserManagementDB = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {users.filter(u => u.role_name === 'User').length}
+              {users.filter(u => u.roleName === 'User').length}
             </div>
           </CardContent>
         </Card>
@@ -367,7 +391,7 @@ const UserManagementDB = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {users.filter(u => u.role_name === 'Moderator').length}
+              {users.filter(u => u.roleName === 'Moderator').length}
             </div>
           </CardContent>
         </Card>
@@ -397,9 +421,9 @@ const UserManagementDB = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tất cả vai trò</SelectItem>
-                {roles.map(role => (
-                  <SelectItem key={role.role_id} value={role.role_id.toString()}>
-                    {role.role_name}
+                {roles.map((role) => (
+                  <SelectItem key={role.id} value={role.name}>
+                    {role.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -440,17 +464,17 @@ const UserManagementDB = () => {
                   </TableRow>
                 ) : (
                   filteredUsers.map((user) => (
-                    <TableRow key={user.user_id}>
-                      <TableCell className="font-mono text-sm">{user.user_id}</TableCell>
+                    <TableRow key={user.userId}>
+                      <TableCell className="font-mono text-sm">{user.userId}</TableCell>
                       <TableCell className="font-medium">{user.username}</TableCell>
                       <TableCell>{user.email}</TableCell>
-                      <TableCell>{user.phone || '-'}</TableCell>
-                      <TableCell>{getRoleBadge(user.role_name || 'User')}</TableCell>
+                      <TableCell>{user.phone || "-"}</TableCell>
+                      <TableCell>{getRoleBadge(user.roleName)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{user.order_count} đơn</Badge>
+                        <Badge variant="outline">{user.orderCount} đơn</Badge>
                       </TableCell>
                       <TableCell className="font-medium text-green-600">
-                        {formatCurrency(user.total_spent || 0)}
+                        {formatCurrencyVND(user.totalSpent)}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -474,9 +498,9 @@ const UserManagementDB = () => {
                               Đổi vai trò
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               className="text-red-600"
-                              onClick={() => handleDeleteUser(user.user_id)}
+                              onClick={() => handleDeleteUser(user.userId)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Xóa
@@ -507,7 +531,7 @@ const UserManagementDB = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">User ID</label>
-                  <p className="font-mono">{selectedUser.user_id}</p>
+                  <p className="font-mono">{selectedUser.userId}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Username</label>
@@ -523,11 +547,11 @@ const UserManagementDB = () => {
                 </div>
                 <div>
                   <label className="text-sm font-medium">Vai trò</label>
-                  <div>{getRoleBadge(selectedUser.role_name || 'User')}</div>
+                  <div>{getRoleBadge(selectedUser.roleName)}</div>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Số đơn hàng</label>
-                  <p>{selectedUser.order_count} đơn hàng</p>
+                  <p>{selectedUser.orderCount} đơn hàng</p>
                 </div>
               </div>
               <div>
@@ -539,12 +563,12 @@ const UserManagementDB = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium">Tổng đơn hàng</label>
-                    <p className="text-lg font-semibold">{selectedUser.order_count} đơn</p>
+                    <p className="text-lg font-semibold">{selectedUser.orderCount} đơn</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium">Tổng chi tiêu</label>
                     <p className="text-lg font-semibold text-green-600">
-                      {formatCurrency(selectedUser.total_spent || 0)}
+                      {formatCurrencyVND(selectedUser.totalSpent)}
                     </p>
                   </div>
                 </div>

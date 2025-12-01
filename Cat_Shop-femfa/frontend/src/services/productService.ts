@@ -1,6 +1,6 @@
-import { apiService } from './api';
+import { apiService, api } from './api';
 import { API_CONFIG, buildUrl } from '@/config/api';
-import { Product, ProductType, Category } from '@/types';
+import { Product, Category } from '@/types';
 
 // Product Service - gọi API backend
 export const productService = {
@@ -11,12 +11,14 @@ export const productService = {
 
   // Lấy sản phẩm theo ID
   async getProductById(id: number): Promise<Product> {
-    return apiService.get<Product>(`/customer/products/${id}`);
+    const url = buildUrl(API_CONFIG.ENDPOINTS.PRODUCTS.DETAIL, { id });
+    return apiService.get<Product>(url);
   },
 
   // Lấy sản phẩm theo loại
   async getProductsByType(typeId: number): Promise<Product[]> {
-    return apiService.get<Product[]>(`${API_CONFIG.ENDPOINTS.PRODUCTS.LIST}?typeId=${typeId}`);
+    const url = buildUrl(API_CONFIG.ENDPOINTS.PRODUCTS.BY_TYPE, { typeId });
+    return apiService.get<Product[]>(url);
   },
 
   // Lấy sản phẩm theo danh mục
@@ -32,18 +34,53 @@ export const productService = {
 
   // Tìm kiếm sản phẩm
   async searchProducts(searchTerm: string): Promise<Product[]> {
-    return apiService.get<Product[]>(`${API_CONFIG.ENDPOINTS.PRODUCTS.SEARCH}?q=${encodeURIComponent(searchTerm)}`);
+    return apiService.get<Product[]>(`${API_CONFIG.ENDPOINTS.PRODUCTS.SEARCH}?keyword=${encodeURIComponent(searchTerm)}`);
   },
 
-  // Tạo sản phẩm mới
-  async createProduct(productData: Omit<Product, 'product_id'>): Promise<Product> {
-    return apiService.post<Product>(API_CONFIG.ENDPOINTS.PRODUCTS.CREATE, productData);
+  // Tạo sản phẩm mới (với file upload - multipart/form-data)
+  // Backend yêu cầu: @RequestPart("product") String productJson và @RequestPart("file") MultipartFile file
+  async createProduct(productData: Omit<Product, 'product_id'>, file?: File): Promise<Product> {
+    const formData = new FormData();
+    formData.append('product', JSON.stringify(productData));
+    if (file) {
+      formData.append('file', file);
+    }
+    
+    return api.post<Product>(API_CONFIG.ENDPOINTS.PRODUCTS.CREATE, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }).then(response => response.data.data);
   },
 
-  // Cập nhật sản phẩm
-  async updateProduct(id: number, productData: Partial<Product>): Promise<Product> {
+  // Cập nhật sản phẩm (với file upload - multipart/form-data)
+  // Backend yêu cầu: @RequestPart String productJson (không có tên, mặc định tìm "productJson") và @RequestPart(value = "file", required = false) MultipartFile file
+  async updateProduct(id: number, productData: Partial<Product>, file?: File): Promise<Product> {
+    if (!id || id === 0) {
+      throw new Error(`Invalid product ID: ${id}. Cannot update product.`);
+    }
+    
     const url = buildUrl(API_CONFIG.ENDPOINTS.PRODUCTS.UPDATE, { id });
-    return apiService.put<Product>(url, productData);
+    const formData = new FormData();
+    // Backend UPDATE yêu cầu field tên là "productJson" (không có @RequestPart("product"))
+    formData.append('productJson', JSON.stringify(productData));
+    if (file) {
+      formData.append('file', file);
+    }
+    
+    console.log("📤 productService.updateProduct:", {
+      id,
+      url,
+      productData,
+      hasFile: !!file,
+      formDataKeys: Array.from(formData.keys())
+    });
+    
+    return api.put<Product>(url, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }).then(response => response.data.data);
   },
 
   // Xóa sản phẩm
@@ -55,25 +92,12 @@ export const productService = {
   // Lấy tất cả sản phẩm cho customer (public API)
   async getAllProductsCustomer(): Promise<Product[]> {
     try {
-      return await apiService.get<Product[]>("/customer/products");
+      return await apiService.get<Product[]>(API_CONFIG.ENDPOINTS.PRODUCTS.LIST);
     } catch (error: any) {
       console.error("Error fetching products:", error);
       // Trả về mảng rỗng nếu có lỗi để tránh crash
       return [];
     }
-  }
-};
-
-// ProductType Service
-export const productTypeService = {
-  // Lấy tất cả loại sản phẩm
-  async getAllProductTypes(): Promise<ProductType[]> {
-    return apiService.get<ProductType[]>(API_CONFIG.ENDPOINTS.PRODUCT_TYPES.LIST);
-  },
-
-  // Lấy loại sản phẩm theo ID
-  async getProductTypeById(id: number): Promise<ProductType> {
-    return apiService.get<ProductType>(`${API_CONFIG.ENDPOINTS.PRODUCT_TYPES.LIST}/${id}`);
   }
 };
 
@@ -107,12 +131,14 @@ export const categoryService = {
   },
 
   // Tạo danh mục mới (admin)
-  async createCategory(categoryData: Omit<Category, 'category_id'>): Promise<Category> {
+  // Backend CategoryRequest: categoryName (String), typeId (Long), description (String, optional)
+  async createCategory(categoryData: { categoryName: string; typeId: number; description?: string | null }): Promise<Category> {
     return apiService.post<Category>(API_CONFIG.ENDPOINTS.CATEGORIES.CREATE, categoryData);
   },
 
   // Cập nhật danh mục (admin)
-  async updateCategory(id: number, categoryData: Partial<Category>): Promise<Category> {
+  // Backend CategoryRequest: categoryName (String), typeId (Long), description (String, optional)
+  async updateCategory(id: number, categoryData: { categoryName: string; typeId: number; description?: string | null }): Promise<Category> {
     const url = buildUrl(API_CONFIG.ENDPOINTS.CATEGORIES.UPDATE, { id });
     return apiService.put<Category>(url, categoryData);
   },

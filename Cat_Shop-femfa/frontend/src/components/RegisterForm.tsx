@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Eye, EyeOff, Mail, Lock, User, Phone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { calculatePasswordStrength, getStrengthColor, getStrengthLabel, type PasswordStrength } from "@/utils/passwordStrength";
 
 interface RegisterFormProps {
   onSwitchToLogin: () => void;
@@ -25,61 +27,13 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const popupCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [passwordStrength, setPasswordStrength] = useState(calculatePasswordStrength(""));
 
-  // Cleanup interval khi component unmount
-  useEffect(() => {
-    return () => {
-      if (popupCheckIntervalRef.current) {
-        clearInterval(popupCheckIntervalRef.current);
-        popupCheckIntervalRef.current = null;
-      }
-    };
-  }, []);
-
-  // Mở popup đăng ký Google thông qua OAuth2 backend
+  // Redirect trực tiếp trong cùng tab để đăng ký Google
   const handleGoogleRegister = () => {
     const googleOAuthUrl = "http://localhost:8080/oauth2/authorization/google";
-    const popup = window.open(googleOAuthUrl, "google-oauth", "width=500,height=600,status=1");
-    
-    // Kiểm tra xem popup có bị chặn không
-    if (!popup) {
-      toast({
-        title: "Popup bị chặn",
-        description: "Vui lòng cho phép popup để đăng ký bằng Google",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Clear interval cũ nếu có
-    if (popupCheckIntervalRef.current) {
-      clearInterval(popupCheckIntervalRef.current);
-    }
-
-    // Lắng nghe khi popup đóng để kiểm tra kết quả
-    popupCheckIntervalRef.current = setInterval(() => {
-      if (popup.closed) {
-        if (popupCheckIntervalRef.current) {
-          clearInterval(popupCheckIntervalRef.current);
-          popupCheckIntervalRef.current = null;
-        }
-        
-        // Kiểm tra xem đã có token chưa (đăng ký thành công)
-        setTimeout(() => {
-          const token = localStorage.getItem("access_token");
-          if (token) {
-            toast({
-              title: "Đăng ký thành công!",
-              description: "Tài khoản Google của bạn đã được tạo thành công",
-            });
-            onClose();
-            // Reload để cập nhật trạng thái đăng nhập
-            window.location.reload();
-          }
-        }, 1000);
-      }
-    }, 500);
+    // Redirect trong cùng tab thay vì mở popup
+    window.location.href = googleOAuthUrl;
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,6 +42,11 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
       ...prev,
       [name]: value
     }));
+    
+    // Tính độ mạnh mật khẩu khi password thay đổi
+    if (name === "password") {
+      setPasswordStrength(calculatePasswordStrength(value));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -219,6 +178,30 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
                 )}
               </Button>
             </div>
+            {formData.password && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Độ mạnh mật khẩu:</span>
+                  <span className={`font-medium ${passwordStrength.strength === "weak" ? "text-red-500" : passwordStrength.strength === "fair" ? "text-orange-500" : passwordStrength.strength === "good" ? "text-yellow-500" : "text-green-500"}`}>
+                    {getStrengthLabel(passwordStrength.strength)}
+                  </span>
+                </div>
+                <Progress 
+                  value={passwordStrength.score} 
+                  className={`h-2 ${passwordStrength.strength === "weak" ? "[&>div]:bg-red-500" : passwordStrength.strength === "fair" ? "[&>div]:bg-orange-500" : passwordStrength.strength === "good" ? "[&>div]:bg-yellow-500" : "[&>div]:bg-green-500"}`}
+                />
+                {passwordStrength.feedback.length > 0 && (
+                  <ul className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                    {passwordStrength.feedback.map((feedback, index) => (
+                      <li key={index} className="flex items-start">
+                        <span className="mr-1">•</span>
+                        <span>{feedback}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

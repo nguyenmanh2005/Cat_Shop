@@ -106,3 +106,13 @@ export interface CleaningDetail {
   usage?: string;
   product?: Product;
 }
+
+export interface TrustedDevice {
+  id: number;
+  userEmail: string;
+  deviceId: string;
+  ipAddress?: string;
+  userAgent?: string;
+  trusted: boolean;
+  lastLogin?: string; // ISO date string from backend
+}

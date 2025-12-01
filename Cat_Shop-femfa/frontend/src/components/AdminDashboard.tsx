@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,40 +17,137 @@ import UserManagement from "./admin/UserManagement";
 import PetManagement from "./admin/PetManagement";
 import OrderManagement from "./admin/OrderManagement";
 import Analytics from "./admin/Analytics";
+import { userService } from "@/services/userService";
+import { petService } from "@/services/petService";
+import { orderService } from "@/services/orderService";
+import { formatCurrencyVND, formatDateTime } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
-// Mock data
-const mockStats = {
-  totalUsers: 1247,
-  totalPets: 89,
-  totalOrders: 156,
-  revenue: 2450000000,
-  userGrowth: 12.5,
-  orderGrowth: 8.3
-};
+interface DashboardStats {
+  totalUsers: number;
+  totalPets: number;
+  totalOrders: number;
+  revenue: number;
+  userGrowth: number;
+  orderGrowth: number;
+}
 
-const mockRecentUsers = [
-  { id: 1, name: "Nguyễn Văn A", email: "user1@email.com", joinDate: "2024-01-15", status: "active" },
-  { id: 2, name: "Trần Thị B", email: "user2@email.com", joinDate: "2024-01-14", status: "active" },
-  { id: 3, name: "Lê Văn C", email: "user3@email.com", joinDate: "2024-01-13", status: "inactive" },
-  { id: 4, name: "Phạm Thị D", email: "user4@email.com", joinDate: "2024-01-12", status: "active" },
-];
+interface RecentUser {
+  id: number;
+  name: string;
+  email?: string;
+  joinedAt?: string;
+  status: "active" | "inactive";
+}
 
-const mockRecentOrders = [
-  { id: 1, customer: "Nguyễn Văn A", pet: "Mèo Bengal", amount: "15.000.000 VNĐ", status: "completed" },
-  { id: 2, customer: "Trần Thị B", pet: "Mèo Persian", amount: "5.500.000 VNĐ", status: "pending" },
-  { id: 3, customer: "Lê Văn C", pet: "Mèo Maine Coon", amount: "12.000.000 VNĐ", status: "shipping" },
-  { id: 4, customer: "Phạm Thị D", pet: "Mèo Ragdoll", amount: "8.000.000 VNĐ", status: "completed" },
-];
+interface RecentOrder {
+  id: number;
+  customer: string;
+  pet?: string;
+  amount: number;
+  status: "completed" | "pending" | "shipping" | "delivered" | "cancelled";
+}
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
+  const [stats, setStats] = useState<DashboardStats>({
+    totalUsers: 0,
+    totalPets: 0,
+    totalOrders: 0,
+    revenue: 0,
+    userGrowth: 0,
+    orderGrowth: 0,
+  });
+  const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
+  const { toast } = useToast();
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(amount);
-  };
+  useEffect(() => {
+    let ignore = false;
+
+    const fetchDashboardData = async () => {
+      try {
+        setIsStatsLoading(true);
+        const [usersResponse, petsResponse, ordersResponse] = await Promise.all([
+          userService.getAllUsers().catch(() => []),
+          petService.getAllPets().catch(() => []),
+          orderService.getAllOrders().catch(() => []),
+        ]);
+
+        if (ignore) return;
+
+        const normalizedUsers: RecentUser[] = (usersResponse || [])
+          .map((user: any, index: number) => {
+            const rawId = user.userId ?? user.user_id ?? user.id;
+            const id = typeof rawId === "number" && rawId > 0 ? rawId : index + 1;
+            return {
+              id,
+              name: user.username ?? user.fullName ?? user.email ?? `User #${id}`,
+              email: user.email,
+              joinedAt: user.createdAt ?? user.created_at,
+              status: "active",
+            };
+          })
+          .sort((a, b) => b.id - a.id)
+          .slice(0, 4);
+
+        const normalizedOrders: RecentOrder[] = (ordersResponse || [])
+          .map((order: any) => {
+            const orderId = order.order_id ?? order.orderId ?? order.id ?? 0;
+            const userId = order.userId ?? order.user_id;
+            return {
+              id: orderId,
+              customer: order.user?.username ?? order.customerName ?? (userId ? `Khách #${userId}` : `Đơn #${orderId}`),
+              pet: order.order_details?.[0]?.product?.productName ?? order.petName,
+              amount: Number(order.total_amount ?? order.totalAmount ?? 0),
+              status: (order.status ?? "pending").toLowerCase(),
+            };
+          })
+          .slice(0, 4);
+
+        const totalOrders = (ordersResponse || []).length;
+        const revenue = (ordersResponse || []).reduce(
+          (sum: number, order: any) => sum + Number(order.total_amount ?? order.totalAmount ?? 0),
+          0
+        );
+
+        setStats({
+          totalUsers: (usersResponse || []).length,
+          totalPets: (petsResponse || []).length,
+          totalOrders,
+          revenue,
+          userGrowth: 0,
+          orderGrowth: 0,
+        });
+        setRecentUsers(normalizedUsers);
+        setRecentOrders(normalizedOrders);
+      } catch (error: any) {
+        if (ignore) return;
+        console.error("Dashboard data error:", error);
+        toast({
+          title: "Không thể tải dữ liệu thống kê",
+          description: error?.message || "Vui lòng thử lại sau.",
+          variant: "destructive",
+        });
+      } finally {
+        if (!ignore) {
+          setIsStatsLoading(false);
+        }
+      }
+    };
+
+    fetchDashboardData();
+    return () => {
+      ignore = true;
+    };
+  }, [toast]);
+
+  const renderUserStatus = (status: "active" | "inactive") => (
+    <Badge variant={status === "active" ? "default" : "secondary"}>
+      {status === "active" ? "Hoạt động" : "Không hoạt động"}
+    </Badge>
+  );
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -88,9 +185,9 @@ const AdminDashboard = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockStats.totalUsers.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{stats.totalUsers.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">
-                <span className="text-green-600">+{mockStats.userGrowth}%</span> từ tháng trước
+                <span className="text-green-600">+{stats.userGrowth}%</span> từ tháng trước
               </p>
             </CardContent>
           </Card>
@@ -101,7 +198,7 @@ const AdminDashboard = () => {
               <PawPrint className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockStats.totalPets}</div>
+              <div className="text-2xl font-bold">{stats.totalPets}</div>
               <p className="text-xs text-muted-foreground">
                 <span className="text-green-600">+3</span> mèo mới tuần này
               </p>
@@ -114,9 +211,9 @@ const AdminDashboard = () => {
               <ShoppingCart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockStats.totalOrders}</div>
+              <div className="text-2xl font-bold">{stats.totalOrders}</div>
               <p className="text-xs text-muted-foreground">
-                <span className="text-green-600">+{mockStats.orderGrowth}%</span> từ tháng trước
+                <span className="text-green-600">+{stats.orderGrowth}%</span> từ tháng trước
               </p>
             </CardContent>
           </Card>
@@ -127,7 +224,9 @@ const AdminDashboard = () => {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(mockStats.revenue)}</div>
+              <div className="text-2xl font-bold">
+                {isStatsLoading ? "..." : formatCurrencyVND(stats.revenue)}
+              </div>
               <p className="text-xs text-muted-foreground">
                 <span className="text-green-600">+15.2%</span> từ tháng trước
               </p>
@@ -174,15 +273,17 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {mockRecentUsers.map((user) => (
+                  {recentUsers.map((user) => (
                     <div key={user.id} className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">{user.name}</p>
                         <p className="text-sm text-muted-foreground">{user.email}</p>
-                        <p className="text-xs text-muted-foreground">{user.joinDate}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {user.joinedAt ? formatDateTime(user.joinedAt) : "—"}
+                        </p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        {getStatusBadge(user.status)}
+                        {renderUserStatus(user.status)}
                         <Button variant="ghost" size="sm">
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -201,15 +302,17 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {mockRecentOrders.map((order) => (
+                  {recentOrders.map((order) => (
                     <div key={order.id} className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">{order.customer}</p>
-                        <p className="text-sm text-muted-foreground">{order.pet}</p>
-                        <p className="text-sm font-medium text-green-600">{order.amount}</p>
+                        <p className="text-sm text-muted-foreground">{order.pet || "—"}</p>
+                        <p className="text-sm font-medium text-green-600">
+                          {formatCurrencyVND(order.amount)}
+                        </p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        {getStatusBadge(order.status)}
+                        {getStatusBadge(order.status as any)}
                         <Button variant="ghost" size="sm">
                           <Eye className="h-4 w-4" />
                         </Button>
