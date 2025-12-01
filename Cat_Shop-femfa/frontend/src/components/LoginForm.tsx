@@ -16,7 +16,7 @@ interface LoginFormProps {
   onClose: () => void;
 }
 
-type VerificationMethod = "otp" | "sms" | "qr" | "google-authenticator" | null;
+type VerificationMethod = "otp" | "sms" | "qr" | "google-authenticator" | "backup-code" | null;
 
 const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   const { login, loginWithOTP, pendingEmail } = useAuth();
@@ -56,6 +56,9 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   
   // Google Authenticator states
   const [googleAuthCode, setGoogleAuthCode] = useState<string>("");
+  
+  // Backup Code states
+  const [backupCode, setBackupCode] = useState<string>("");
   
   // User phone number state (để check xem user đã đăng ký số điện thoại chưa)
   const [userPhoneNumber, setUserPhoneNumber] = useState<string | null>(null);
@@ -662,6 +665,64 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     }
   };
 
+  const handleVerifyBackupCode = async () => {
+    // Backup code format: XXXX-XXXX (8 ký tự + 1 dấu gạch ngang)
+    if (!backupCode || !/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(backupCode.toUpperCase())) {
+      toast({
+        title: "Mã backup không hợp lệ",
+        description: "Vui lòng nhập mã backup code đúng định dạng (XXXX-XXXX)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!verificationEmail) {
+      toast({
+        title: "Email không hợp lệ",
+        description: "Vui lòng đăng nhập lại bằng email và mật khẩu",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const result = await authService.verifyGoogleAuthenticator(verificationEmail, backupCode.toUpperCase());
+
+      if (result.accessToken && result.refreshToken) {
+        // Lưu token
+        localStorage.setItem('access_token', result.accessToken);
+        localStorage.setItem('refresh_token', result.refreshToken);
+        localStorage.setItem('user_email', verificationEmail);
+
+        toast({
+          title: "Đăng nhập thành công!",
+          description: "Backup code đã được sử dụng và không thể dùng lại.",
+        });
+        setNeedsVerification(false);
+        setVerificationMethod(null);
+        setBackupCode("");
+        onClose();
+        window.location.reload();
+        return;
+      }
+
+      toast({
+        title: "Mã backup không chính xác",
+        description: "Vui lòng kiểm tra lại mã backup code",
+        variant: "destructive",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Lỗi xác thực",
+        description: error.message || "Đã xảy ra lỗi khi xác thực backup code",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Reset về bước đăng nhập ban đầu
   const handleBackToLogin = () => {
     setNeedsVerification(false);
@@ -670,6 +731,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     resetSmsOtpState();
     setQrCodeData("");
     setQrStatus("pending");
+    setGoogleAuthCode("");
+    setBackupCode("");
     setRecaptchaToken(null);
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
@@ -907,6 +970,23 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   <div className="flex-1 text-left">
                     <h4 className="font-semibold">Xác minh bằng Google Authenticator</h4>
                     <p className="text-sm text-muted-foreground">Nhập mã từ ứng dụng Google Authenticator</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVerificationMethod("backup-code");
+                    setBackupCode("");
+                  }}
+                  className="flex items-center gap-4 p-4 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+                >
+                  <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                    <ShieldCheck className="h-6 w-6 text-orange-600" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h4 className="font-semibold">Xác minh bằng Backup Code</h4>
+                    <p className="text-sm text-muted-foreground">Nhập mã backup code (định dạng: XXXX-XXXX)</p>
                   </div>
                 </button>
               </div>
@@ -1242,6 +1322,65 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                 onClick={() => {
                   setVerificationMethod(null);
                   setGoogleAuthCode("");
+                }}
+                className="w-full"
+              >
+                Chọn phương thức khác
+              </Button>
+            </div>
+            </>
+          ) : verificationMethod === "backup-code" ? (
+            <>
+              {/* Bước 3d: Xác minh Backup Code */}
+              <div className="space-y-6">
+              <div className="text-center space-y-2">
+                <h3 className="text-xl font-semibold">Xác minh bằng Backup Code</h3>
+                <p className="text-sm text-muted-foreground">
+                  Nhập mã backup code (định dạng: XXXX-XXXX)
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="backupCode">Mã Backup Code</Label>
+                <Input
+                  id="backupCode"
+                  type="text"
+                  placeholder="XXXX-XXXX"
+                  value={backupCode}
+                  onChange={(e) => {
+                    // Chỉ cho phép chữ cái in hoa, số và dấu gạch ngang
+                    let value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+                    // Tự động thêm dấu gạch ngang sau 4 ký tự
+                    if (value.length > 4 && value[4] !== '-') {
+                      value = value.slice(0, 4) + '-' + value.slice(4);
+                    }
+                    // Giới hạn độ dài: XXXX-XXXX (9 ký tự)
+                    value = value.slice(0, 9);
+                    setBackupCode(value);
+                  }}
+                  maxLength={9}
+                  className="text-center text-xl tracking-wider font-mono"
+                  disabled={isLoading}
+                />
+                <p className="text-xs text-muted-foreground text-center">
+                  Định dạng: 4 chữ cái/số - 4 chữ cái/số (ví dụ: ABCD-1234)
+                </p>
+              </div>
+
+              <Button
+                onClick={handleVerifyBackupCode}
+                className="w-full"
+                disabled={isLoading || !/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(backupCode.toUpperCase())}
+              >
+                {isLoading ? "Đang xác thực..." : "Xác thực"}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setVerificationMethod(null);
+                  setBackupCode("");
                 }}
                 className="w-full"
               >
