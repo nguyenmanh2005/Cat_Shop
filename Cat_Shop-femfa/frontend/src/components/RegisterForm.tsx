@@ -8,6 +8,7 @@ import { Eye, EyeOff, Mail, Lock, User, Phone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { calculatePasswordStrength, getStrengthColor, getStrengthLabel, type PasswordStrength } from "@/utils/passwordStrength";
+import GoogleReCaptcha from "./GoogleReCaptcha";
 
 interface RegisterFormProps {
   onSwitchToLogin: () => void;
@@ -28,6 +29,7 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(calculatePasswordStrength(""));
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
 
   // Redirect trực tiếp trong cùng tab để đăng ký Google
   const handleGoogleRegister = () => {
@@ -51,6 +53,15 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!recaptchaToken) {
+      toast({
+        title: "Xác thực reCAPTCHA",
+        description: "Vui lòng xác thực reCAPTCHA để tiếp tục",
+        variant: "destructive",
+      });
+      return;
+    }
     
     if (formData.password !== formData.confirmPassword) {
       toast({
@@ -253,10 +264,15 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
             </Label>
           </div>
 
+          <GoogleReCaptcha 
+            onVerify={setRecaptchaToken} 
+            onExpire={() => setRecaptchaToken(null)}
+          />
+
           <Button
             type="submit"
             className="w-full"
-            disabled={isLoading}
+            disabled={isLoading || !recaptchaToken}
           >
             {isLoading ? "Đang đăng ký..." : "Đăng ký"}
           </Button>

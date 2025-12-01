@@ -201,17 +201,39 @@ export const authService = {
   },
 
   async forgotPassword(email: string): Promise<{ message: string }> {
-    return apiService.post<{ message: string }>(
-      API_CONFIG.ENDPOINTS.AUTH.FORGOT_PASSWORD,
-      { email }
-    );
+    try {
+      // Tăng timeout cho request forgot password lên 30 giây vì gửi email có thể mất thời gian
+      const response = await apiService.post<{ message: string }>(
+        API_CONFIG.ENDPOINTS.AUTH.FORGOT_PASSWORD,
+        { email },
+        { timeout: 30000 } // 30 giây
+      );
+      return response;
+    } catch (error: any) {
+      console.error('Forgot password error:', error);
+      
+      // Xử lý lỗi timeout riêng
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        throw new Error('Yêu cầu gửi email đặt lại mật khẩu đã hết thời gian chờ. Vui lòng kiểm tra kết nối mạng và thử lại.');
+      }
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Không thể gửi email đặt lại mật khẩu';
+      throw new Error(errorMessage);
+    }
   },
 
   async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
-    return apiService.post<{ message: string }>(
-      API_CONFIG.ENDPOINTS.AUTH.RESET_PASSWORD,
-      { token, newPassword }
-    );
+    try {
+      const response = await apiService.post<{ message: string }>(
+        API_CONFIG.ENDPOINTS.AUTH.RESET_PASSWORD,
+        { token, newPassword }
+      );
+      return response;
+    } catch (error: any) {
+      console.error('Reset password error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Không thể đặt lại mật khẩu';
+      throw new Error(errorMessage);
+    }
   },
 
   async getProfile(email?: string): Promise<UserProfile> {
@@ -266,13 +288,21 @@ export const authService = {
 
   async sendOtp(email: string): Promise<{ message: string }> {
     try {
+      // Tăng timeout cho request send OTP lên 30 giây vì gửi email có thể mất thời gian
       const response = await apiService.post<{ message: string }>(
         API_CONFIG.ENDPOINTS.AUTH.SEND_OTP,
-        { email }
+        { email },
+        { timeout: 30000 } // 30 giây
       );
       return response;
     } catch (error: any) {
       console.error('Send OTP error:', error);
+      
+      // Xử lý lỗi timeout riêng
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        throw new Error('Yêu cầu gửi OTP đã hết thời gian chờ. Vui lòng kiểm tra kết nối mạng và thử lại.');
+      }
+      
       const errorMessage = error.response?.data?.message || error.message || 'Không thể gửi OTP';
       throw new Error(errorMessage);
     }
@@ -431,14 +461,21 @@ export const authService = {
   // SMS OTP methods
   async sendSmsOtp(phoneNumber: string): Promise<string> {
     try {
-      // Backend trả về string message (trong ApiResponse.data)
+      // Tăng timeout cho request send SMS OTP lên 30 giây vì gửi SMS có thể mất thời gian
       const response = await apiService.post<string>(
         API_CONFIG.ENDPOINTS.AUTH.SEND_SMS_OTP,
-        { phoneNumber }
+        { phoneNumber },
+        { timeout: 30000 } // 30 giây
       );
       return response;
     } catch (error: any) {
       console.error('Send SMS OTP error:', error);
+      
+      // Xử lý lỗi timeout riêng
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        throw new Error('Yêu cầu gửi OTP SMS đã hết thời gian chờ. Vui lòng kiểm tra kết nối mạng và thử lại.');
+      }
+      
       const errorMessage = error.response?.data?.message || error.message || 'Không thể gửi OTP qua SMS';
       throw new Error(errorMessage);
     }

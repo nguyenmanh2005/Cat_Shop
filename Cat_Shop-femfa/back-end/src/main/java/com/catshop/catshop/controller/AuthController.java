@@ -632,4 +632,60 @@ public class AuthController {
         }
     }
 
+    // ✅ Quên mật khẩu - Gửi email chứa link reset password
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<String>> forgotPassword(@RequestBody Map<String, String> request) {
+        log.info("🔐 [FORGOT-PASSWORD] Request received");
+        
+        String email = request.get("email");
+        if (email == null || email.isBlank()) {
+            throw new BadRequestException("Email không được để trống");
+        }
+        
+        try {
+            authService.forgotPassword(email);
+            log.info("✅ [FORGOT-PASSWORD] Reset password email sent successfully to: {}", email);
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Email đặt lại mật khẩu đã được gửi đến " + email + ". Vui lòng kiểm tra hộp thư của bạn.",
+                    "Reset password email sent successfully"));
+        } catch (ResourceNotFoundException e) {
+            log.error("❌ [FORGOT-PASSWORD] Email not found: {}", email);
+            throw e; // Re-throw để GlobalExceptionHandler xử lý
+        } catch (Exception e) {
+            log.error("❌ [FORGOT-PASSWORD] Failed to send reset password email: {}", e.getMessage(), e);
+            throw new BadRequestException("Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại sau.");
+        }
+    }
+
+    // ✅ Đặt lại mật khẩu - Sử dụng token từ email
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<String>> resetPassword(@RequestBody Map<String, String> request) {
+        log.info("🔐 [RESET-PASSWORD] Request received");
+        
+        String token = request.get("token");
+        String newPassword = request.get("newPassword");
+        
+        if (token == null || token.isBlank()) {
+            throw new BadRequestException("Token không được để trống");
+        }
+        
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new BadRequestException("Mật khẩu mới không được để trống");
+        }
+        
+        try {
+            authService.resetPassword(token, newPassword);
+            log.info("✅ [RESET-PASSWORD] Password reset successfully");
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại với mật khẩu mới.",
+                    "Password reset successfully"));
+        } catch (BadRequestException | ResourceNotFoundException e) {
+            log.error("❌ [RESET-PASSWORD] Reset password failed: {}", e.getMessage());
+            throw e; // Re-throw để GlobalExceptionHandler xử lý
+        } catch (Exception e) {
+            log.error("❌ [RESET-PASSWORD] Unexpected error: {}", e.getMessage(), e);
+            throw new BadRequestException("Đã xảy ra lỗi khi đặt lại mật khẩu. Vui lòng thử lại sau.");
+        }
+    }
+
 }

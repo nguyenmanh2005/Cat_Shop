@@ -77,8 +77,8 @@ public class IpSecurityServiceImpl implements IpSecurityService {
             helper.setTo(email);
             helper.setSubject("⚠️ Cảnh báo bảo mật: Đăng nhập từ địa chỉ IP mới");
 
-            // Tạo link đổi mật khẩu
-            String resetPasswordUrl = frontendUrl + "/reset-password?token=" + resetPasswordToken;
+            // Tạo link đổi mật khẩu (dùng route riêng cho security alert)
+            String resetPasswordUrl = frontendUrl + "/reset-password-security?token=" + resetPasswordToken;
 
             String htmlContent = String.format("""
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafc;">

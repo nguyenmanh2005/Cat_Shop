@@ -35,5 +35,8 @@ public interface AuthService {
     String generateRefreshTokenForUser(User user);
     void saveRefreshToken(String email, String refreshToken);
 
+    // Quên mật khẩu
+    void forgotPassword(String email);
+    void resetPassword(String token, String newPassword);
 
 }

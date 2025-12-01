@@ -322,4 +322,81 @@ public class AuthServiceImpl implements AuthService {
         userRepository.save(user);
         return true;
     }
+
+    // ------------------------- FORGOT PASSWORD -------------------------
+    @Override
+    public void forgotPassword(String email) {
+        log.info("🔐 [FORGOT-PASSWORD] Request received for email: {}", email);
+        
+        // Kiểm tra email có tồn tại trong database
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Email " + email + " không tồn tại trong hệ thống"));
+        
+        // Tạo reset password token (có hiệu lực 24 giờ)
+        String resetToken = jwtUtils.generateResetPasswordToken(email);
+        
+        // Lấy frontend URL từ environment variable hoặc dùng mặc định
+        String frontendUrl = System.getenv("FRONTEND_URL");
+        if (frontendUrl == null || frontendUrl.isBlank()) {
+            frontendUrl = "http://localhost:5173"; // Default cho development
+        }
+        
+        // Gửi email chứa link reset password
+        try {
+            emailService.sendResetPasswordEmail(email, resetToken, frontendUrl);
+            log.info("✅ [FORGOT-PASSWORD] Reset password email sent successfully to: {}", email);
+        } catch (Exception e) {
+            log.error("❌ [FORGOT-PASSWORD] Failed to send reset password email to {}: {}", email, e.getMessage(), e);
+            throw new BadRequestException("Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại sau.");
+        }
+    }
+
+    // ------------------------- RESET PASSWORD -------------------------
+    @Override
+    public void resetPassword(String token, String newPassword) {
+        log.info("🔐 [RESET-PASSWORD] Request received");
+        
+        // Validate token
+        if (!jwtUtils.validateResetPasswordToken(token)) {
+            log.error("❌ [RESET-PASSWORD] Invalid or expired token");
+            throw new BadRequestException("Token không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu đặt lại mật khẩu mới.");
+        }
+        
+        // Lấy email từ token
+        String email = jwtUtils.getEmailFromToken(token);
+        if (email == null || email.isBlank()) {
+            throw new BadRequestException("Token không hợp lệ");
+        }
+        
+        // Tìm user
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với email: " + email));
+        
+        // Validate mật khẩu mới
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new BadRequestException("Mật khẩu mới không được để trống");
+        }
+        
+        if (newPassword.length() < 6) {
+            throw new BadRequestException("Mật khẩu phải có ít nhất 6 ký tự");
+        }
+        
+        // Mã hóa mật khẩu mới
+        String encodedPassword = passwordEncoder.encode(newPassword);
+        
+        // Cập nhật mật khẩu
+        user.setPasswordHash(encodedPassword);
+        userRepository.save(user);
+        
+        // Xóa tất cả refresh token của user (đăng xuất tất cả thiết bị)
+        try {
+            logout(email);
+            log.info("✅ [RESET-PASSWORD] All devices logged out for: {}", email);
+        } catch (Exception e) {
+            log.warn("⚠️ [RESET-PASSWORD] Failed to logout all devices for {}: {}", email, e.getMessage());
+            // Không throw exception - mật khẩu đã được đổi thành công
+        }
+        
+        log.info("✅ [RESET-PASSWORD] Password reset successfully for: {}", email);
+    }
 }

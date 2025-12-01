@@ -28,6 +28,7 @@ import QrLogin from "./pages/QrLogin";
 import LoginSuccess from "./pages/LoginSuccess";
 import AuthFlowApp from "./authFlow/AuthFlowApp";
 import ResetPasswordSecurity from "./components/ResetPasswordSecurity";
+import ResetPasswordForm from "./components/ResetPasswordForm";
 
 const queryClient = new QueryClient();
 
@@ -62,7 +63,8 @@ const App = () => (
               <Route path="/auth-flow/*" element={<AuthFlowApp />} />
               {/* Redirect /login to /auth-flow/login */}
               <Route path="/login" element={<Navigate to="/auth-flow/login" replace />} />
-              <Route path="/reset-password" element={<ResetPasswordSecurity />} />
+              <Route path="/reset-password" element={<ResetPasswordForm />} />
+              <Route path="/reset-password-security" element={<ResetPasswordSecurity />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/checkout" element={<Checkout />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
