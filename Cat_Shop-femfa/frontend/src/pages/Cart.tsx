@@ -51,18 +51,24 @@ const Cart = () => {
 
   if (items.length === 0) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="min-h-screen bg-background flex flex-col overflow-x-hidden page-transition">
         <Header />
         <main className="flex-1 container mx-auto px-4 py-16">
-          <div className="text-center space-y-4">
-            <ShoppingBag className="h-24 w-24 mx-auto text-muted-foreground" />
-            <h2 className="text-2xl font-bold">Giỏ hàng của bạn đang trống</h2>
-            <p className="text-muted-foreground">
+          <div className="text-center space-y-4 animate-fade-in-up">
+            <div className="animate-bounce">
+              <ShoppingBag className="h-24 w-24 mx-auto text-muted-foreground" />
+            </div>
+            <h2 className="text-2xl font-bold animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+              Giỏ hàng của bạn đang trống
+            </h2>
+            <p className="text-muted-foreground animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
               Hãy thêm sản phẩm vào giỏ hàng để tiếp tục mua sắm
             </p>
-            <Button onClick={() => navigate("/")} className="mt-4">
-              Tiếp tục mua sắm
-            </Button>
+            <div className="animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
+              <Button onClick={() => navigate("/")} className="mt-4 hover-lift">
+                Tiếp tục mua sắm
+              </Button>
+            </div>
           </div>
         </main>
         <Footer />
@@ -71,24 +77,28 @@ const Cart = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col overflow-x-hidden page-transition">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Giỏ hàng của bạn</h1>
+        <h1 className="text-3xl font-bold mb-8 animate-fade-in-down">Giỏ hàng của bạn</h1>
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
-            {items.map((item) => (
-              <Card key={item.product.productId}>
+            {items.map((item, index) => (
+              <Card 
+                key={item.product.productId}
+                className="card-hover animate-fade-in-up gpu-accelerated"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
                 <CardContent className="p-6">
                   <div className="flex gap-4">
                     {/* Product Image */}
-                    <div className="w-24 h-24 rounded-lg overflow-hidden border border-border flex-shrink-0">
+                    <div className="w-24 h-24 rounded-lg overflow-hidden border border-border flex-shrink-0 group">
                       <img
                         src={item.product.imageUrl || "/placeholder.svg"}
                         alt={item.product.productName}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                       />
                     </div>
 
@@ -113,7 +123,7 @@ const Cart = () => {
                               description: `${item.product.productName} đã được xóa khỏi giỏ hàng`,
                             });
                           }}
-                          className="text-destructive hover:text-destructive"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
                         >
                           <Trash2 className="h-5 w-5" />
                         </Button>
@@ -178,7 +188,7 @@ const Cart = () => {
 
           {/* Order Summary */}
           <div className="lg:col-span-1">
-            <Card className="sticky top-4">
+            <Card className="sticky top-4 animate-fade-in-right card-hover">
               <CardHeader>
                 <CardTitle>Tóm tắt đơn hàng</CardTitle>
               </CardHeader>

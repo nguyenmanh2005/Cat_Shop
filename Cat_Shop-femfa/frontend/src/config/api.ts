@@ -19,9 +19,12 @@ export const API_CONFIG = {
       PROFILE: '/auth/profile',
       FORGOT_PASSWORD: '/auth/forgot-password',
       RESET_PASSWORD: '/auth/reset-password',
-      // OTP Login
+      // OTP Login (cho user đã có tài khoản)
       SEND_OTP: '/auth/send-otp',
       VERIFY_OTP: '/auth/verify-otp',
+      // OTP Register (cho user mới đăng ký)
+      REGISTER_SEND_OTP: '/auth/register/send-otp',
+      REGISTER_VERIFY_OTP: '/auth/register/verify-otp',
       // SMS OTP Login
       SEND_SMS_OTP: '/auth/send-sms-otp',
       VERIFY_SMS_OTP: '/auth/verify-sms-otp',

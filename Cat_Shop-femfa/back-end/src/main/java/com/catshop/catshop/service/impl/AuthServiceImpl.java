@@ -332,8 +332,22 @@ public class AuthServiceImpl implements AuthService {
         // Lưu user vào database
         userRepository.save(user);
 
-        // Gửi email xác thực
-        sendEmailVerification(email);
+        // KHÔNG gửi email link kích hoạt nữa - frontend sẽ tự gửi OTP
+        // Nếu có flag skipEmailVerification = true hoặc useOtpVerification = true, bỏ qua gửi email link
+        Boolean skipEmail = userRequest.getSkipEmailVerification();
+        Boolean useOtp = userRequest.getUseOtpVerification();
+        
+        if (skipEmail == null && useOtp == null) {
+            // Nếu không có flag, vẫn KHÔNG gửi email link (mặc định dùng OTP)
+            log.info("📧 [REGISTER] Skipping email link verification for: {} (using OTP instead)", email);
+        } else if (skipEmail != null && skipEmail) {
+            log.info("📧 [REGISTER] Skipping email link verification for: {} (skipEmailVerification=true)", email);
+        } else if (useOtp != null && useOtp) {
+            log.info("📧 [REGISTER] Skipping email link verification for: {} (useOtpVerification=true)", email);
+        } else {
+            // Nếu cả 2 flag đều false/null, vẫn không gửi (mặc định dùng OTP)
+            log.info("📧 [REGISTER] Skipping email link verification for: {} (default: use OTP)", email);
+        }
 
         return true;
     }

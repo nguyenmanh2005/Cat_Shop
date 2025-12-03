@@ -62,7 +62,12 @@ const saveTokens = (tokens?: Partial<AuthTokens>) => {
 
 export const authService = {
   register: async (payload: RegisterPayload) => {
-    const { data } = await axiosInstance.post("/auth/register", payload);
+    const { data } = await axiosInstance.post("/auth/register", {
+      ...payload,
+      // Yêu cầu backend KHÔNG gửi email link kích hoạt, chỉ tạo user (sẽ gửi OTP riêng sau)
+      skipEmailVerification: true,
+      useOtpVerification: true,
+    });
     return data as { message: string };
   },
   login: async (payload: LoginPayload) => {
@@ -108,6 +113,54 @@ export const authService = {
   sendOtp: async (email: string) => {
     const { data } = await axiosInstance.post("/auth/send-otp", { email });
     return data;
+  },
+  // OTP đăng ký (tách riêng với OTP đăng nhập)
+  // Tạm thời dùng endpoint chung /auth/send-otp cho đến khi backend implement /auth/register/send-otp
+  sendRegisterOtp: async (email: string) => {
+    try {
+      // Thử dùng endpoint riêng trước, nếu 404 thì fallback về endpoint chung
+      try {
+        const { data } = await axiosInstance.post("/auth/register/send-otp", { email });
+        return data;
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          console.warn('Register OTP endpoint not found, using common OTP endpoint');
+          const { data } = await axiosInstance.post("/auth/send-otp", { email });
+          return data;
+        }
+        throw error;
+      }
+    } catch (error: any) {
+      throw error;
+    }
+  },
+  verifyRegisterOtp: async ({ email, otp, deviceId }: VerifyOtpPayload) => {
+    try {
+      // Thử dùng endpoint riêng trước, nếu 404 thì fallback về endpoint chung
+      try {
+        const { data } = await axiosInstance.post<AuthResponse>("/auth/register/verify-otp", {
+          email,
+          otp,
+          deviceId,
+        });
+        saveTokens(data);
+        return data;
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          console.warn('Register verify OTP endpoint not found, using common OTP endpoint');
+          const { data } = await axiosInstance.post<AuthResponse>("/auth/verify-otp", {
+            email,
+            otp,
+            deviceId,
+          });
+          saveTokens(data);
+          return data;
+        }
+        throw error;
+      }
+    } catch (error: any) {
+      throw error;
+    }
   },
   generateBackupCodes: async (email: string) => {
     const { data } = await axiosInstance.post<{ backupCodes: string[]; count: number; message: string }>(

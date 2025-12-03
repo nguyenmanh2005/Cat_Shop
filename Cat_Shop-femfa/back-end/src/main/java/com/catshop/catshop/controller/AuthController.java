@@ -332,15 +332,12 @@ public class AuthController {
             }
             log.info("✅ User registered successfully: {}", request.getEmail());
 
-            // Gửi lại email xác thực (phòng trường hợp user chưa nhận được)
-            try {
-                authService.sendEmailVerification(request.getEmail());
-            } catch (Exception e) {
-                log.warn("⚠️ Không thể gửi email xác thực cho {}: {}", request.getEmail(), e.getMessage());
-            }
+            // KHÔNG gửi email link kích hoạt nữa - frontend sẽ tự gửi OTP
+            // Email link đã được bỏ hoàn toàn, chỉ dùng OTP để xác thực đăng ký
+            log.info("📧 [REGISTER] Skipping email link verification - using OTP instead");
 
             return ResponseEntity.ok(ApiResponse.success(
-                    "Tạo tài khoản thành công. Vui lòng kiểm tra email để xác thực tài khoản.",
+                    "Tạo tài khoản thành công. Vui lòng kiểm tra email để nhận mã OTP xác thực.",
                     "User created successfully"));
         } catch (BadRequestException e) {
             // Email đã tồn tại, số điện thoại đã tồn tại, etc.
@@ -558,7 +555,7 @@ public class AuthController {
 
     /**
      * Mobile app gọi endpoint này sau khi scan QR code
-     * Gửi credentials để xác nhận đăng nhập
+     * Gửi credentials (email + password) để xác nhận đăng nhập
      */
     @PostMapping("/qr/confirm")
     public ResponseEntity<ApiResponse<String>> confirmQrLogin(@Valid @RequestBody QrLoginRequest request) {
@@ -582,6 +579,45 @@ public class AuthController {
         } catch (Exception e) {
             log.error("❌ [QR-LOGIN] Unexpected error: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(ApiResponse.error(500, 
+                    "Lỗi khi xác nhận đăng nhập: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Mobile app (đã đăng nhập sẵn) xác nhận đăng nhập bằng access token
+     * - Điện thoại gửi sessionId và kèm Authorization: Bearer <access_token>
+     * - Backend dùng access token để xác định user, không cần nhập lại mật khẩu
+     */
+    @PostMapping("/qr/confirm-token")
+    public ResponseEntity<ApiResponse<String>> confirmQrLoginWithToken(
+            @RequestBody Map<String, String> request,
+            @RequestHeader(value = "Authorization", required = false) String bearerToken) {
+
+        String sessionId = request.get("sessionId");
+        if (sessionId == null || sessionId.isBlank()) {
+            throw new BadRequestException("Session ID không được để trống");
+        }
+
+        if (bearerToken == null || !bearerToken.startsWith("Bearer ")) {
+            throw new BadRequestException("Access token không hợp lệ hoặc không được cung cấp");
+        }
+
+        String accessToken = bearerToken.replace("Bearer ", "").trim();
+
+        log.info("📱 [QR-LOGIN] Confirm with access token. Session: {}", sessionId);
+
+        try {
+            qrLoginService.confirmQrLoginWithAccessToken(sessionId, accessToken);
+            log.info("✅ [QR-LOGIN] Login confirmed successfully via access token");
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Đăng nhập thành công. Vui lòng quay lại trình duyệt.",
+                    "Login confirmed successfully (access token)"));
+        } catch (BadRequestException | ResourceNotFoundException e) {
+            log.error("❌ [QR-LOGIN] Confirm with token failed: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("❌ [QR-LOGIN] Unexpected error (token): {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(ApiResponse.error(500,
                     "Lỗi khi xác nhận đăng nhập: " + e.getMessage()));
         }
     }

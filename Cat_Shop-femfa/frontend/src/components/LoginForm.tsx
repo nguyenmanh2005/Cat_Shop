@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useLayoutEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { QRCodeSVG } from "qrcode.react";
 import ForgotPasswordForm from "./ForgotPasswordForm";
 import GoogleReCaptcha from "./GoogleReCaptcha";
 import { ShieldCheck } from "lucide-react";
+import gsap from "gsap";
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
@@ -63,6 +64,32 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   // User phone number state (để check xem user đã đăng ký số điện thoại chưa)
   const [userPhoneNumber, setUserPhoneNumber] = useState<string | null>(null);
   const [checkingPhone, setCheckingPhone] = useState(false);
+
+  const animationScope = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (!animationScope.current) return;
+
+    const ctx = gsap.context(() => {
+      gsap.from(".login-panel", {
+        y: 40,
+        opacity: 0,
+        duration: 0.9,
+        ease: "power3.out",
+        stagger: 0.15
+      });
+
+      gsap.from(".login-highlight", {
+        scale: 0.9,
+        opacity: 0,
+        duration: 0.8,
+        ease: "back.out(1.4)",
+        delay: 0.2
+      });
+    }, animationScope);
+
+    return () => ctx.revert();
+  }, []);
 
   // Redirect trực tiếp trong cùng tab để đăng nhập Google
   const handleGoogleLogin = () => {
@@ -167,6 +194,15 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     };
   }, [smsOtpCountdown]);
 
+  // Tự động tạo QR code cho đăng nhập bằng mã QR (giống Discord/Zalo) khi mở màn đăng nhập chính
+  useEffect(() => {
+    if (!needsVerification && !qrCodeData && !isLoading) {
+      // Không cần await, chỉ khởi động generate + polling
+      handleGenerateQrCode();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsVerification]);
+
   const resetOtpState = () => {
     setOtp("");
     setOtpSent(false);
@@ -242,8 +278,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
         title: "Xác minh tài khoản",
         description: result.message || "Vui lòng chọn phương thức xác minh để tiếp tục đăng nhập",
       });
-    } catch (error: any) {
-      const errorMessage = error.message || "Email hoặc mật khẩu không chính xác";
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Email hoặc mật khẩu không chính xác";
       toast({
         title: "Đăng nhập thất bại",
         description: errorMessage,
@@ -273,10 +309,10 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
         title: "OTP đã được gửi",
         description: "Vui lòng kiểm tra email của bạn để lấy mã OTP. Mã có hiệu lực trong 2 phút.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Lỗi gửi OTP",
-        description: error.message || "Không thể gửi mã OTP",
+        description: error instanceof Error ? error.message : "Không thể gửi mã OTP",
         variant: "destructive",
       });
     } finally {
@@ -312,7 +348,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
         setUserPhoneNumber(null);
         setPhoneNumber("");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error checking user phone:", error);
       // Nếu lỗi 401, có thể do chưa đăng nhập hoặc token hết hạn
       // Không cần hiển thị toast vì đây là trong quá trình đăng nhập
@@ -361,10 +397,10 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
         title: "OTP đã được gửi",
         description: `Mã OTP đã được gửi đến số điện thoại ${cleanPhone}. Mã có hiệu lực trong 2 phút.`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Lỗi gửi OTP",
-        description: error.message || "Không thể gửi mã OTP qua SMS",
+        description: error instanceof Error ? error.message : "Không thể gửi mã OTP qua SMS",
         variant: "destructive",
       });
     } finally {
@@ -426,10 +462,10 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
         description: result.message || "Vui lòng kiểm tra lại mã OTP đã được gửi đến số điện thoại của bạn",
         variant: "destructive",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Lỗi xác thực",
-        description: error.message || "Đã xảy ra lỗi khi xác thực OTP SMS",
+        description: error instanceof Error ? error.message : "Đã xảy ra lỗi khi xác thực OTP SMS",
         variant: "destructive",
       });
     } finally {
@@ -458,14 +494,10 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       // Start polling for status
       startQrStatusPolling(response.sessionId);
       
-      toast({
-        title: "QR code đã được tạo",
-        description: "Vui lòng quét mã bằng ứng dụng di động",
-      });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Lỗi tạo QR Code",
-        description: error.message || "Không thể tạo mã QR",
+        description: error instanceof Error ? error.message : "Không thể tạo mã QR",
         variant: "destructive",
       });
     } finally {
@@ -597,10 +629,10 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
         description: result.message || "Vui lòng kiểm tra lại mã OTP đã được gửi đến email của bạn",
         variant: "destructive",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Lỗi xác thực",
-        description: error.message || "Đã xảy ra lỗi khi xác thực OTP",
+        description: error instanceof Error ? error.message : "Đã xảy ra lỗi khi xác thực OTP",
         variant: "destructive",
       });
     } finally {
@@ -654,10 +686,10 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
         description: "Vui lòng kiểm tra lại mã từ ứng dụng Google Authenticator",
         variant: "destructive",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Lỗi xác thực",
-        description: error.message || "Đã xảy ra lỗi khi xác thực Google Authenticator",
+        description: error instanceof Error ? error.message : "Đã xảy ra lỗi khi xác thực Google Authenticator",
         variant: "destructive",
       });
     } finally {
@@ -712,10 +744,10 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
         description: "Vui lòng kiểm tra lại mã backup code",
         variant: "destructive",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Lỗi xác thực",
-        description: error.message || "Đã xảy ra lỗi khi xác thực backup code",
+        description: error instanceof Error ? error.message : "Đã xảy ra lỗi khi xác thực backup code",
         variant: "destructive",
       });
     } finally {
@@ -755,24 +787,28 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl overflow-hidden grid grid-cols-1 lg:grid-cols-2">
-      <div className="bg-gradient-to-br from-blue-600 to-blue-800 p-8 lg:p-12 flex flex-col justify-between text-white relative overflow-hidden">
+    <div
+      ref={animationScope}
+      className="bg-white rounded-2xl shadow-xl overflow-hidden grid grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)] max-w-[90vw] mx-auto w-full"
+    >
+      {/* Left Panel - Branding (thu nhỏ) */}
+      <div className="login-panel bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-6 lg:p-8 flex flex-col justify-center text-white relative overflow-hidden">
         <div className="relative z-10">
-          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-6">
-            <Shield className="h-8 w-8 text-blue-600" />
+          <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-lg flex items-center justify-center mb-4 shadow-lg">
+            <Shield className="h-6 w-6 text-white" />
           </div>
-          <div className="my-8 flex items-center justify-center">
-            <div className="relative">
-              <div className="w-48 h-48 bg-white/20 rounded-3xl flex items-center justify-center backdrop-blur-sm">
-                <Lock className="h-24 w-24 text-white" />
+          <div className="my-6 flex items-center justify-center">
+            <div className="relative login-highlight">
+              <div className="w-32 h-32 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center shadow-xl border border-white/20">
+                <Lock className="h-16 w-16 text-white drop-shadow-lg" />
               </div>
-              <div className="absolute -top-4 -right-4 w-24 h-24 bg-blue-400/30 rounded-full blur-2xl"></div>
-              <div className="absolute -bottom-4 -left-4 w-32 h-32 bg-blue-500/30 rounded-full blur-3xl"></div>
+              <div className="absolute -top-3 -right-3 w-20 h-20 bg-blue-400/30 rounded-full blur-2xl animate-pulse"></div>
+              <div className="absolute -bottom-3 -left-3 w-24 h-24 bg-indigo-500/30 rounded-full blur-2xl animate-pulse"></div>
             </div>
           </div>
-          <div className="space-y-4">
-            <h2 className="text-3xl font-bold">SECURE ACCESS</h2>
-            <p className="text-blue-100 text-lg">
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold tracking-tight drop-shadow-md">SECURE ACCESS</h2>
+            <p className="text-blue-100 text-sm leading-relaxed">
               {!needsVerification
                 ? "Đăng nhập bằng Email & Mật khẩu"
                 : verificationMethod === "otp"
@@ -787,7 +823,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
             </p>
           </div>
         </div>
-        <div className="absolute inset-0 opacity-10">
+        <div className="absolute inset-0 opacity-5">
           <div
             className="absolute inset-0"
             style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '20px 20px' }}
@@ -795,126 +831,184 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
         </div>
       </div>
 
-      <div className="p-8 lg:p-12 flex flex-col justify-center">
-        <div className="space-y-6">
+      {/* Right Panel - Login Form */}
+      <div className="login-panel p-8 lg:p-10 flex flex-col justify-center bg-gradient-to-br from-gray-50 to-white">
+        <div className="space-y-5">
           {!needsVerification ? (
             <>
-              {/* Bước 1: Đăng nhập bằng email/password */}
-              <div className="space-y-6">
-              <form onSubmit={handleEmailPasswordLogin} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Nhập email của bạn"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
+              {/* Bước 1: Đăng nhập bằng email/password + QR song song (giống Discord) */}
+              <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+                {/* Cột trái: Email + mật khẩu */}
+                <div className="space-y-3 flex-1">
+                  <form onSubmit={handleEmailPasswordLogin} className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-sm font-semibold text-gray-700">Email</Label>
+                      <div className="relative group">
+                        <Mail className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="Nhập email của bạn"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="pl-10 h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 transition-all"
+                          required
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="text-sm font-semibold text-gray-700">Mật khẩu</Label>
+                      <div className="relative group">
+                        <Lock className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Nhập mật khẩu"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="pl-10 pr-10 h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 transition-all"
+                          required
+                          disabled={isLoading}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-gray-400 hover:text-gray-600"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="py-2">
+                      <GoogleReCaptcha 
+                        onVerify={setRecaptchaToken} 
+                        onExpire={() => setRecaptchaToken(null)}
+                      />
+                    </div>
+
+                    <Button 
+                      type="submit" 
+                      className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
+                      disabled={isLoading || !recaptchaToken}
+                    >
+                      {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
+                    </Button>
+
+                    <div className="flex items-center gap-3 text-xs font-medium uppercase text-gray-400 my-4">
+                      <span className="h-px w-full bg-gray-200"></span>
+                      <span>HOẶC</span>
+                      <span className="h-px w-full bg-gray-200"></span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleGoogleLogin}
+                      className="flex w-full items-center justify-center gap-3 rounded-lg border-2 border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-all hover:border-gray-300 hover:shadow-md active:scale-[0.98]"
+                    >
+                      <svg aria-hidden="true" focusable="false" className="h-5 w-5" viewBox="0 0 24 24">
+                        <path
+                          fill="#EA4335"
+                          d="M12 10.2v3.6h5.1c-.2 1.2-.9 2.3-1.9 3l3.1 2.4c1.8-1.6 2.8-3.9 2.8-6.6 0-.6-.1-1.2-.2-1.8H12z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M6.6 14.3l-.9.7-2.5 1.9C5.1 19.7 8.3 21.6 12 21.6c3 0 5.5-1 7.3-2.7l-3.1-2.4c-.9.6-2 .9-3.2.9-2.4 0-4.4-1.6-5.1-3.8z"
+                        />
+                        <path
+                          fill="#4A90E2"
+                          d="M3.2 6.9 5.7 8.8c.7-2.2 2.7-3.7 5.1-3.7 1.5 0 2.8.5 3.8 1.4l2.8-2.8C15.9 2 14 1.2 12 1.2 8.3 1.2 5.1 3 3.2 6.9z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M12 3.6c-2.4 0-4.4 1.5-5.1 3.7l-2.5-1.9C5.1 3 8.3 1.2 12 1.2c2 0 3.9.8 5.3 2.3l-2.8 2.8c-1-.9-2.3-1.4-3.8-1.4z"
+                        />
+                        <path fill="none" d="M1 1h22v22H1z" />
+                      </svg>
+                      <span>Đăng nhập bằng Google</span>
+                    </button>
+                  </form>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password">Mật khẩu</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Nhập mật khẩu"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10"
-                      required
-                      disabled={isLoading}
-                    />
+                {/* Cột phải: Đăng nhập bằng mã QR */}
+                <div className="space-y-3 rounded-xl border-2 border-dashed border-blue-200 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 p-4 flex flex-col items-center justify-between backdrop-blur-sm shadow-inner flex-1">
+                  <div className="text-center space-y-1 w-full">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <QrCode className="h-4 w-4 text-blue-600" />
+                      <p className="text-sm font-bold text-blue-900">Đăng nhập bằng Mã QR</p>
+                    </div>
+                    <p className="text-xs text-blue-700 leading-relaxed px-1">
+                      
+                    </p>
+                  </div>
+
+                  <div className="flex justify-center items-center p-3 bg-white rounded-lg shadow-md border border-blue-100 min-h-[180px] w-full">
+                    {qrCodeData ? (
+                      <div className="relative">
+                        <img
+                          src={`data:image/png;base64,${qrCodeData}`}
+                          alt="QR Code đăng nhập"
+                          className="w-40 h-40 rounded-lg shadow-sm"
+                        />
+                        <div className="absolute inset-0 rounded-lg border-2 border-blue-400/30 animate-pulse"></div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-xs text-gray-500 gap-2">
+                        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent" />
+                        <span className="font-medium">Đang tạo mã QR...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 text-center w-full">
+                    <p className="text-xs text-blue-600 leading-relaxed">
+                      
+                    </p>
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={isLoading}
+                      onClick={handleGenerateQrCode}
+                      className="w-full flex items-center justify-center gap-2 border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400 transition-all h-9 text-xs"
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                      <QrCode className="h-3.5 w-3.5" />
+                      <span className="font-semibold">Tạo mã QR mới</span>
                     </Button>
                   </div>
                 </div>
-
-                <GoogleReCaptcha 
-                  onVerify={setRecaptchaToken} 
-                  onExpire={() => setRecaptchaToken(null)}
-                />
-
-                <Button type="submit" className="w-full" disabled={isLoading || !recaptchaToken}>
-                  {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
-                </Button>
-              </form>
-
-              <div className="flex items-center gap-3 text-xs font-medium uppercase text-muted-foreground">
-                <span className="h-px w-full bg-muted"></span>
-                <span>Hoặc</span>
-                <span className="h-px w-full bg-muted"></span>
               </div>
-
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:shadow-md"
-              >
-                <svg aria-hidden="true" focusable="false" className="h-5 w-5" viewBox="0 0 24 24">
-                  <path
-                    fill="#EA4335"
-                    d="M12 10.2v3.6h5.1c-.2 1.2-.9 2.3-1.9 3l3.1 2.4c1.8-1.6 2.8-3.9 2.8-6.6 0-.6-.1-1.2-.2-1.8H12z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M6.6 14.3l-.9.7-2.5 1.9C5.1 19.7 8.3 21.6 12 21.6c3 0 5.5-1 7.3-2.7l-3.1-2.4c-.9.6-2 .9-3.2.9-2.4 0-4.4-1.6-5.1-3.8z"
-                  />
-                  <path
-                    fill="#4A90E2"
-                    d="M3.2 6.9 5.7 8.8c.7-2.2 2.7-3.7 5.1-3.7 1.5 0 2.8.5 3.8 1.4l2.8-2.8C15.9 2 14 1.2 12 1.2 8.3 1.2 5.1 3 3.2 6.9z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M12 3.6c-2.4 0-4.4 1.5-5.1 3.7l-2.5-1.9C5.1 3 8.3 1.2 12 1.2c2 0 3.9.8 5.3 2.3l-2.8 2.8c-1-.9-2.3-1.4-3.8-1.4z"
-                  />
-                  <path fill="none" d="M1 1h22v22H1z" />
-                </svg>
-                <span>Đăng nhập bằng Google</span>
-              </button>
-            </div>
             </>
           ) : verificationMethod === null ? (
             <>
               {/* Bước 2: Chọn phương thức xác minh */}
-              <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <h3 className="text-xl font-semibold">Xác minh tài khoản</h3>
-                <p className="text-sm text-muted-foreground">
+              <div className="space-y-5">
+              <div className="text-center space-y-1.5">
+                <h3 className="text-xl font-bold text-gray-900">Xác minh tài khoản</h3>
+                <p className="text-sm text-gray-600">
                   Vui lòng chọn phương thức xác minh để tiếp tục đăng nhập
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 gap-2.5">
                 <button
                   type="button"
                   onClick={() => {
                     setVerificationMethod("otp");
                     setOtpSent(false);
                   }}
-                  className="flex items-center gap-4 p-4 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+                  className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50/50 transition-all duration-200 active:scale-[0.98] shadow-sm hover:shadow-md"
                 >
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center shadow-sm">
                     <Mail className="h-6 w-6 text-blue-600" />
                   </div>
                   <div className="flex-1 text-left">
-                    <h4 className="font-semibold">Xác minh bằng Email OTP</h4>
-                    <p className="text-sm text-muted-foreground">Nhận mã OTP qua email</p>
+                    <h4 className="font-bold text-gray-900 text-sm">Xác minh bằng Email OTP</h4>
+                    <p className="text-xs text-gray-600 mt-0.5">Nhận mã OTP qua email</p>
                   </div>
                 </button>
 
@@ -931,22 +1025,22 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                     }
                   }}
                   disabled={checkingPhone}
-                  className={`flex items-center gap-4 p-4 border-2 rounded-lg transition-colors ${
+                  className={`flex items-center gap-3 p-4 border-2 rounded-lg transition-all duration-200 ${
                     checkingPhone
                       ? "border-gray-200 bg-gray-50 cursor-not-allowed opacity-60"
-                      : "border-gray-200 hover:border-primary hover:bg-primary/5"
+                      : "border-gray-200 hover:border-green-500 hover:bg-green-50/50 active:scale-[0.98] shadow-sm hover:shadow-md"
                   }`}
                 >
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                    checkingPhone ? "bg-gray-100" : "bg-green-100"
+                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center shadow-sm ${
+                    checkingPhone ? "bg-gray-100" : "bg-gradient-to-br from-green-100 to-green-200"
                   }`}>
                     <Phone className={`h-6 w-6 ${
                       checkingPhone ? "text-gray-400" : "text-green-600"
                     }`} />
                   </div>
                   <div className="flex-1 text-left">
-                    <h4 className="font-semibold">Xác minh bằng SMS OTP</h4>
-                    <p className="text-sm text-muted-foreground">
+                    <h4 className="font-bold text-gray-900 text-sm">Xác minh bằng SMS OTP</h4>
+                    <p className="text-xs text-gray-600 mt-0.5">
                       {checkingPhone 
                         ? "Đang kiểm tra..." 
                         : userPhoneNumber 
@@ -962,14 +1056,14 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                     setVerificationMethod("google-authenticator");
                     setGoogleAuthCode("");
                   }}
-                  className="flex items-center gap-4 p-4 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+                  className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50/50 transition-all duration-200 active:scale-[0.98] shadow-sm hover:shadow-md"
                 >
-                  <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg flex items-center justify-center shadow-sm">
                     <KeyRound className="h-6 w-6 text-purple-600" />
                   </div>
                   <div className="flex-1 text-left">
-                    <h4 className="font-semibold">Xác minh bằng Google Authenticator</h4>
-                    <p className="text-sm text-muted-foreground">Nhập mã từ ứng dụng Google Authenticator</p>
+                    <h4 className="font-bold text-gray-900 text-sm">Xác minh bằng Google Authenticator</h4>
+                    <p className="text-xs text-gray-600 mt-0.5">Nhập mã từ ứng dụng Google Authenticator</p>
                   </div>
                 </button>
 
@@ -979,14 +1073,14 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                     setVerificationMethod("backup-code");
                     setBackupCode("");
                   }}
-                  className="flex items-center gap-4 p-4 border-2 border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+                  className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:bg-orange-50/50 transition-all duration-200 active:scale-[0.98] shadow-sm hover:shadow-md"
                 >
-                  <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg flex items-center justify-center shadow-sm">
                     <ShieldCheck className="h-6 w-6 text-orange-600" />
                   </div>
                   <div className="flex-1 text-left">
-                    <h4 className="font-semibold">Xác minh bằng Backup Code</h4>
-                    <p className="text-sm text-muted-foreground">Nhập mã backup code (định dạng: XXXX-XXXX)</p>
+                    <h4 className="font-bold text-gray-900 text-sm">Xác minh bằng Backup Code</h4>
+                    <p className="text-xs text-gray-600 mt-0.5">Nhập mã backup code (định dạng: XXXX-XXXX)</p>
                   </div>
                 </button>
               </div>
@@ -995,7 +1089,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                 type="button"
                 variant="outline"
                 onClick={handleBackToLogin}
-                className="w-full"
+                className="w-full h-10 border-gray-300 hover:bg-gray-50 font-semibold text-sm"
               >
                 Quay lại đăng nhập
               </Button>
@@ -1004,11 +1098,11 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
           ) : verificationMethod === "otp" ? (
             <>
               {/* Bước 3a: Xác minh OTP */}
-              <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <h3 className="text-xl font-semibold">Xác minh bằng Email OTP</h3>
-                <p className="text-sm text-muted-foreground">
-                  Mã OTP sẽ được gửi đến: <strong>{verificationEmail}</strong>
+              <div className="space-y-4">
+              <div className="text-center space-y-1">
+                <h3 className="text-xl font-bold text-gray-900">Xác minh bằng Email OTP</h3>
+                <p className="text-xs text-gray-600">
+                  Mã OTP sẽ được gửi đến: <strong className="text-gray-900">{verificationEmail}</strong>
                 </p>
               </div>
 
@@ -1016,23 +1110,23 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                 <Button 
                   type="button" 
                   onClick={handleRequestOtp} 
-                  className="w-full" 
+                  className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
                   disabled={isLoading}
                 >
                   {isLoading ? "Đang gửi..." : "Gửi mã OTP"}
                 </Button>
               ) : (
                 <>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="otp">Mã OTP</Label>
+                      <Label htmlFor="otp" className="text-sm font-semibold text-gray-700">Mã OTP</Label>
                       {otpCountdown > 0 && (
-                        <span className="text-sm text-muted-foreground">
-                          Còn lại: <span className="font-semibold text-primary">{Math.floor(otpCountdown / 60)}:{(otpCountdown % 60).toString().padStart(2, '0')}</span>
+                        <span className="text-sm text-gray-600">
+                          Còn lại: <span className="font-bold text-blue-600">{Math.floor(otpCountdown / 60)}:{(otpCountdown % 60).toString().padStart(2, '0')}</span>
                         </span>
                       )}
                       {otpCountdown === 0 && otpSent && (
-                        <span className="text-sm text-red-500 font-medium">
+                        <span className="text-sm text-red-600 font-semibold">
                           Mã OTP đã hết hạn
                         </span>
                       )}
@@ -1044,20 +1138,20 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
                       maxLength={6}
-                      className={`text-center text-2xl tracking-[0.6rem] ${otpCountdown === 0 ? 'border-red-300' : ''}`}
+                      className={`text-center text-2xl tracking-[0.6rem] h-14 border-2 ${otpCountdown === 0 ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500/20'} transition-all font-mono`}
                       disabled={isLoading}
                     />
                     {otpCountdown === 0 && otpSent && (
-                      <p className="text-xs text-red-500 text-center">
+                      <p className="text-xs text-red-600 text-center bg-red-50 p-2 rounded-lg">
                         ⚠️ Mã OTP đã hết hạn. Vui lòng gửi lại mã mới hoặc thử nhập mã hiện tại (có thể vẫn còn hiệu lực).
                       </p>
                     )}
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-3">
                     <Button 
                       onClick={handleVerifyOtp} 
-                      className="flex-1" 
+                      className="flex-1 h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
                       disabled={isLoading || otp.length !== 6}
                     >
                       {isLoading ? "Đang xác thực..." : "Xác thực OTP"}
@@ -1067,6 +1161,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                       variant="outline" 
                       onClick={handleResendOtp} 
                       disabled={isLoading}
+                      className="h-11 border-gray-300 hover:bg-gray-50 font-semibold"
                     >
                       {otpCountdown > 0 ? `Gửi lại (${Math.floor(otpCountdown / 60)}:${(otpCountdown % 60).toString().padStart(2, '0')})` : "Gửi lại mã mới"}
                     </Button>
@@ -1081,7 +1176,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   setVerificationMethod(null);
                   resetOtpState();
                 }}
-                className="w-full"
+                className="w-full h-11 border-gray-300 hover:bg-gray-50 font-semibold"
               >
                 Chọn phương thức khác
               </Button>
@@ -1090,20 +1185,20 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
           ) : verificationMethod === "sms" ? (
             <>
               {/* Bước 3b: Xác minh SMS OTP */}
-              <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <h3 className="text-xl font-semibold">Xác minh bằng SMS OTP</h3>
-                <p className="text-sm text-muted-foreground">
+              <div className="space-y-5">
+              <div className="text-center space-y-1.5">
+                <h3 className="text-xl font-bold text-gray-900">Xác minh bằng SMS OTP</h3>
+                <p className="text-sm text-gray-600">
                   Nhập số điện thoại để nhận mã OTP qua tin nhắn SMS
                 </p>
               </div>
 
               {!smsOtpSent ? (
                 <>
-                  <div className="space-y-2">
-                    <Label htmlFor="phoneNumber">Số điện thoại</Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <div className="space-y-3">
+                    <Label htmlFor="phoneNumber" className="text-sm font-semibold text-gray-700">Số điện thoại</Label>
+                    <div className="relative group">
+                      <Phone className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-green-600 transition-colors" />
                       <Input
                         id="phoneNumber"
                         type="tel"
@@ -1114,17 +1209,17 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                           const value = e.target.value.replace(/[^0-9+]/g, '');
                           setPhoneNumber(value);
                         }}
-                        className="pl-10"
+                        className="pl-10 h-11 border-gray-300 focus:border-green-500 focus:ring-green-500/20 transition-all"
                         disabled={isLoading}
                       />
                     </div>
                     {userPhoneNumber && (
-                      <p className="text-xs text-muted-foreground">
-                        Số điện thoại đã đăng ký: <strong>{userPhoneNumber}</strong>
+                      <p className="text-xs text-gray-600 bg-green-50 p-2 rounded-lg">
+                        Số điện thoại đã đăng ký: <strong className="text-green-700">{userPhoneNumber}</strong>
                       </p>
                     )}
                     {!userPhoneNumber && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-gray-500">
                         Nhập số điện thoại để nhận mã OTP qua SMS
                       </p>
                     )}
@@ -1132,7 +1227,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   <Button 
                     type="button" 
                     onClick={handleRequestSmsOtp} 
-                    className="w-full" 
+                    className="w-full h-11 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
                     disabled={isLoading || !phoneNumber}
                   >
                     {isLoading ? "Đang gửi..." : "Gửi mã OTP"}
@@ -1140,16 +1235,16 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                 </>
               ) : (
                 <>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="smsOtp">Mã OTP</Label>
+                      <Label htmlFor="smsOtp" className="text-sm font-semibold text-gray-700">Mã OTP</Label>
                       {smsOtpCountdown > 0 && (
-                        <span className="text-sm text-muted-foreground">
-                          Còn lại: <span className="font-semibold text-primary">{Math.floor(smsOtpCountdown / 60)}:{(smsOtpCountdown % 60).toString().padStart(2, '0')}</span>
+                        <span className="text-sm text-gray-600">
+                          Còn lại: <span className="font-bold text-green-600">{Math.floor(smsOtpCountdown / 60)}:{(smsOtpCountdown % 60).toString().padStart(2, '0')}</span>
                         </span>
                       )}
                       {smsOtpCountdown === 0 && smsOtpSent && (
-                        <span className="text-sm text-red-500 font-medium">
+                        <span className="text-sm text-red-600 font-semibold">
                           Mã OTP đã hết hạn
                         </span>
                       )}
@@ -1161,23 +1256,23 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                       value={smsOtp}
                       onChange={(e) => setSmsOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
                       maxLength={6}
-                      className={`text-center text-2xl tracking-[0.6rem] ${smsOtpCountdown === 0 ? 'border-red-300' : ''}`}
+                      className={`text-center text-2xl tracking-[0.6rem] h-14 border-2 ${smsOtpCountdown === 0 ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20' : 'border-gray-300 focus:border-green-500 focus:ring-green-500/20'} transition-all font-mono`}
                       disabled={isLoading}
                     />
-                    <p className="text-xs text-muted-foreground text-center">
-                      Mã OTP đã được gửi đến: <strong>{phoneNumber}</strong>
+                    <p className="text-xs text-gray-600 text-center bg-green-50 p-2 rounded-lg">
+                      Mã OTP đã được gửi đến: <strong className="text-green-700">{phoneNumber}</strong>
                     </p>
                     {smsOtpCountdown === 0 && smsOtpSent && (
-                      <p className="text-xs text-red-500 text-center">
+                      <p className="text-xs text-red-600 text-center bg-red-50 p-2 rounded-lg">
                         ⚠️ Mã OTP đã hết hạn. Vui lòng gửi lại mã mới hoặc thử nhập mã hiện tại (có thể vẫn còn hiệu lực).
                       </p>
                     )}
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-3">
                     <Button 
                       onClick={handleVerifySmsOtp} 
-                      className="flex-1" 
+                      className="flex-1 h-11 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
                       disabled={isLoading || smsOtp.length !== 6}
                     >
                       {isLoading ? "Đang xác thực..." : "Xác thực OTP"}
@@ -1187,6 +1282,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                       variant="outline" 
                       onClick={handleResendSmsOtp} 
                       disabled={isLoading}
+                      className="h-11 border-gray-300 hover:bg-gray-50 font-semibold"
                     >
                       {smsOtpCountdown > 0 ? `Gửi lại (${Math.floor(smsOtpCountdown / 60)}:${(smsOtpCountdown % 60).toString().padStart(2, '0')})` : "Gửi lại mã mới"}
                     </Button>
@@ -1201,7 +1297,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   setVerificationMethod(null);
                   resetSmsOtpState();
                 }}
-                className="w-full"
+                className="w-full h-11 border-gray-300 hover:bg-gray-50 font-semibold"
               >
                 Chọn phương thức khác
               </Button>
@@ -1210,40 +1306,59 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
           ) : verificationMethod === "qr" ? (
             <>
               {/* Bước 3b: Xác minh QR Code */}
-              <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <h3 className="text-xl font-semibold">Xác minh bằng QR Code</h3>
-                <p className="text-sm text-muted-foreground">
+              <div className="space-y-5">
+              <div className="text-center space-y-1.5">
+                <h3 className="text-xl font-bold text-gray-900">Xác minh bằng QR Code</h3>
+                <p className="text-sm text-gray-600">
                   Quét mã QR bằng ứng dụng di động để xác minh
                 </p>
               </div>
 
               {qrCodeData ? (
-                <div className="space-y-4">
-                  <div className="flex justify-center p-4 bg-gray-50 rounded-lg">
-                    <img 
-                      src={`data:image/png;base64,${qrCodeData}`}
-                      alt="QR Code"
-                      className="w-64 h-64"
-                    />
+                <div className="space-y-3">
+                  <div className="flex justify-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-100">
+                    <div className="relative">
+                      <img 
+                        src={`data:image/png;base64,${qrCodeData}`}
+                        alt="QR Code"
+                        className="w-56 h-56 rounded-lg shadow-md"
+                      />
+                      {qrStatus === "pending" && (
+                        <div className="absolute inset-0 rounded-lg border-2 border-blue-400/50 animate-pulse"></div>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-sm text-center text-muted-foreground">
-                    {qrStatus === "pending" 
-                      ? "Quét mã QR bằng ứng dụng di động để xác minh"
+                  <div className={`text-center p-4 rounded-xl ${
+                    qrStatus === "pending" 
+                      ? "bg-blue-50 border border-blue-200"
                       : qrStatus === "approved"
-                      ? "✅ Xác minh thành công!"
-                      : "❌ QR code đã hết hạn. Vui lòng tạo mã mới."}
-                  </p>
-                  {qrStatus === "pending" && (
-                    <p className="text-xs text-center text-muted-foreground">
-                      Đang chờ xác nhận từ ứng dụng di động...
+                      ? "bg-green-50 border border-green-200"
+                      : "bg-red-50 border border-red-200"
+                  }`}>
+                    <p className={`text-sm font-semibold ${
+                      qrStatus === "pending" 
+                        ? "text-blue-700"
+                        : qrStatus === "approved"
+                        ? "text-green-700"
+                        : "text-red-700"
+                    }`}>
+                      {qrStatus === "pending" 
+                        ? "⏳ Quét mã QR bằng ứng dụng di động để xác minh"
+                        : qrStatus === "approved"
+                        ? "✅ Xác minh thành công!"
+                        : "❌ QR code đã hết hạn. Vui lòng tạo mã mới."}
                     </p>
-                  )}
+                    {qrStatus === "pending" && (
+                      <p className="text-xs text-blue-600 mt-2">
+                        Đang chờ xác nhận từ ứng dụng di động...
+                      </p>
+                    )}
+                  </div>
                   {qrStatus === "expired" && (
                     <Button
                       type="button"
                       onClick={handleGenerateQrCode}
-                      className="w-full"
+                      className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
                       disabled={isLoading}
                     >
                       Tạo mã QR mới
@@ -1254,7 +1369,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                 <Button
                   type="button"
                   onClick={handleGenerateQrCode}
-                  className="w-full"
+                  className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
                   disabled={isLoading}
                 >
                   {isLoading ? "Đang tạo..." : "Tạo mã QR"}
@@ -1277,7 +1392,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                     pollingTimeoutRef.current = null;
                   }
                 }}
-                className="w-full"
+                className="w-full h-11 border-gray-300 hover:bg-gray-50 font-semibold"
               >
                 Chọn phương thức khác
               </Button>
@@ -1286,16 +1401,16 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
           ) : verificationMethod === "google-authenticator" ? (
             <>
               {/* Bước 3c: Xác minh Google Authenticator */}
-              <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <h3 className="text-xl font-semibold">Xác minh bằng Google Authenticator</h3>
-                <p className="text-sm text-muted-foreground">
+              <div className="space-y-5">
+              <div className="text-center space-y-1.5">
+                <h3 className="text-xl font-bold text-gray-900">Xác minh bằng Google Authenticator</h3>
+                <p className="text-sm text-gray-600">
                   Mở ứng dụng Google Authenticator và nhập mã 6 chữ số
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="googleAuthCode">Mã Google Authenticator</Label>
+                <Label htmlFor="googleAuthCode" className="text-sm font-semibold text-gray-700">Mã Google Authenticator</Label>
                 <Input
                   id="googleAuthCode"
                   type="text"
@@ -1303,14 +1418,14 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   value={googleAuthCode}
                   onChange={(e) => setGoogleAuthCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
                   maxLength={6}
-                  className="text-center text-2xl tracking-[0.6rem]"
+                  className="text-center text-2xl tracking-[0.6rem] h-14 border-2 border-gray-300 focus:border-purple-500 focus:ring-purple-500/20 transition-all font-mono"
                   disabled={isLoading}
                 />
               </div>
 
               <Button
                 onClick={handleVerifyGoogleAuthenticator}
-                className="w-full"
+                className="w-full h-11 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
                 disabled={isLoading || googleAuthCode.length !== 6}
               >
                 {isLoading ? "Đang xác thực..." : "Xác thực"}
@@ -1323,7 +1438,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   setVerificationMethod(null);
                   setGoogleAuthCode("");
                 }}
-                className="w-full"
+                className="w-full h-11 border-gray-300 hover:bg-gray-50 font-semibold"
               >
                 Chọn phương thức khác
               </Button>
@@ -1332,16 +1447,16 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
           ) : verificationMethod === "backup-code" ? (
             <>
               {/* Bước 3d: Xác minh Backup Code */}
-              <div className="space-y-6">
-              <div className="text-center space-y-2">
-                <h3 className="text-xl font-semibold">Xác minh bằng Backup Code</h3>
-                <p className="text-sm text-muted-foreground">
+              <div className="space-y-5">
+              <div className="text-center space-y-1.5">
+                <h3 className="text-xl font-bold text-gray-900">Xác minh bằng Backup Code</h3>
+                <p className="text-sm text-gray-600">
                   Nhập mã backup code (định dạng: XXXX-XXXX)
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="backupCode">Mã Backup Code</Label>
+                <Label htmlFor="backupCode" className="text-sm font-semibold text-gray-700">Mã Backup Code</Label>
                 <Input
                   id="backupCode"
                   type="text"
@@ -1359,17 +1474,17 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                     setBackupCode(value);
                   }}
                   maxLength={9}
-                  className="text-center text-xl tracking-wider font-mono"
+                  className="text-center text-xl tracking-wider font-mono h-12 border-2 border-gray-300 focus:border-orange-500 focus:ring-orange-500/20 transition-all"
                   disabled={isLoading}
                 />
-                <p className="text-xs text-muted-foreground text-center">
+                <p className="text-xs text-gray-600 text-center bg-orange-50 p-2 rounded-lg">
                   Định dạng: 4 chữ cái/số - 4 chữ cái/số (ví dụ: ABCD-1234)
                 </p>
               </div>
 
               <Button
                 onClick={handleVerifyBackupCode}
-                className="w-full"
+                className="w-full h-11 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
                 disabled={isLoading || !/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(backupCode.toUpperCase())}
               >
                 {isLoading ? "Đang xác thực..." : "Xác thực"}
@@ -1382,7 +1497,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   setVerificationMethod(null);
                   setBackupCode("");
                 }}
-                className="w-full"
+                className="w-full h-11 border-gray-300 hover:bg-gray-50 font-semibold"
               >
                 Chọn phương thức khác
               </Button>
@@ -1392,16 +1507,20 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
           }
 
           {!needsVerification && (
-            <div className="flex items-center justify-between pt-4 border-t">
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200 mt-4">
               <Button 
                 variant="link" 
-                className="p-0 h-auto text-sm"
+                className="p-0 h-auto text-xs text-gray-600 hover:text-blue-600 transition-colors"
                 onClick={() => setShowForgotPassword(true)}
                 type="button"
               >
                 Quên mật khẩu?
               </Button>
-              <Button variant="link" className="p-0 h-auto text-sm font-medium" onClick={onSwitchToRegister}>
+              <Button 
+                variant="link" 
+                className="p-0 h-auto text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors" 
+                onClick={onSwitchToRegister}
+              >
                 Tạo tài khoản
               </Button>
             </div>
