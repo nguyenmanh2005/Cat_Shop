@@ -120,10 +120,13 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("*")); // mọi FE
+        // Cho phép tất cả origins (bao gồm Railway domains)
+        config.setAllowedOriginPatterns(List.of("*")); // Dùng setAllowedOriginPatterns thay vì setAllowedOrigins
         config.setAllowedMethods(List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(false); // JWT gửi header -> false
+        config.setExposedHeaders(List.of("*")); // Expose tất cả headers
+        config.setAllowCredentials(true); // Cho phép credentials
+        config.setMaxAge(3600L); // Cache preflight requests
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
