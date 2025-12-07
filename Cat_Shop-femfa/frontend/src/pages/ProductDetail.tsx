@@ -9,9 +9,9 @@ const ProductDetail = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col overflow-x-hidden page-transition">
       <Header />
-      <main className="flex-1">
+      <main className="flex-1 animate-fade-in">
         <CatDetailView />
       </main>
       <Footer />

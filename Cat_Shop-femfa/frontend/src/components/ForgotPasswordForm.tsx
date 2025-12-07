@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Mail, ArrowLeft, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/authService";
+import { calculatePasswordStrength, getStrengthLabel } from "@/utils/passwordStrength";
 
 interface ForgotPasswordFormProps {
   onBack: () => void;
@@ -14,10 +15,16 @@ interface ForgotPasswordFormProps {
 const ForgotPasswordForm = ({ onBack, onClose }: ForgotPasswordFormProps) => {
   const { toast } = useToast();
   const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+  const [step, setStep] = useState<"email" | "otp">("email");
+  const [passwordStrength, setPasswordStrength] = useState(
+    calculatePasswordStrength("")
+  );
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email) {
@@ -32,15 +39,64 @@ const ForgotPasswordForm = ({ onBack, onClose }: ForgotPasswordFormProps) => {
     try {
       setIsLoading(true);
       await authService.forgotPassword(email);
-      setEmailSent(true);
       toast({
-        title: "Email đã được gửi",
-        description: "Vui lòng kiểm tra hộp thư của bạn để đặt lại mật khẩu",
+        title: "OTP đã được gửi",
+        description: "Vui lòng kiểm tra email của bạn để lấy mã OTP đặt lại mật khẩu",
       });
+      setStep("otp");
     } catch (error: any) {
       toast({
-        title: "Lỗi gửi email",
-        description: error.message || "Không thể gửi email đặt lại mật khẩu",
+        title: "Lỗi gửi OTP",
+        description: error.message || "Không thể gửi mã OTP đặt lại mật khẩu",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!otp) {
+      toast({
+        title: "OTP không được để trống",
+        description: "Vui lòng nhập mã OTP được gửi đến email của bạn",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      toast({
+        title: "Mật khẩu mới không hợp lệ",
+        description: "Mật khẩu mới phải có ít nhất 6 ký tự",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Xác nhận mật khẩu không khớp",
+        description: "Vui lòng nhập lại mật khẩu mới giống nhau",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await authService.resetPassword(email, otp, newPassword);
+      toast({
+        title: "Đặt lại mật khẩu thành công",
+        description: "Vui lòng đăng nhập lại với mật khẩu mới của bạn",
+      });
+      onBack();
+    } catch (error: any) {
+      toast({
+        title: "Lỗi đặt lại mật khẩu",
+        description: error.message || "Không thể đặt lại mật khẩu. Vui lòng thử lại.",
         variant: "destructive",
       });
     } finally {
@@ -81,7 +137,7 @@ const ForgotPasswordForm = ({ onBack, onClose }: ForgotPasswordFormProps) => {
 
       <div className="p-8 lg:p-12 flex flex-col justify-center">
         <div className="space-y-6">
-          {!emailSent ? (
+          {step === "email" ? (
             <>
               <div className="space-y-2">
                 <h3 className="text-2xl font-bold">Đặt lại mật khẩu</h3>
@@ -90,7 +146,7 @@ const ForgotPasswordForm = ({ onBack, onClose }: ForgotPasswordFormProps) => {
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSendOtp} className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="forgot-email">Email</Label>
                   <div className="relative">
@@ -109,23 +165,110 @@ const ForgotPasswordForm = ({ onBack, onClose }: ForgotPasswordFormProps) => {
                 </div>
 
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Đang gửi..." : "Gửi link đặt lại mật khẩu"}
+                  {isLoading ? "Đang gửi..." : "Gửi mã OTP"}
                 </Button>
               </form>
             </>
           ) : (
-            <div className="space-y-6 text-center">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                <Mail className="h-10 w-10 text-green-600" />
-              </div>
+            <>
               <div className="space-y-2">
-                <h3 className="text-2xl font-bold">Email đã được gửi!</h3>
+                <h3 className="text-2xl font-bold">Nhập OTP & mật khẩu mới</h3>
                 <p className="text-sm text-muted-foreground">
-                  Chúng tôi đã gửi link đặt lại mật khẩu đến <strong>{email}</strong>. 
-                  Vui lòng kiểm tra hộp thư của bạn và làm theo hướng dẫn.
+                  Mã OTP đã được gửi đến email <strong>{email}</strong>. Vui lòng nhập mã OTP và mật khẩu mới.
                 </p>
               </div>
-            </div>
+
+              <form onSubmit={handleResetPassword} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="otp">Mã OTP</Label>
+                  <Input
+                    id="otp"
+                    type="text"
+                    placeholder="Nhập mã 6 chữ số"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                    maxLength={6}
+                    required
+                    disabled={isLoading}
+                    className="text-center text-2xl tracking-[0.6rem]"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">Mật khẩu mới</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    placeholder="Nhập mật khẩu mới"
+                    value={newPassword}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setNewPassword(value);
+                      setPasswordStrength(calculatePasswordStrength(value));
+                    }}
+                    required
+                    disabled={isLoading}
+                  />
+                  {newPassword && (
+                    <div className="space-y-1.5 mt-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Độ mạnh mật khẩu:</span>
+                        <span
+                          className={`font-medium ${
+                            passwordStrength.strength === "weak"
+                              ? "text-red-500"
+                              : passwordStrength.strength === "fair"
+                              ? "text-orange-500"
+                              : passwordStrength.strength === "good"
+                              ? "text-yellow-500"
+                              : "text-green-500"
+                          }`}
+                        >
+                          {getStrengthLabel(passwordStrength.strength)}
+                        </span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${
+                            passwordStrength.strength === "weak"
+                              ? "bg-red-500"
+                              : passwordStrength.strength === "fair"
+                              ? "bg-orange-500"
+                              : passwordStrength.strength === "good"
+                              ? "bg-yellow-500"
+                              : "bg-green-500"
+                          }`}
+                          style={{ width: `${passwordStrength.score}%` }}
+                        />
+                      </div>
+                      <ul className="text-xs text-muted-foreground space-y-0.5 mt-1 list-disc list-inside">
+                        <li>Ít nhất 6 ký tự</li>
+                        <li>Nên có chữ cái in hoa và chữ thường</li>
+                        <li>Nên có số</li>
+                        <li>Nên có ký tự đặc biệt (ví dụ: ! @ # $ %)</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Xác nhận mật khẩu mới</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Nhập lại mật khẩu mới"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? "Đang đặt lại..." : "Đặt lại mật khẩu"}
+                </Button>
+              </form>
+            </>
           )}
 
           <div className="pt-4 border-t">

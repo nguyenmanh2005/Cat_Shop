@@ -26,11 +26,11 @@ public interface IpSecurityService {
 
     /**
      * Gửi email cảnh báo khi có đăng nhập từ IP mới
+     * (chỉ cảnh báo, không kèm link đổi mật khẩu)
      * @param email Email của user
      * @param ipAddress IP address mới
      * @param userAgent User-Agent
-     * @param resetPasswordToken Token để đổi mật khẩu (nếu cần)
      */
-    void sendSecurityAlertEmail(String email, String ipAddress, String userAgent, String resetPasswordToken);
+    void sendSecurityAlertEmail(String email, String ipAddress, String userAgent);
 }
 

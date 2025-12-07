@@ -9,6 +9,7 @@ import { loadFavoriteIds, saveFavoriteIds } from "@/utils/favorites";
 import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { Heart } from "lucide-react";
 
 const Favorites = () => {
   const [favoriteIds, setFavoriteIds] = useState<number[]>(() => loadFavoriteIds());
@@ -90,12 +91,12 @@ const Favorites = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col overflow-x-hidden page-transition">
       <Header />
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-6 animate-fade-in">
         <div className="max-w-7xl mx-auto">
           <Breadcrumb items={breadcrumbItems} />
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-8 animate-fade-in-down">
             <div>
               <h1 className="text-3xl font-bold text-foreground">Thú cưng yêu thích</h1>
               <p className="text-muted-foreground mt-2">
@@ -106,19 +107,25 @@ const Favorites = () => {
 
           {loading ? (
             <div className="flex justify-center items-center h-64">
-              <div className="text-lg text-muted-foreground">Đang tải danh sách yêu thích...</div>
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <div className="text-lg text-muted-foreground animate-pulse">Đang tải danh sách yêu thích...</div>
+              </div>
             </div>
           ) : error ? (
-            <div className="text-center py-12">
+            <div className="text-center py-12 animate-fade-in">
               <p className="text-lg text-red-500 mb-4">{error}</p>
             </div>
           ) : products.length === 0 ? (
-            <div className="text-center py-12">
+            <div className="text-center py-12 animate-fade-in-up">
+              <div className="animate-bounce mb-4">
+                <Heart className="h-16 w-16 mx-auto text-muted-foreground" />
+              </div>
               <p className="text-lg text-muted-foreground mb-4">
                 Bạn chưa có sản phẩm yêu thích nào.
               </p>
               <button
-                className="text-primary underline"
+                className="text-primary underline hover:text-primary/80 transition-colors"
                 onClick={() => navigate("/pets")}
               >
                 Quay lại xem sản phẩm
@@ -126,15 +133,20 @@ const Favorites = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {products.map((product) => (
-                <ProductCard
+              {products.map((product, index) => (
+                <div
                   key={product.productId}
-                  product={product}
-                  onViewDetails={() => handleViewDetails(product)}
-                  onAddToCart={handleAddToCart}
-                  onToggleFavorite={() => handleRemoveFavorite(product.productId)}
-                  isFavorite
-                />
+                  className="animate-fade-in-up"
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <ProductCard
+                    product={product}
+                    onViewDetails={() => handleViewDetails(product)}
+                    onAddToCart={handleAddToCart}
+                    onToggleFavorite={() => handleRemoveFavorite(product.productId)}
+                    isFavorite
+                  />
+                </div>
               ))}
             </div>
           )}

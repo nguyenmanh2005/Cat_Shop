@@ -35,11 +35,6 @@ const GoogleReCaptcha = ({ onVerify, onExpire, className = "" }: GoogleReCaptcha
         theme="light"
         size="normal"
       />
-      {!siteKey || siteKey === "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" ? (
-        <p className="text-xs text-muted-foreground mt-2">
-          ⚠️ Đang sử dụng reCAPTCHA test key. Vui lòng cấu hình VITE_RECAPTCHA_SITE_KEY trong file .env
-        </p>
-      ) : null}
     </div>
   );
 };

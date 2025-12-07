@@ -20,6 +20,13 @@ public interface QrLoginService {
     boolean confirmQrLogin(QrLoginRequest request);
 
     /**
+     * Xác nhận đăng nhập từ thiết bị đã đăng nhập sẵn (dùng access token)
+     * @param sessionId Session ID từ QR code
+     * @param accessToken Access token của user trên điện thoại
+     */
+    void confirmQrLoginWithAccessToken(String sessionId, String accessToken);
+
+    /**
      * Kiểm tra trạng thái của QR login session
      * @param sessionId Session ID từ QR code
      * @return QrLoginStatusResponse với status và tokens (nếu đã approve)

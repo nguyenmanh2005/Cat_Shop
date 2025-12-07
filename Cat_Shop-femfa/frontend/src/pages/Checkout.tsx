@@ -205,19 +205,19 @@ const Checkout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col overflow-x-hidden page-transition">
       <Header />
-      <main className="flex-1 container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 py-8 animate-fade-in">
         <Button
           variant="ghost"
-          className="mb-6"
+          className="mb-6 hover-lift animate-fade-in-left"
           onClick={() => navigate("/cart")}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Quay lại giỏ hàng
         </Button>
 
-        <h1 className="text-3xl font-bold mb-8">Thanh toán</h1>
+        <h1 className="text-3xl font-bold mb-8 animate-fade-in-down">Thanh toán</h1>
 
         <form onSubmit={handleSubmit}>
           <div className="grid lg:grid-cols-3 gap-8">

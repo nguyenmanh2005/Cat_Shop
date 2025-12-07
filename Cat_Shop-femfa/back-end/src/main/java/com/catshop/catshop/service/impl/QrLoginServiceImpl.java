@@ -98,39 +98,45 @@ public class QrLoginServiceImpl implements QrLoginService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Email không tồn tại"));
 
-        // ⛔ Chặn Admin đăng nhập qua QR - QR login chỉ dành cho Customer
-        if (user.getRole() != null && "Admin".equalsIgnoreCase(user.getRole().getRoleName())) {
-            log.warn("⛔ [QR-LOGIN] Admin không được phép đăng nhập qua QR: {}", email);
-            saveSessionStatus(sessionId, "REJECTED", null);
-            throw new BadRequestException("Tài khoản Admin không được phép đăng nhập qua QR code. Vui lòng sử dụng email và mật khẩu.");
-        }
+        processQrApproval(sessionId, user, password);
 
-        // Validate password
-        boolean passwordMatches = passwordEncoder.matches(password, user.getPasswordHash());
-        if (!passwordMatches) {
-            log.error("❌ [QR-LOGIN] Invalid password for: {}", email);
-            saveSessionStatus(sessionId, "REJECTED", null);
-            throw new BadRequestException("Mật khẩu không chính xác");
-        }
-
-        // Generate tokens
-        String accessToken = jwtUtils.generateAccessToken(user.getEmail(), user.getRole().getRoleName());
-        String refreshToken = jwtUtils.generateRefreshToken(user.getEmail());
-
-        // Lưu refresh token vào Redis (nếu Redis available)
-        try {
-            redisTemplate.opsForValue().set("refresh:" + user.getEmail(), refreshToken, 7, TimeUnit.DAYS);
-        } catch (DataAccessException e) {
-            log.warn("⚠️ [QR-LOGIN] Cannot save refresh token to Redis: {}", e.getMessage());
-        }
-
-        // Lưu tokens vào session status
-        TokenResponse tokens = new TokenResponse(accessToken, refreshToken, false);
-        saveSessionStatus(sessionId, "APPROVED", tokens);
-
-        log.info("✅ [QR-LOGIN] Login confirmed successfully. Session: {}, Email: {}", sessionId, email);
+        log.info("✅ [QR-LOGIN] Login confirmed successfully (password). Session: {}, Email: {}", sessionId, email);
 
         return true;
+    }
+
+    @Override
+    public void confirmQrLoginWithAccessToken(String sessionId, String accessToken) {
+        log.info("📱 [QR-LOGIN] Confirm with access token. Session: {}", sessionId);
+
+        String currentStatus = getSessionStatus(sessionId);
+        if (currentStatus == null) {
+            log.error("❌ [QR-LOGIN] Session not found or expired: {}", sessionId);
+            throw new BadRequestException("QR code đã hết hạn hoặc không hợp lệ");
+        }
+
+        if (!"PENDING".equals(currentStatus)) {
+            log.error("❌ [QR-LOGIN] Session already processed. Status: {}", currentStatus);
+            throw new BadRequestException("QR code đã được sử dụng");
+        }
+
+        // Validate access token và lấy email từ token
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new BadRequestException("Access token không hợp lệ");
+        }
+
+        // Ném lỗi rõ nếu token không hợp lệ / hết hạn
+        if (!jwtUtils.validateToken(accessToken)) {
+            throw new BadRequestException("Phiên đăng nhập trên điện thoại không hợp lệ hoặc đã hết hạn");
+        }
+
+        String email = jwtUtils.getEmailFromToken(accessToken);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+
+        processQrApproval(sessionId, user, null);
+
+        log.info("✅ [QR-LOGIN] Login confirmed successfully (access token). Session: {}, Email: {}", sessionId, email);
     }
 
     @Override
@@ -270,6 +276,45 @@ public class QrLoginServiceImpl implements QrLoginService {
         } catch (DataAccessException e) {
             log.warn("⚠️ Failed to delete session from Redis: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Xử lý chung khi chấp nhận đăng nhập QR cho một user (từ password hoặc access token)
+     */
+    private void processQrApproval(String sessionId, User user, String rawPasswordIfProvided) {
+        String email = user.getEmail();
+
+        // ⛔ Chặn Admin đăng nhập qua QR - QR login chỉ dành cho Customer
+        if (user.getRole() != null && "Admin".equalsIgnoreCase(user.getRole().getRoleName())) {
+            log.warn("⛔ [QR-LOGIN] Admin không được phép đăng nhập qua QR: {}", email);
+            saveSessionStatus(sessionId, "REJECTED", null);
+            throw new BadRequestException("Tài khoản Admin không được phép đăng nhập qua QR code. Vui lòng sử dụng email và mật khẩu.");
+        }
+
+        // Nếu có rawPassword, validate password (flow cũ)
+        if (rawPasswordIfProvided != null) {
+            boolean passwordMatches = passwordEncoder.matches(rawPasswordIfProvided, user.getPasswordHash());
+            if (!passwordMatches) {
+                log.error("❌ [QR-LOGIN] Invalid password for: {}", email);
+                saveSessionStatus(sessionId, "REJECTED", null);
+                throw new BadRequestException("Mật khẩu không chính xác");
+            }
+        }
+
+        // Generate tokens
+        String accessToken = jwtUtils.generateAccessToken(user.getEmail(), user.getRole().getRoleName());
+        String refreshToken = jwtUtils.generateRefreshToken(user.getEmail());
+
+        // Lưu refresh token vào Redis (nếu Redis available)
+        try {
+            redisTemplate.opsForValue().set("refresh:" + user.getEmail(), refreshToken, 7, TimeUnit.DAYS);
+        } catch (DataAccessException e) {
+            log.warn("⚠️ [QR-LOGIN] Cannot save refresh token to Redis: {}", e.getMessage());
+        }
+
+        // Lưu tokens vào session status
+        TokenResponse tokens = new TokenResponse(accessToken, refreshToken, false);
+        saveSessionStatus(sessionId, "APPROVED", tokens);
     }
 
     // Inner class cho QR data

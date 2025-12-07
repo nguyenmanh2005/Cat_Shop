@@ -164,7 +164,7 @@ const Blog = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col overflow-x-hidden page-transition">
       <Header />
       
       <main className="flex-1">
@@ -187,15 +187,19 @@ const Blog = () => {
           <div className="max-w-7xl mx-auto px-6">
             <h2 className="text-3xl font-bold text-foreground mb-8">Bài viết nổi bật</h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {featuredPosts.map((post) => (
-                <Card key={post.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                  <div className="aspect-video bg-muted relative overflow-hidden">
+              {featuredPosts.map((post, index) => (
+                <Card 
+                  key={post.id} 
+                  className="overflow-hidden card-hover animate-fade-in-up gpu-accelerated"
+                  style={{ animationDelay: `${index * 150}ms` }}
+                >
+                  <div className="aspect-video bg-muted relative overflow-hidden group">
                     <img 
                       src={post.image || "/placeholder.svg"} 
                       alt={post.title}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />
-                    <Badge className="absolute top-4 left-4 bg-primary">
+                    <Badge className="absolute top-4 left-4 bg-primary animate-pulse">
                       Nổi bật
                     </Badge>
                   </div>
@@ -206,7 +210,7 @@ const Blog = () => {
                         {formatDate(post.publishDate)}
                       </span>
                     </div>
-                    <h3 className="text-xl font-bold mb-3 line-clamp-2">{post.title}</h3>
+                    <h3 className="text-xl font-bold mb-3 line-clamp-2 group-hover:text-primary transition-colors">{post.title}</h3>
                     <p className="text-muted-foreground mb-4 line-clamp-3">{post.excerpt}</p>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -219,8 +223,8 @@ const Blog = () => {
                           {post.views}
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm">
-                        Đọc thêm <ArrowRight className="h-4 w-4 ml-1" />
+                      <Button variant="ghost" size="sm" className="hover-lift">
+                        Đọc thêm <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
                       </Button>
                     </div>
                   </CardContent>

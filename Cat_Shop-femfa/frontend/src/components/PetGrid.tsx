@@ -387,10 +387,13 @@ const PetGrid = () => {
 
   if (totalLoading) {
     return (
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 animate-fade-in">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-center items-center h-64">
-            <div className="text-lg">Đang tải...</div>
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+              <div className="text-lg animate-pulse">Đang tải...</div>
+            </div>
           </div>
         </div>
       </div>
@@ -399,7 +402,7 @@ const PetGrid = () => {
 
   if (!isAuthenticated) {
     return (
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 animate-fade-in">
         <div className="max-w-7xl mx-auto text-center py-12">
           <p className="text-muted-foreground text-lg">
             Vui lòng đăng nhập để xem sản phẩm.
@@ -410,11 +413,11 @@ const PetGrid = () => {
   }
 
   return (
-    <div className="flex-1 p-6">
+    <div className="flex-1 p-6 animate-fade-in">
       <div className="max-w-7xl mx-auto">
         <Breadcrumb items={breadcrumbItems} />
 
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 animate-fade-in-down">
           <div>
             <h1 className="text-2xl font-bold text-foreground">SẢN PHẨM</h1>
             {(() => {
@@ -523,23 +526,28 @@ const PetGrid = () => {
         {/* Danh sách sản phẩm */}
         {filteredProducts.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => (
-              <ProductCard
+            {filteredProducts.map((product, index) => (
+              <div
                 key={product.productId}
-                product={product}
-                onViewDetails={() => handleViewDetails(product)}
-                onAddToCart={handleAddToCart}
-                onToggleFavorite={handleToggleFavorite}
-                isFavorite={favoriteIds.includes(product.productId)}
-              />
+                className="animate-fade-in-up gpu-accelerated"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <ProductCard
+                  product={product}
+                  onViewDetails={() => handleViewDetails(product)}
+                  onAddToCart={handleAddToCart}
+                  onToggleFavorite={handleToggleFavorite}
+                  isFavorite={favoriteIds.includes(product.productId)}
+                />
+              </div>
             ))}
           </div>
         ) : (
-          <div className="text-center py-12">
+          <div className="text-center py-12 animate-fade-in">
             <p className="text-muted-foreground text-lg">
               Không tìm thấy sản phẩm nào
             </p>
-            {loading && <p className="text-sm text-muted-foreground mt-2">Đang tải...</p>}
+            {loading && <p className="text-sm text-muted-foreground mt-2 animate-pulse">Đang tải...</p>}
           </div>
         )}
       </div>

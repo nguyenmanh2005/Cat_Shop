@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,9 @@ import { Progress } from "@/components/ui/progress";
 import { Eye, EyeOff, Mail, Lock, User, Phone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { calculatePasswordStrength, getStrengthColor, getStrengthLabel, type PasswordStrength } from "@/utils/passwordStrength";
+import { calculatePasswordStrength, getStrengthLabel } from "@/utils/passwordStrength";
+import GoogleReCaptcha from "./GoogleReCaptcha";
+import { authService } from "@/services/authService";
 
 interface RegisterFormProps {
   onSwitchToLogin: () => void;
@@ -28,6 +30,44 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(calculatePasswordStrength(""));
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  
+  // OTP verification states
+  const [step, setStep] = useState<"form" | "verifyOtp">("form");
+  const [otp, setOtp] = useState("");
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpCountdown, setOtpCountdown] = useState(0);
+  const otpCountdownRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Countdown timer cho OTP (2 phút = 120 giây)
+  useEffect(() => {
+    if (otpCountdown > 0) {
+      otpCountdownRef.current = setInterval(() => {
+        setOtpCountdown((prev) => {
+          if (prev <= 1) {
+            if (otpCountdownRef.current) {
+              clearInterval(otpCountdownRef.current);
+              otpCountdownRef.current = null;
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (otpCountdownRef.current) {
+        clearInterval(otpCountdownRef.current);
+        otpCountdownRef.current = null;
+      }
+    }
+
+    return () => {
+      if (otpCountdownRef.current) {
+        clearInterval(otpCountdownRef.current);
+        otpCountdownRef.current = null;
+      }
+    };
+  }, [otpCountdown]);
 
   // Redirect trực tiếp trong cùng tab để đăng ký Google
   const handleGoogleRegister = () => {
@@ -61,22 +101,48 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
       return;
     }
 
+    if (!recaptchaToken) {
+      toast({
+        title: "Thiếu xác minh bảo mật",
+        description: "Vui lòng hoàn thành captcha trước khi đăng ký.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     
     try {
+      // Bước 1: Đăng ký tài khoản (backend tạo user)
       await register({
         fullName: formData.fullName,
         email: formData.email,
         phone: formData.phone,
         password: formData.password,
+        captchaToken: recaptchaToken,
       });
       
-      toast({
-        title: "Đăng ký thành công!",
-        description: "Tài khoản của bạn đã được tạo thành công",
-      });
-      // Chuyển sang form đăng nhập hoặc đóng modal nếu đã tự động đăng nhập
-      onSwitchToLogin();
+      // Bước 2: Gửi OTP ĐĂNG KÝ để xác thực email (QUAN TRỌNG: phải thành công mới cho tiếp tục)
+      try {
+        await authService.sendRegisterOtp(formData.email);
+        setOtpCountdown(120); // 2 phút
+        toast({
+          title: "Mã xác thực đăng ký đã được gửi",
+          description: `Mã OTP đăng ký đã được gửi đến email ${formData.email}. Vui lòng kiểm tra hộp thư và nhập mã để kích hoạt tài khoản.`,
+        });
+        // Chỉ chuyển sang bước verify OTP nếu gửi OTP thành công
+        setStep("verifyOtp");
+      } catch (otpError: any) {
+        // Nếu gửi OTP fail, hiện lỗi và KHÔNG cho tiếp tục
+        // (User đã được tạo nhưng chưa verify - cần xử lý ở backend)
+        toast({
+          title: "Lỗi gửi mã xác thực đăng ký",
+          description: otpError.message || "Không thể gửi mã OTP đăng ký. Vui lòng thử lại hoặc liên hệ hỗ trợ.",
+          variant: "destructive",
+        });
+        // KHÔNG chuyển sang bước verify, giữ nguyên ở form
+        // User có thể thử lại bằng cách bấm "Gửi lại mã" sau
+      }
     } catch (error: any) {
       const errorMessage = error.message || "Đã xảy ra lỗi, vui lòng thử lại";
       toast({
@@ -89,16 +155,87 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
     }
   };
 
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!otp || otp.length !== 6) {
+      toast({
+        title: "Mã OTP không hợp lệ",
+        description: "Vui lòng nhập mã 6 chữ số được gửi đến email của bạn.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+
+    try {
+      // Dùng OTP đăng ký riêng (khác với OTP đăng nhập)
+      const result = await authService.verifyRegisterOtp(formData.email, otp);
+
+      if (result.accessToken) {
+        toast({
+          title: "Đăng ký và xác thực thành công!",
+          description: "Tài khoản của bạn đã được kích hoạt và đăng nhập thành công.",
+        });
+        onClose();
+        window.location.reload();
+        return;
+      }
+
+      toast({
+        title: "Mã OTP đăng ký hợp lệ",
+        description: "Vui lòng tiếp tục các bước xác thực bảo mật nếu được yêu cầu.",
+      });
+    } catch (error: any) {
+      const errorMessage = error.message || "Mã OTP đăng ký không chính xác hoặc đã hết hạn";
+      toast({
+        title: "Lỗi xác thực OTP đăng ký",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    try {
+      setIsLoading(true);
+      // Dùng OTP đăng ký riêng
+      await authService.sendRegisterOtp(formData.email);
+      setOtpCountdown(120);
+      setOtp("");
+      toast({
+        title: "Mã OTP đăng ký đã được gửi lại",
+        description: "Vui lòng kiểm tra lại hộp thư email của bạn.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Lỗi gửi lại mã đăng ký",
+        description: error.message || "Không thể gửi lại mã OTP đăng ký. Vui lòng thử lại.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-bold text-primary">Đăng ký</CardTitle>
+        <CardTitle className="text-2xl font-bold text-primary">
+          {step === "form" ? "Đăng ký" : "Xác thực tài khoản"}
+        </CardTitle>
         <CardDescription>
-          Tạo tài khoản mới để trải nghiệm dịch vụ tốt nhất
+          {step === "form"
+            ? "Tạo tài khoản mới để trải nghiệm dịch vụ tốt nhất"
+            : `Nhập mã OTP vừa được gửi đến email ${formData.email} để kích hoạt tài khoản`}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {step === "form" ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="fullName">Họ và tên</Label>
             <div className="relative">
@@ -253,10 +390,16 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
             </Label>
           </div>
 
+          <GoogleReCaptcha
+            onVerify={setRecaptchaToken}
+            onExpire={() => setRecaptchaToken(null)}
+            className="mt-2"
+          />
+
           <Button
             type="submit"
             className="w-full"
-            disabled={isLoading}
+            disabled={isLoading || !recaptchaToken}
           >
             {isLoading ? "Đang đăng ký..." : "Đăng ký"}
           </Button>
@@ -307,6 +450,63 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
             </Button>
           </div>
         </form>
+        ) : (
+          <form onSubmit={handleVerifyOtp} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="register-otp">Mã xác thực (OTP)</Label>
+              <Input
+                id="register-otp"
+                type="text"
+                placeholder="Nhập mã 6 chữ số"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+                maxLength={6}
+                className="text-center text-2xl tracking-[0.6rem] h-14 border-2 border-primary/40 focus:border-primary focus:ring-primary/30 font-mono"
+                disabled={isVerifyingOtp}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Nếu không thấy email, vui lòng kiểm tra hộp thư rác (spam) hoặc thư mục quảng cáo.
+              </p>
+              {otpCountdown > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Mã còn hiệu lực trong: <span className="font-bold text-primary">{Math.floor(otpCountdown / 60)}:{(otpCountdown % 60).toString().padStart(2, '0')}</span>
+                </p>
+              )}
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isVerifyingOtp || otp.length !== 6}
+            >
+              {isVerifyingOtp ? "Đang xác thực..." : "Xác thực & đăng nhập"}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={isLoading || isVerifyingOtp}
+              onClick={handleResendOtp}
+            >
+              {isLoading ? "Đang gửi..." : otpCountdown > 0 ? `Gửi lại (${Math.floor(otpCountdown / 60)}:${(otpCountdown % 60).toString().padStart(2, '0')})` : "Gửi lại mã"}
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              disabled={isVerifyingOtp}
+              onClick={() => {
+                setStep("form");
+                setOtp("");
+                setOtpCountdown(0);
+              }}
+            >
+              Quay về chỉnh sửa thông tin đăng ký
+            </Button>
+          </form>
+        )}
       </CardContent>
     </Card>
   );

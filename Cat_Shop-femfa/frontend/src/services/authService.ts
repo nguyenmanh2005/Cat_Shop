@@ -7,6 +7,7 @@ import { decodeJwtPayload } from '@/utils/jwt';
 export interface LoginRequest {
   email: string;
   password: string;
+  captchaToken?: string;
 }
 
 export interface RegisterRequest {
@@ -15,6 +16,7 @@ export interface RegisterRequest {
   password: string;
   phone?: string;
   address?: string;
+  captchaToken?: string;
 }
 
 export interface TokenResponse {
@@ -83,6 +85,7 @@ export const authService = {
         email: credentials.email,
         password: credentials.password,
         deviceId,
+        captchaToken: credentials.captchaToken,
       });
 
       console.log('✅ Login response:', response.data);
@@ -158,6 +161,10 @@ export const authService = {
         password: userData.password,
         phone: userData.phone || '',
         address: userData.address || '',
+        captchaToken: userData.captchaToken,
+        // Yêu cầu backend KHÔNG gửi email link kích hoạt, chỉ tạo user (sẽ gửi OTP riêng sau)
+        skipEmailVerification: true,
+        useOtpVerification: true,
       });
     } catch (error: any) {
       console.error('Register error:', error);
@@ -207,11 +214,26 @@ export const authService = {
     );
   },
 
-  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
-    return apiService.post<{ message: string }>(
-      API_CONFIG.ENDPOINTS.AUTH.RESET_PASSWORD,
-      { token, newPassword }
-    );
+  // Đặt lại mật khẩu bằng OTP gửi qua email
+  async resetPassword(email: string, otp: string, newPassword: string): Promise<{ message: string }> {
+    try {
+      return await apiService.post<{ message: string }>(
+        API_CONFIG.ENDPOINTS.AUTH.RESET_PASSWORD,
+        { email, otp, newPassword }
+      );
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+
+      // Lấy message rõ ràng từ backend nếu có
+      const backendMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        "Không thể đặt lại mật khẩu. Vui lòng thử lại.";
+
+      // Thay thế message mặc định của Axios
+      throw new Error(backendMessage);
+    }
   },
 
   async getProfile(email?: string): Promise<UserProfile> {
@@ -344,6 +366,101 @@ export const authService = {
     }
   },
 
+  // OTP Register (cho user mới đăng ký - tách riêng với OTP đăng nhập)
+  // Tạm thời dùng endpoint chung /auth/send-otp cho đến khi backend implement /auth/register/send-otp
+  async sendRegisterOtp(email: string): Promise<{ message: string }> {
+    try {
+      // Thử dùng endpoint riêng trước, nếu 404 thì fallback về endpoint chung
+      try {
+        const response = await apiService.post<{ message: string }>(
+          API_CONFIG.ENDPOINTS.AUTH.REGISTER_SEND_OTP,
+          { email }
+        );
+        return response;
+      } catch (error: any) {
+        // Nếu endpoint riêng chưa có (404), dùng endpoint chung
+        if (error.response?.status === 404) {
+          console.warn('Register OTP endpoint not found, using common OTP endpoint');
+          const response = await apiService.post<{ message: string }>(
+            API_CONFIG.ENDPOINTS.AUTH.SEND_OTP,
+            { email }
+          );
+          return response;
+        }
+        throw error;
+      }
+    } catch (error: any) {
+      console.error('Send Register OTP error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Không thể gửi mã OTP đăng ký';
+      throw new Error(errorMessage);
+    }
+  },
+
+  async verifyRegisterOtp(email: string, otp: string): Promise<TokenResponse> {
+    try {
+      const deviceId = await getOrCreateDeviceId();
+      
+      console.log('🔐 Verifying Register OTP:', {
+        email,
+        otpLength: otp.length,
+        deviceId
+      });
+      
+      // Thử dùng endpoint riêng trước, nếu 404 thì fallback về endpoint chung
+      let response: TokenResponse;
+      try {
+        response = await apiService.post<TokenResponse>(
+          API_CONFIG.ENDPOINTS.AUTH.REGISTER_VERIFY_OTP,
+          { email, otp, deviceId }
+        );
+      } catch (error: any) {
+        // Nếu endpoint riêng chưa có (404), dùng endpoint chung
+        if (error.response?.status === 404) {
+          console.warn('Register verify OTP endpoint not found, using common OTP endpoint');
+          response = await apiService.post<TokenResponse>(
+            API_CONFIG.ENDPOINTS.AUTH.VERIFY_OTP,
+            { email, otp, deviceId }
+          );
+        } else {
+          throw error;
+        }
+      }
+
+      console.log('✅ Verify Register OTP response:', response);
+
+      // Nếu có accessToken, lưu token (đăng ký thành công + tự động đăng nhập)
+      if (response.accessToken) {
+        storeTokens(response, email);
+      }
+
+      return response;
+    } catch (error: any) {
+      console.error('❌ Verify Register OTP error:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+      
+      let errorMessage = 'Xác thực OTP đăng ký thất bại';
+      
+      if (error.response?.data) {
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else if (error.response.status === 400) {
+          errorMessage = error.response.data.message || 
+                        error.response.data.error || 
+                        'Mã OTP đăng ký không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.';
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      throw new Error(errorMessage);
+    }
+  },
+
   parseAccessToken(): { email: string; role?: string } | null {
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
     if (!token) return null;
@@ -379,6 +496,21 @@ export const authService = {
     } catch (error: any) {
       console.error('Check QR status error:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Không thể kiểm tra trạng thái';
+      throw new Error(errorMessage);
+    }
+  },
+
+  // Xác nhận QR login bằng access token đang có trên thiết bị (không cần nhập lại mật khẩu)
+  async confirmQrLoginWithToken(sessionId: string): Promise<{ message: string }> {
+    try {
+      const response = await apiService.post<{ message: string }>(
+        '/auth/qr/confirm-token',
+        { sessionId }
+      );
+      return response;
+    } catch (error: any) {
+      console.error('Confirm QR login with token error:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Không thể xác nhận đăng nhập QR';
       throw new Error(errorMessage);
     }
   },

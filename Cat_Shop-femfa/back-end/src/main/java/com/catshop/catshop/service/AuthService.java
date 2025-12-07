@@ -6,8 +6,6 @@ import com.catshop.catshop.dto.request.UserRequest;
 import com.catshop.catshop.dto.response.TokenResponse;
 import com.catshop.catshop.entity.User;
 
-import java.util.Map;
-
 public interface AuthService {
 
     // Bước 1: login gửi OTP
@@ -25,6 +23,10 @@ public interface AuthService {
     // Đăng ký tài khoản
     boolean register(UserRequest request);
 
+    // Xác thực email đăng ký
+    void sendEmailVerification(String email);
+    void verifyEmail(String token);
+
     // Làm mới access token bằng refresh token
     String refreshAccessToken(String refreshToken);
 
@@ -35,5 +37,7 @@ public interface AuthService {
     String generateRefreshTokenForUser(User user);
     void saveRefreshToken(String email, String refreshToken);
 
-
+    // Quên mật khẩu - gửi OTP và đặt lại mật khẩu bằng OTP
+    void sendPasswordResetOtp(String email);
+    void resetPassword(String email, String otp, String newPassword);
 }
