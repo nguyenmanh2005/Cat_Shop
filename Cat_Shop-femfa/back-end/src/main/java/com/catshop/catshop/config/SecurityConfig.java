@@ -78,6 +78,8 @@ public class SecurityConfig {
 
                 // Quy định quyền truy cập
                 .authorizeHttpRequests(auth -> auth
+                        // ✅ Cho phép OPTIONS requests (CORS preflight)
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // ✅ Cho phép tất cả các endpoint auth và public (ưu tiên cao nhất)
                         .requestMatchers("/auth/**", "/api/auth/**", "/public/**", "/oauth2/**").permitAll()
                         // ✅ Cho phép GET categories cho customer (không cần auth)
