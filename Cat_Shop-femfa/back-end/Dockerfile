@@ -36,17 +36,22 @@ RUN addgroup -S spring && adduser -S spring -G spring
 # Create uploads directory BEFORE switching to non-root user
 RUN mkdir -p /app/uploads
 
-# Copy jar from build stage (as root) - find jar file dynamically
-# Spring Boot creates jar with pattern: artifactId-version.jar
-# But we'll copy any jar file that matches the pattern
-COPY --from=build --chown=spring:spring /app/target/catshop-*.jar app.jar
+# Copy all jar files from build stage (as root)
+COPY --from=build /app/target/*.jar /tmp/
 
-# Verify jar file exists and is readable
-RUN ls -la app.jar && \
-    test -f app.jar || (echo "ERROR: app.jar not found!" && \
-    echo "Listing /app/target/:" && \
-    ls -la /app/target/ 2>&1 || true && \
-    exit 1)
+# Find and rename the jar file to app.jar
+# Spring Boot creates jar with pattern: artifactId-version.jar
+RUN JAR_FILE=$(ls /tmp/catshop-*.jar 2>/dev/null | head -1) && \
+    if [ -z "$JAR_FILE" ]; then \
+        echo "ERROR: No catshop jar file found!" && \
+        echo "Listing /tmp/:" && \
+        ls -la /tmp/ && \
+        exit 1; \
+    fi && \
+    echo "Found jar file: $JAR_FILE" && \
+    mv "$JAR_FILE" /app/app.jar && \
+    chown spring:spring /app/app.jar && \
+    ls -la /app/app.jar
 
 # Set ownership for all files to spring user
 RUN chown -R spring:spring /app
