@@ -236,7 +236,11 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       return;
     }
 
-    if (!recaptchaToken) {
+    // Chỉ yêu cầu captcha nếu có site key được cấu hình
+    const hasRecaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY && 
+                                 import.meta.env.VITE_RECAPTCHA_SITE_KEY.trim() !== "";
+    
+    if (hasRecaptchaSiteKey && !recaptchaToken) {
       toast({
         title: "Xác thực reCAPTCHA",
         description: "Vui lòng xác thực reCAPTCHA để tiếp tục",

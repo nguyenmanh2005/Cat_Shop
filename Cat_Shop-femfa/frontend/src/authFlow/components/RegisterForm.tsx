@@ -64,7 +64,11 @@ const RegisterForm = () => {
 
   // Xử lý gửi form đăng ký lên server
   const onSubmit = async (formValues: RegisterFormValues) => {
-    if (!recaptchaToken) {
+    // Chỉ yêu cầu captcha nếu có site key được cấu hình
+    const hasRecaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY && 
+                                 import.meta.env.VITE_RECAPTCHA_SITE_KEY.trim() !== "";
+    
+    if (hasRecaptchaSiteKey && !recaptchaToken) {
       setError("Vui lòng xác thực reCAPTCHA để tiếp tục");
       return;
     }

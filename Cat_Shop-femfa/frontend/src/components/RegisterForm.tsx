@@ -101,7 +101,11 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
       return;
     }
 
-    if (!recaptchaToken) {
+    // Chỉ yêu cầu captcha nếu có site key được cấu hình
+    const hasRecaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY && 
+                                 import.meta.env.VITE_RECAPTCHA_SITE_KEY.trim() !== "";
+    
+    if (hasRecaptchaSiteKey && !recaptchaToken) {
       toast({
         title: "Thiếu xác minh bảo mật",
         description: "Vui lòng hoàn thành captcha trước khi đăng ký.",
