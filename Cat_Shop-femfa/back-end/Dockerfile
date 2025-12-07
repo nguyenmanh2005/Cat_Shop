@@ -8,14 +8,23 @@ COPY pom.xml .
 # Download dependencies (this helps with caching)
 RUN mvn dependency:go-offline -B
 
-# Copy source code (copy everything to ensure all files are included)
+# Copy source code
 COPY src ./src
 
-# Verify CaptchaService exists (for debugging)
-RUN ls -la src/main/java/com/catshop/catshop/service/CaptchaService.java || (echo "CaptchaService.java not found!" && find . -name "CaptchaService.java" && exit 1)
+# Debug: List all service files to verify CaptchaService exists
+RUN echo "=== Checking service files ===" && \
+    ls -la src/main/java/com/catshop/catshop/service/ || true && \
+    echo "=== Checking CaptchaService ===" && \
+    ls -la src/main/java/com/catshop/catshop/service/CaptchaService.java || \
+    (echo "ERROR: CaptchaService.java not found!" && \
+     find . -name "*.java" -type f | head -20 && \
+     exit 1)
 
-# Build application
-RUN mvn clean package -DskipTests
+# Build application with verbose output
+RUN mvn clean package -DskipTests -X 2>&1 | tail -100 || \
+    (echo "=== Build failed, showing errors ===" && \
+     mvn clean package -DskipTests -e 2>&1 | tail -200 && \
+     exit 1)
 
 # Runtime stage
 FROM eclipse-temurin:21-jre-alpine
