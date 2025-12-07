@@ -35,7 +35,8 @@ const LoginTest = () => {
     setError('');
 
     try {
-      const result = await login(formData.email, formData.password);
+      // Trang test admin không có UI captcha, dùng token giả cho môi trường dev
+      const result = await login(formData.email, formData.password, "dev-debug-captcha");
 
       if (result.success) {
         navigate('/admin');

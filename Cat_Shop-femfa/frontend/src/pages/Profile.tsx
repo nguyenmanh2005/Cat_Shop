@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { User, Mail, Phone, MapPin, Save, Edit } from "lucide-react";
+import { User, Mail, Phone, MapPin, Save, Edit, QrCode } from "lucide-react";
 import { User as UserType } from "@/types";
 import { useNavigate } from "react-router-dom";
 
@@ -105,10 +105,13 @@ const Profile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="min-h-screen bg-background flex flex-col overflow-x-hidden page-transition">
         <Header />
         <main className="flex-1 flex items-center justify-center">
-          <div className="text-lg">Đang tải...</div>
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <div className="text-lg animate-pulse">Đang tải...</div>
+          </div>
         </main>
         <Footer />
       </div>
@@ -116,13 +119,13 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col overflow-x-hidden page-transition">
       <Header />
       
-      <main className="flex-1 py-8">
+      <main className="flex-1 py-8 animate-fade-in">
         <div className="max-w-4xl mx-auto px-6">
           {/* Page Header */}
-          <div className="mb-8">
+          <div className="mb-8 animate-fade-in-down">
             <h1 className="text-3xl font-bold text-foreground mb-2">
               Thông tin cá nhân
             </h1>
@@ -132,7 +135,7 @@ const Profile = () => {
           </div>
 
           {/* Profile Card */}
-          <Card>
+          <Card className="card-hover animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -256,6 +259,24 @@ const Profile = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">ID tài khoản</span>
                   <span className="font-medium">{user?.user_id}</span>
+                </div>
+
+                {/* Đăng nhập thiết bị khác bằng QR (giống Zalo) */}
+                <div className="pt-2 border-t mt-4">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Đang đăng nhập trên điện thoại? Bạn có thể dùng mã QR để đăng nhập nhanh trên thiết bị khác.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full flex items-center justify-center gap-2"
+                    onClick={() => {
+                      navigate("/qr-login");
+                    }}
+                  >
+                    <QrCode className="h-4 w-4" />
+                    <span>Quét mã QR để đăng nhập thiết bị khác</span>
+                  </Button>
                 </div>
               </div>
             </CardContent>

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Shield, Key, Download, RefreshCw, Eye, EyeOff, Lock, Smartphone, Trash2, AlertTriangle, Clock, Globe, Phone, CheckCircle2 } from "lucide-react";
+import { Shield, Key, Download, RefreshCw, Eye, EyeOff, Lock, Smartphone, Trash2, AlertTriangle, Clock, Globe, Phone, CheckCircle2, QrCode } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { apiService } from "@/services/api";
 import { userService } from "@/services/userService";
@@ -34,16 +34,6 @@ const Security = () => {
   const [showBackupCodes, setShowBackupCodes] = useState(false);
   const [remainingBackupCodes, setRemainingBackupCodes] = useState<number>(0);
   const [regeneratingCodes, setRegeneratingCodes] = useState(false);
-  
-  // Đổi mật khẩu states
-  const [showChangePassword, setShowChangePassword] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [changingPassword, setChangingPassword] = useState(false);
   
   // Quản lý thiết bị states
   const [devices, setDevices] = useState<TrustedDevice[]>([]);
@@ -249,75 +239,7 @@ const Security = () => {
     }
   };
 
-  // Đổi mật khẩu
-  const handleChangePassword = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setError("Vui lòng điền đầy đủ thông tin");
-      toast({
-        title: "Lỗi",
-        description: "Vui lòng điền đầy đủ thông tin",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setError("Mật khẩu mới phải có ít nhất 6 ký tự");
-      toast({
-        title: "Lỗi",
-        description: "Mật khẩu mới phải có ít nhất 6 ký tự",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setError("Mật khẩu mới và xác nhận mật khẩu không khớp");
-      toast({
-        title: "Lỗi",
-        description: "Mật khẩu mới và xác nhận mật khẩu không khớp",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setError(undefined);
-      setChangingPassword(true);
-      await userService.changePassword(currentPassword, newPassword);
-      
-      // Reset form
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setShowChangePassword(false);
-      
-      toast({
-        title: "Thành công",
-        description: "Đổi mật khẩu thành công",
-      });
-    } catch (err: any) {
-      console.error("Lỗi khi đổi mật khẩu:", err);
-      let errorMessage = "Không thể đổi mật khẩu. Vui lòng thử lại.";
-      
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (err?.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err?.message) {
-        errorMessage = err.message;
-      }
-      
-      setError(errorMessage);
-      toast({
-        title: "Lỗi",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setChangingPassword(false);
-    }
-  };
+  // Đổi mật khẩu đã được đưa về flow "Quên mật khẩu" ở màn đăng nhập
 
   // Load danh sách thiết bị
   const loadDevices = async () => {
@@ -923,126 +845,39 @@ const Security = () => {
             </CardContent>
           </Card>
 
-          {/* Đổi mật khẩu Section */}
+          {/* Đăng nhập thiết bị khác bằng QR (thay cho Đổi mật khẩu thủ công) */}
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Lock className="h-5 w-5" />
-                Đổi mật khẩu
+                <QrCode className="h-5 w-5" />
+                Đăng nhập thiết bị khác bằng mã QR
               </CardTitle>
               <CardDescription>
-                Thay đổi mật khẩu để bảo vệ tài khoản của bạn
+                Mở trang bảo mật này trên điện thoại đã đăng nhập, sau đó quét mã QR trên màn hình máy tính để đăng nhập nhanh giống như Zalo.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {!showChangePassword ? (
-                <Button
-                  variant="outline"
-                  onClick={() => setShowChangePassword(true)}
-                  className="w-full"
-                >
-                  <Lock className="h-4 w-4 mr-2" />
-                  Đổi mật khẩu
-                </Button>
-              ) : (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="currentPassword">Mật khẩu hiện tại</Label>
-                    <div className="relative">
-                      <Input
-                        id="currentPassword"
-                        type={showCurrentPassword ? "text" : "password"}
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        placeholder="Nhập mật khẩu hiện tại"
-                        className="pr-10"
-                        disabled={changingPassword}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      >
-                        {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="newPassword">Mật khẩu mới</Label>
-                    <div className="relative">
-                      <Input
-                        id="newPassword"
-                        type={showNewPassword ? "text" : "password"}
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
-                        className="pr-10"
-                        disabled={changingPassword}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowNewPassword(!showNewPassword)}
-                      >
-                        {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Xác nhận mật khẩu mới</Label>
-                    <div className="relative">
-                      <Input
-                        id="confirmPassword"
-                        type={showConfirmPassword ? "text" : "password"}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Nhập lại mật khẩu mới"
-                        className="pr-10"
-                        disabled={changingPassword}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      >
-                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleChangePassword}
-                      disabled={changingPassword}
-                      className="flex-1"
-                    >
-                      {changingPassword ? "Đang đổi..." : "Đổi mật khẩu"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setShowChangePassword(false);
-                        setCurrentPassword("");
-                        setNewPassword("");
-                        setConfirmPassword("");
-                        setError(undefined);
-                      }}
-                      disabled={changingPassword}
-                      className="flex-1"
-                    >
-                      Hủy
-                    </Button>
-                  </div>
+              <div className="space-y-4">
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+                  <p className="font-medium mb-2">Cách sử dụng:</p>
+                  <ol className="list-decimal list-inside space-y-1">
+                    <li>Mở trang đăng nhập trên máy tính và chọn đăng nhập bằng mã QR.</li>
+                    <li>Mở trang bảo mật này trên điện thoại (đã đăng nhập sẵn tài khoản).</li>
+                    <li>Nhấn nút bên dưới để chuyển đến trang quét QR và quét mã trên màn hình máy tính.</li>
+                    <li>Sau khi quét, máy tính sẽ tự đăng nhập tài khoản của bạn.</li>
+                  </ol>
                 </div>
-              )}
+                <Button
+                  type="button"
+                  className="w-full flex items-center justify-center gap-2"
+                  onClick={() => {
+                    navigate("/qr-login");
+                  }}
+                >
+                  <QrCode className="h-4 w-4" />
+                  <span>Mở camera quét mã QR đăng nhập</span>
+                </Button>
+              </div>
             </CardContent>
           </Card>
 

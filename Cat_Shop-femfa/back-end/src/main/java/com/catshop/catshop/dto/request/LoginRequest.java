@@ -20,4 +20,7 @@ public class LoginRequest {
 
     @NotBlank(message = "Thiết Bị ID không được để trống")
     private String deviceId;
+
+    // Captcha token khi đăng nhập
+    private String captchaToken;
 }

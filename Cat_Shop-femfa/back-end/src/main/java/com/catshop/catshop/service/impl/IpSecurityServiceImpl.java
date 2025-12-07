@@ -69,16 +69,13 @@ public class IpSecurityServiceImpl implements IpSecurityService {
     }
 
     @Override
-    public void sendSecurityAlertEmail(String email, String ipAddress, String userAgent, String resetPasswordToken) {
+    public void sendSecurityAlertEmail(String email, String ipAddress, String userAgent) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setTo(email);
             helper.setSubject("⚠️ Cảnh báo bảo mật: Đăng nhập từ địa chỉ IP mới");
-
-            // Tạo link đổi mật khẩu
-            String resetPasswordUrl = frontendUrl + "/reset-password?token=" + resetPasswordToken;
 
             String htmlContent = String.format("""
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafc;">
@@ -96,20 +93,9 @@ public class IpSecurityServiceImpl implements IpSecurityService {
                         </div>
                         
                         <p style="color: #4a5568; font-size: 16px; line-height: 1.6;">
-                            <strong>Nếu đây không phải là bạn,</strong> vui lòng:
+                            <strong>Nếu đây không phải là bạn,</strong> vui lòng kiểm tra ngay hoạt động đăng nhập
+                            và đổi mật khẩu từ trang \"Quên mật khẩu\" trong ứng dụng CatShop.
                         </p>
-                        
-                        <ol style="color: #4a5568; font-size: 16px; line-height: 1.8;">
-                            <li>Click vào nút bên dưới để đổi mật khẩu ngay lập tức</li>
-                            <li>Kiểm tra các hoạt động đăng nhập gần đây trong tài khoản</li>
-                            <li>Liên hệ với chúng tôi nếu bạn nghi ngờ có người xâm nhập</li>
-                        </ol>
-                        
-                        <div style="text-align: center; margin: 30px 0;">
-                            <a href="%s" style="display: inline-block; background-color: #e53e3e; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
-                                🔒 Đổi mật khẩu ngay
-                            </a>
-                        </div>
                         
                         <p style="color: #718096; font-size: 14px; line-height: 1.6; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
                             <strong>Lưu ý:</strong> Link đổi mật khẩu có hiệu lực trong 24 giờ. Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.
@@ -127,8 +113,7 @@ public class IpSecurityServiceImpl implements IpSecurityService {
                 """,
                 ipAddress,
                 LocalDateTime.now().toString(),
-                userAgent != null ? userAgent : "Không xác định",
-                resetPasswordUrl
+                userAgent != null ? userAgent : "Không xác định"
             );
 
             helper.setText(htmlContent, true);

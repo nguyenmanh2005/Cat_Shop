@@ -26,5 +26,14 @@ public class UserRequest {
     @Size(max = 255, message = "Address too long")
     private String address;
 
+    // Captcha token từ frontend (reCAPTCHA hoặc tương tự)
+    private String captchaToken;
+
+    // Flag để bỏ qua gửi email link kích hoạt (dùng OTP thay thế)
+    private Boolean skipEmailVerification;
+    
+    // Flag để báo backend dùng OTP thay vì email link
+    private Boolean useOtpVerification;
+
 }
 

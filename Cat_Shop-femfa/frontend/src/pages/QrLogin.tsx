@@ -22,9 +22,11 @@ const QrLogin = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [status, setStatus] = useState<"scanning" | "login" | "success" | "error">(
+  const [status, setStatus] = useState<"scanning" | "login" | "success" | "error" | "processing">(
     searchParams.get("sessionId") ? "login" : "scanning"
   );
+
+  const isLoggedIn = !!localStorage.getItem("access_token");
 
   // Nếu có sessionId từ URL, chuyển thẳng sang form login
   useEffect(() => {
@@ -82,7 +84,7 @@ const QrLogin = () => {
   };
 
   const stopScanning = async () => {
-    if (scannerRef.current) {
+      if (scannerRef.current) {
       try {
         await scannerRef.current.stop();
         scannerRef.current.clear();
@@ -137,12 +139,39 @@ const QrLogin = () => {
       }
 
       setScannedSessionId(sanitizedSessionId);
-      setStatus("login");
-      
-      toast({
-        title: "Quét QR thành công!",
-        description: "Vui lòng nhập thông tin đăng nhập",
-      });
+
+      // Nếu đã đăng nhập sẵn trên điện thoại → xác nhận luôn bằng access token (giống Zalo)
+      if (isLoggedIn) {
+        setStatus("processing");
+        try {
+          await authService.confirmQrLoginWithToken(sanitizedSessionId);
+          setStatus("success");
+          toast({
+            title: "Đã cho phép đăng nhập trên thiết bị khác",
+            description: "Vui lòng quay lại trình duyệt trên máy tính của bạn",
+          });
+
+          // Sau 3 giây quay về trang chủ / đóng tab
+          setTimeout(() => {
+            window.location.href = "/";
+          }, 3000);
+        } catch (error: any) {
+          console.error("Error confirming QR with token:", error);
+          setStatus("error");
+          toast({
+            title: "Không thể xác nhận đăng nhập",
+            description: error.message || "Vui lòng thử lại hoặc đăng nhập lại trên điện thoại.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        // Chưa đăng nhập trên điện thoại → yêu cầu nhập email/mật khẩu (flow cũ)
+        setStatus("login");
+        toast({
+          title: "Quét QR thành công!",
+          description: "Vui lòng nhập thông tin đăng nhập",
+        });
+      }
     } catch (error: any) {
       console.error("Error parsing QR:", error);
       toast({

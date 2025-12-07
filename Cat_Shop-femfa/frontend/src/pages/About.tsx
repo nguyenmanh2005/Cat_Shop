@@ -84,18 +84,18 @@ const About = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col overflow-x-hidden page-transition">
       <Header />
       
-      <main className="flex-1">
+      <main className="flex-1 animate-fade-in">
         {/* Hero Section */}
-        <section className="bg-gradient-to-r from-primary/10 to-primary/5 py-16">
+        <section className="bg-gradient-to-r from-primary/10 to-primary/5 py-16 animate-fade-in-down">
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center">
               <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
                 Về Cham Pets
               </h1>
-              <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+              <p className="text-xl text-muted-foreground max-w-3xl mx-auto animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
                 Chuyên cung cấp mèo cảnh chất lượng cao với sự chăm sóc tận tâm và yêu thương vô điều kiện
               </p>
             </div>
@@ -169,12 +169,16 @@ const About = () => {
                 {features.map((feature, index) => {
                   const Icon = feature.icon;
                   return (
-                    <Card key={index} className="text-center hover:shadow-lg transition-shadow">
+                    <Card 
+                      key={index} 
+                      className="text-center card-hover animate-fade-in-up group"
+                      style={{ animationDelay: `${index * 100}ms` }}
+                    >
                       <CardContent className="p-6">
-                        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <Icon className="h-8 w-8 text-primary" />
+                        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-primary group-hover:scale-110 transition-all duration-300">
+                          <Icon className="h-8 w-8 text-primary group-hover:text-primary-foreground transition-colors duration-300" />
                         </div>
-                        <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
+                        <h3 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors duration-300">{feature.title}</h3>
                         <p className="text-muted-foreground text-sm">{feature.description}</p>
                       </CardContent>
                     </Card>
@@ -245,7 +249,11 @@ const About = () => {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {testimonials.map((testimonial, index) => (
-                  <Card key={index} className="hover:shadow-lg transition-shadow">
+                  <Card 
+                    key={index} 
+                    className="card-hover animate-fade-in-up"
+                    style={{ animationDelay: `${index * 150}ms` }}
+                  >
                     <CardContent className="p-6">
                       <div className="flex items-center gap-1 mb-3">
                         {[...Array(testimonial.rating)].map((_, i) => (
