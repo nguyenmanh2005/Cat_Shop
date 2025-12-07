@@ -36,14 +36,25 @@ RUN addgroup -S spring && adduser -S spring -G spring
 # Create uploads directory BEFORE switching to non-root user
 RUN mkdir -p /app/uploads
 
-# Copy jar from build stage (as root)
-COPY --from=build /app/target/*.jar app.jar
+# Debug: List jar files in build stage
+RUN echo "=== Listing jar files ===" && \
+    ls -la /app/target/*.jar 2>&1 || echo "No jar files found in /app/target/"
+
+# Copy jar from build stage (as root) - use specific pattern
+COPY --from=build --chown=spring:spring /app/target/catshop-0.0.1-SNAPSHOT.jar app.jar
+
+# Verify jar file exists
+RUN ls -la app.jar && \
+    test -f app.jar || (echo "ERROR: app.jar not found!" && ls -la /app/ && exit 1)
 
 # Set ownership for all files to spring user
 RUN chown -R spring:spring /app
 
 # Switch to non-root user
 USER spring:spring
+
+# Verify jar is accessible
+RUN test -r app.jar || (echo "ERROR: Cannot read app.jar!" && ls -la app.jar && exit 1)
 
 # Expose port
 EXPOSE 8080
