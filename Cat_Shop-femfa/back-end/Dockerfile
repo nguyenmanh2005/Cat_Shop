@@ -20,15 +20,29 @@ RUN echo "=== Checking service files ===" && \
      find . -name "*.java" -type f | head -20 && \
      exit 1)
 
-# Build application with verbose output
-RUN mvn clean package -DskipTests -X 2>&1 | tail -100 || \
-    (echo "=== Build failed, showing errors ===" && \
-     mvn clean package -DskipTests -e 2>&1 | tail -200 && \
+# Build application (save full output to file for debugging)
+RUN mvn clean package -DskipTests > /tmp/build.log 2>&1 || \
+    (echo "=== Build failed ===" && \
+     cat /tmp/build.log && \
      exit 1)
 
-# Debug: List jar files after build
-RUN echo "=== Listing jar files in target ===" && \
-    ls -la /app/target/*.jar || echo "No jar files found"
+# Verify build succeeded and jar file exists
+RUN echo "=== Checking build result ===" && \
+    echo "Build log tail:" && \
+    tail -50 /tmp/build.log && \
+    echo "=== Listing target directory ===" && \
+    ls -la /app/target/ && \
+    echo "=== Looking for jar files ===" && \
+    find /app/target -name "*.jar" -type f && \
+    echo "=== Verifying jar file ===" && \
+    JAR_COUNT=$(find /app/target -name "*.jar" -type f | wc -l) && \
+    if [ "$JAR_COUNT" -eq 0 ]; then \
+        echo "ERROR: No jar file found after build!" && \
+        echo "Full build log:" && \
+        cat /tmp/build.log && \
+        exit 1; \
+    fi && \
+    echo "Found $JAR_COUNT jar file(s)"
 
 # Runtime stage
 FROM eclipse-temurin:21-jre-alpine
@@ -49,13 +63,16 @@ RUN echo "=== Listing copied files ===" && \
 
 # Find and copy the jar file to app.jar
 # Spring Boot creates jar with pattern: artifactId-version.jar
-RUN JAR_FILE=$(ls /tmp/target/catshop-*.jar 2>/dev/null | head -1) && \
+RUN echo "=== Finding jar file ===" && \
+    JAR_FILE=$(find /tmp/target -name "*.jar" -type f ! -name "*-sources.jar" ! -name "*-javadoc.jar" | head -1) && \
     if [ -z "$JAR_FILE" ]; then \
-        echo "ERROR: No catshop jar file found!" && \
+        echo "ERROR: No jar file found!" && \
         echo "Listing /tmp/target/:" && \
         ls -la /tmp/target/ && \
         echo "Looking for any jar files:" && \
         find /tmp/target -name "*.jar" -type f || true && \
+        echo "Looking for all files:" && \
+        find /tmp/target -type f | head -20 && \
         exit 1; \
     fi && \
     echo "Found jar file: $JAR_FILE" && \
