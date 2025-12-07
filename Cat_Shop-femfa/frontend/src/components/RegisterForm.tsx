@@ -32,6 +32,10 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
   const [passwordStrength, setPasswordStrength] = useState(calculatePasswordStrength(""));
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   
+  // Kiểm tra xem có site key được cấu hình không
+  const hasRecaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY && 
+                               import.meta.env.VITE_RECAPTCHA_SITE_KEY.trim() !== "";
+  
   // OTP verification states
   const [step, setStep] = useState<"form" | "verifyOtp">("form");
   const [otp, setOtp] = useState("");
@@ -403,7 +407,7 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
           <Button
             type="submit"
             className="w-full"
-            disabled={isLoading || !recaptchaToken}
+            disabled={isLoading || (hasRecaptchaSiteKey && !recaptchaToken)}
           >
             {isLoading ? "Đang đăng ký..." : "Đăng ký"}
           </Button>

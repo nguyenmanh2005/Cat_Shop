@@ -17,6 +17,10 @@ const LoginForm = () => {
   } = useForm<LoginFormValues>();
   const [error, setError] = useState<string | undefined>();
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  
+  // Kiểm tra xem có site key được cấu hình không
+  const hasRecaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY && 
+                               import.meta.env.VITE_RECAPTCHA_SITE_KEY.trim() !== "";
 
   // Redirect trực tiếp trong cùng tab để đăng nhập Google
   const handleGoogleLogin = () => {
@@ -114,7 +118,7 @@ const LoginForm = () => {
 
         <button
           type="submit"
-          disabled={isSubmitting || !recaptchaToken}
+          disabled={isSubmitting || (hasRecaptchaSiteKey && !recaptchaToken)}
           className="inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           {isSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}

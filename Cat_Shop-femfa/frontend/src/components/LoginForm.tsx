@@ -30,6 +30,10 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
   
+  // Kiểm tra xem có site key được cấu hình không
+  const hasRecaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY && 
+                               import.meta.env.VITE_RECAPTCHA_SITE_KEY.trim() !== "";
+  
   // Verification states
   const [needsVerification, setNeedsVerification] = useState(false);
   const [verificationMethod, setVerificationMethod] = useState<VerificationMethod>(null);
@@ -236,10 +240,6 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       return;
     }
 
-    // Chỉ yêu cầu captcha nếu có site key được cấu hình
-    const hasRecaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY && 
-                                 import.meta.env.VITE_RECAPTCHA_SITE_KEY.trim() !== "";
-    
     if (hasRecaptchaSiteKey && !recaptchaToken) {
       toast({
         title: "Xác thực reCAPTCHA",
@@ -898,7 +898,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                     <Button 
                       type="submit" 
                       className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
-                      disabled={isLoading || !recaptchaToken}
+                      disabled={isLoading || (hasRecaptchaSiteKey && !recaptchaToken)}
                     >
                       {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
                     </Button>
