@@ -116,6 +116,12 @@ public class SmsServiceImpl implements SmsService {
     /**
      * Gửi SMS qua ESMS (Việt Nam)
      * API Documentation: https://esms.vn/
+     * 
+     * Lưu ý về lỗi CodeResult 101 (Authorize Failed):
+     * - Kiểm tra API Key và Secret Key trong application.properties
+     * - Đăng nhập vào https://esms.vn/ để kiểm tra API Key còn hoạt động
+     * - Đảm bảo tài khoản ESMS đã được kích hoạt và có số dư
+     * - Kiểm tra API Key có đúng format (32 ký tự hex)
      */
     private boolean sendViaEsms(String phoneNumber, String otp) {
         log.info("📱 [SMS-SERVICE] Gửi SMS qua ESMS đến: {}", phoneNumber);
@@ -125,7 +131,15 @@ public class SmsServiceImpl implements SmsService {
             if (esmsApiKey == null || esmsApiKey.isBlank() || 
                 esmsSecretKey == null || esmsSecretKey.isBlank()) {
                 log.error("❌ [SMS-SERVICE] ESMS API Key hoặc Secret Key chưa được cấu hình");
+                log.error("❌ [SMS-SERVICE] Vui lòng kiểm tra application.properties:");
+                log.error("    - sms.esms.api-key");
+                log.error("    - sms.esms.secret-key");
                 return false;
+            }
+
+            // Validate API Key format (thường là 32 ký tự hex)
+            if (esmsApiKey.length() < 20 || esmsSecretKey.length() < 20) {
+                log.warn("⚠️ [SMS-SERVICE] API Key hoặc Secret Key có vẻ không đúng format");
             }
 
             // Chuẩn hóa số điện thoại (ESMS yêu cầu format: 84xxxxxxxxx hoặc 0901888484)
@@ -135,23 +149,28 @@ public class SmsServiceImpl implements SmsService {
             String message = "Ma OTP cua ban la: " + otp + ". Co hieu luc trong 2 phut. - Cat Shop";
             
             // ESMS API URL - Sử dụng endpoint JSON (theo tài liệu API)
+            // Có thể thử endpoint khác nếu endpoint này không hoạt động:
+            // - https://rest.esms.vn/MainService.svc/json/SendMultipleMessage_V4_post_json/
+            // - https://rest.esms.vn/MainService.svc/json/SendMultipleMessage_V4_get/
             String apiUrl = "https://rest.esms.vn/MainService.svc/json/SendMultipleMessage_V4_post_json/";
             
             // Tạo request body theo format ESMS yêu cầu
             Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("ApiKey", esmsApiKey);
-            requestBody.put("SecretKey", esmsSecretKey);
+            requestBody.put("ApiKey", esmsApiKey.trim());
+            requestBody.put("SecretKey", esmsSecretKey.trim());
             requestBody.put("Phone", normalizedPhone);
             requestBody.put("Content", message);
             
             // Brandname và SmsType
+            // Lưu ý: Nếu không có brandname, có thể cần dùng SmsType = 1 (SMS quảng cáo)
+            // hoặc đăng ký brandname với ESMS
             if (esmsBrandName != null && !esmsBrandName.isBlank()) {
-                requestBody.put("Brandname", esmsBrandName);
+                requestBody.put("Brandname", esmsBrandName.trim());
                 requestBody.put("SmsType", "2"); // 2 = SMS CSKH có brandname
             } else {
-                // Không có brandname - vẫn dùng SmsType = 2 (CSKH) nhưng không truyền Brandname
-                // Lưu ý: Có thể cần đăng ký với ESMS để gửi không có brandname
-                requestBody.put("SmsType", "2"); // 2 = SMS CSKH
+                // Không có brandname - thử dùng SmsType = 1 (SMS quảng cáo) thay vì 2
+                // Nếu vẫn lỗi, cần đăng ký brandname với ESMS
+                requestBody.put("SmsType", "1"); // 1 = SMS quảng cáo (không cần brandname)
             }
             
             // IsUnicode: 0 = không dấu, 1 = có dấu
@@ -162,18 +181,20 @@ public class SmsServiceImpl implements SmsService {
             String requestId = java.util.UUID.randomUUID().toString();
             requestBody.put("RequestId", requestId);
             
-            // Log request để debug
-            log.info("📱 [SMS-SERVICE] Request body: ApiKey={}, Phone={}, Content={}, SmsType={}, IsUnicode=0", 
-                    esmsApiKey.substring(0, Math.min(10, esmsApiKey.length())) + "...", 
+            // Log request để debug (ẩn API key đầy đủ vì lý do bảo mật)
+            log.info("📱 [SMS-SERVICE] Request body: ApiKey={}...{}, Phone={}, Content={}, SmsType={}, IsUnicode=0", 
+                    esmsApiKey.substring(0, Math.min(8, esmsApiKey.length())),
+                    esmsApiKey.length() > 8 ? "..." : "",
                     normalizedPhone, message, requestBody.get("SmsType"));
             
             // Headers
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("Accept", "application/json");
             
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
             
-            log.info("📱 [SMS-SERVICE] Gửi request đến ESMS API...");
+            log.info("📱 [SMS-SERVICE] Gửi request đến ESMS API: {}", apiUrl);
             
             // Gọi ESMS API
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
@@ -203,18 +224,62 @@ public class SmsServiceImpl implements SmsService {
                 if (codeResult != null && codeResult == 100) {
                     log.info("✅ [SMS-SERVICE] SMS đã được gửi thành công qua ESMS đến: {}", phoneNumber);
                     log.info("📱 [SMS-SERVICE] SMSID: {}", responseBody.get("SMSID"));
+                    log.info("📱 [SMS-SERVICE] Full response: {}", responseBody);
+                    
+                    // Cảnh báo: CodeResult = 100 chỉ có nghĩa là ESMS đã nhận request
+                    // SMS có thể vẫn bị nhà mạng chặn hoặc không đến được điện thoại
+                    log.warn("⚠️ [SMS-SERVICE] LƯU Ý: CodeResult = 100 chỉ có nghĩa ESMS đã nhận request");
+                    log.warn("⚠️ [SMS-SERVICE] Nếu không nhận được SMS, kiểm tra:");
+                    log.warn("    1. Dashboard ESMS: https://esms.vn/ → Xem lịch sử gửi SMS");
+                    log.warn("    2. SMS có thể bị nhà mạng chặn (spam filter)");
+                    log.warn("    3. Cần đăng ký Brandname để gửi SMS CSKH (SmsType = 2)");
+                    log.warn("    4. SmsType = 1 (quảng cáo) có thể bị chặn bởi một số nhà mạng");
+                    
                     return true;
                 } else {
                     log.error("❌ [SMS-SERVICE] ESMS trả về lỗi. CodeResult: {}, ErrorMessage: {}", 
                             codeResult, errorMessage);
                     log.error("❌ [SMS-SERVICE] Full response: {}", responseBody);
+                    
+                    // Xử lý các lỗi phổ biến
+                    if (codeResult != null) {
+                        switch (codeResult) {
+                            case 101:
+                                log.error("❌ [SMS-SERVICE] Lỗi xác thực (CodeResult 101):");
+                                log.error("    - Kiểm tra API Key và Secret Key trong application.properties");
+                                log.error("    - Đăng nhập vào https://esms.vn/ để kiểm tra API Key");
+                                log.error("    - Đảm bảo tài khoản đã được kích hoạt và có số dư");
+                                log.error("    - API Key hiện tại: {}...{}", 
+                                        esmsApiKey.substring(0, Math.min(8, esmsApiKey.length())),
+                                        esmsApiKey.length() > 8 ? "..." : "");
+                                break;
+                            case 102:
+                                log.error("❌ [SMS-SERVICE] Số điện thoại không hợp lệ (CodeResult 102)");
+                                break;
+                            case 103:
+                                log.error("❌ [SMS-SERVICE] Nội dung SMS không hợp lệ (CodeResult 103)");
+                                break;
+                            case 104:
+                                log.error("❌ [SMS-SERVICE] Tài khoản không đủ số dư (CodeResult 104)");
+                                break;
+                            default:
+                                log.error("❌ [SMS-SERVICE] Lỗi không xác định. CodeResult: {}", codeResult);
+                        }
+                    }
                     return false;
                 }
             } else {
                 log.error("❌ [SMS-SERVICE] ESMS API trả về status code: {}", response.getStatusCode());
+                if (responseBody != null) {
+                    log.error("❌ [SMS-SERVICE] Response body: {}", responseBody);
+                }
                 return false;
             }
             
+        } catch (org.springframework.web.client.RestClientException e) {
+            log.error("❌ [SMS-SERVICE] Lỗi kết nối đến ESMS API: {}", e.getMessage());
+            log.error("❌ [SMS-SERVICE] Kiểm tra kết nối internet và URL API");
+            return false;
         } catch (Exception e) {
             log.error("❌ [SMS-SERVICE] Lỗi khi gọi ESMS API: {}", e.getMessage(), e);
             return false;
@@ -224,30 +289,31 @@ public class SmsServiceImpl implements SmsService {
     /**
      * Chuẩn hóa số điện thoại về format ESMS yêu cầu
      * Theo tài liệu API: có thể dùng "0901888484" hoặc "84901888484"
-     * Ở đây giữ nguyên format "0901888484" (format Việt Nam) như trong tài liệu
+     * ESMS khuyến nghị dùng format quốc tế "84901888484" để tránh lỗi
      * Input: 0912345678, +84912345678, 84912345678, 0339474338
-     * Output: 0912345678 (giữ format Việt Nam nếu bắt đầu bằng 0)
+     * Output: 84912345678 (format quốc tế - khuyến nghị)
      */
     private String normalizePhoneNumber(String phoneNumber) {
         // Loại bỏ khoảng trắng và ký tự đặc biệt
         String normalized = phoneNumber.replaceAll("\\s+", "").replaceAll("[^0-9+]", "");
         
-        // Chuyển đổi format
+        // Chuyển đổi format - ESMS khuyến nghị dùng format quốc tế (84xxxxxxxxx)
         if (normalized.startsWith("+84")) {
-            // +84912345678 -> 0912345678
-            return "0" + normalized.substring(3);
+            // +84912345678 -> 84912345678
+            return normalized.substring(1);
         } else if (normalized.startsWith("84") && normalized.length() >= 11) {
-            // 84912345678 -> 0912345678
-            return "0" + normalized.substring(2);
-        } else if (normalized.startsWith("0") && normalized.length() == 10) {
-            // 0912345678 -> 0912345678 (giữ nguyên)
+            // 84912345678 -> 84912345678 (giữ nguyên)
             return normalized;
+        } else if (normalized.startsWith("0") && normalized.length() == 10) {
+            // 0912345678 -> 84912345678 (chuyển sang format quốc tế)
+            return "84" + normalized.substring(1);
         } else {
-            // Giả sử là số điện thoại Việt Nam (10 số)
-            if (normalized.length() == 10) {
-                return normalized;
+            // Giả sử là số điện thoại Việt Nam (10 số bắt đầu bằng 0)
+            if (normalized.length() == 10 && normalized.startsWith("0")) {
+                return "84" + normalized.substring(1);
             }
-            // Nếu không phải format Việt Nam, thử format quốc tế
+            // Nếu không phải format Việt Nam, trả về nguyên bản
+            log.warn("⚠️ [SMS-SERVICE] Số điện thoại không đúng format Việt Nam: {}", phoneNumber);
             return normalized;
         }
     }
