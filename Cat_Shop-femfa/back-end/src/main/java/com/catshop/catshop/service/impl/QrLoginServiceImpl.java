@@ -45,18 +45,26 @@ public class QrLoginServiceImpl implements QrLoginService {
 
     @Override
     public QrLoginResponse generateQrCode() {
+        log.info("📱 [QR-LOGIN] Starting QR code generation. Frontend URL: {}", frontendUrl);
+        
         // Tạo session ID ngẫu nhiên
         String sessionId = generateSessionId();
+        log.debug("📱 [QR-LOGIN] Generated session ID: {}", sessionId);
         
         // Tạo QR code data (chứa session ID)
         String qrData = createQrData(sessionId);
+        log.debug("📱 [QR-LOGIN] QR data created: {}", qrData);
         
         try {
             // Generate QR code image (Base64)
+            log.debug("📱 [QR-LOGIN] Generating QR code image...");
             String qrCodeBase64 = qrCodeGenerator.generateBase64QrCode(qrData, 300, 300);
+            log.debug("📱 [QR-LOGIN] QR code image generated (length: {})", qrCodeBase64 != null ? qrCodeBase64.length() : 0);
             
             // Lưu session vào Redis với status PENDING
+            log.debug("📱 [QR-LOGIN] Saving session to Redis...");
             saveSessionStatus(sessionId, "PENDING", null);
+            log.debug("📱 [QR-LOGIN] Session saved to Redis successfully");
             
             log.info("✅ QR code generated successfully. Session ID: {}", sessionId);
             
@@ -69,6 +77,8 @@ public class QrLoginServiceImpl implements QrLoginService {
                     
         } catch (Exception e) {
             log.error("❌ Failed to generate QR code: {}", e.getMessage(), e);
+            log.error("❌ Exception type: {}", e.getClass().getName());
+            log.error("❌ Stack trace: ", e);
             throw new BadRequestException("Không thể tạo QR code: " + e.getMessage());
         }
     }
@@ -229,8 +239,11 @@ public class QrLoginServiceImpl implements QrLoginService {
             }
         } catch (DataAccessException e) {
             log.error("❌ Failed to save session status to Redis: {}", e.getMessage());
+            log.error("❌ Redis connection error. Check REDIS_HOST, REDIS_PORT, REDIS_PASSWORD");
+            log.error("❌ Exception type: {}", e.getClass().getName());
+            log.error("❌ Stack trace: ", e);
             // Fallback: lưu vào in-memory (nếu cần)
-            throw new BadRequestException("Không thể lưu session. Vui lòng thử lại.");
+            throw new BadRequestException("Không thể lưu session. Redis connection failed: " + e.getMessage());
         }
     }
 
