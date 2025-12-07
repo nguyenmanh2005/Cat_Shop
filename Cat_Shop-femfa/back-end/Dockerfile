@@ -34,13 +34,16 @@ WORKDIR /app
 RUN addgroup -S spring && adduser -S spring -G spring
 
 # Create uploads directory BEFORE switching to non-root user
-RUN mkdir -p /app/uploads && chown -R spring:spring /app
+RUN mkdir -p /app/uploads
+
+# Copy jar from build stage (as root)
+COPY --from=build /app/target/*.jar app.jar
+
+# Set ownership for all files to spring user
+RUN chown -R spring:spring /app
 
 # Switch to non-root user
 USER spring:spring
-
-# Copy jar from build stage
-COPY --from=build /app/target/*.jar app.jar
 
 # Expose port
 EXPOSE 8080
