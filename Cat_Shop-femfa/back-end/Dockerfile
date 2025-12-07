@@ -26,6 +26,10 @@ RUN mvn clean package -DskipTests -X 2>&1 | tail -100 || \
      mvn clean package -DskipTests -e 2>&1 | tail -200 && \
      exit 1)
 
+# Debug: List jar files after build
+RUN echo "=== Listing jar files in target ===" && \
+    ls -la /app/target/*.jar || echo "No jar files found"
+
 # Runtime stage
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
@@ -36,22 +40,29 @@ RUN addgroup -S spring && adduser -S spring -G spring
 # Create uploads directory BEFORE switching to non-root user
 RUN mkdir -p /app/uploads
 
-# Copy all jar files from build stage (as root)
-COPY --from=build /app/target/*.jar /tmp/
+# Copy target directory from build stage to inspect
+COPY --from=build /app/target /tmp/target
 
-# Find and rename the jar file to app.jar
+# Debug: List what was copied
+RUN echo "=== Listing copied files ===" && \
+    ls -la /tmp/target/ || echo "No target directory"
+
+# Find and copy the jar file to app.jar
 # Spring Boot creates jar with pattern: artifactId-version.jar
-RUN JAR_FILE=$(ls /tmp/catshop-*.jar 2>/dev/null | head -1) && \
+RUN JAR_FILE=$(ls /tmp/target/catshop-*.jar 2>/dev/null | head -1) && \
     if [ -z "$JAR_FILE" ]; then \
         echo "ERROR: No catshop jar file found!" && \
-        echo "Listing /tmp/:" && \
-        ls -la /tmp/ && \
+        echo "Listing /tmp/target/:" && \
+        ls -la /tmp/target/ && \
+        echo "Looking for any jar files:" && \
+        find /tmp/target -name "*.jar" -type f || true && \
         exit 1; \
     fi && \
     echo "Found jar file: $JAR_FILE" && \
-    mv "$JAR_FILE" /app/app.jar && \
+    cp "$JAR_FILE" /app/app.jar && \
     chown spring:spring /app/app.jar && \
-    ls -la /app/app.jar
+    ls -la /app/app.jar && \
+    echo "Jar file copied successfully"
 
 # Set ownership for all files to spring user
 RUN chown -R spring:spring /app
