@@ -97,6 +97,11 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
 
-# Run application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Run application with memory limits
+# -Xmx512m: Maximum heap size 512MB
+# -Xms256m: Initial heap size 256MB
+# -XX:+UseG1GC: Use G1 garbage collector (better for low memory)
+# -XX:MaxMetaspaceSize=128m: Limit metaspace
+# -XX:+ExitOnOutOfMemoryError: Exit immediately on OOM
+ENTRYPOINT ["java", "-Xmx512m", "-Xms256m", "-XX:+UseG1GC", "-XX:MaxMetaspaceSize=128m", "-XX:+ExitOnOutOfMemoryError", "-jar", "app.jar"]
 

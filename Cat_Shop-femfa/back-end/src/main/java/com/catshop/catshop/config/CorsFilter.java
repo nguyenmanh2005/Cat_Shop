@@ -8,12 +8,14 @@ import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
+@Slf4j
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class CorsFilter implements Filter {
@@ -24,9 +26,11 @@ public class CorsFilter implements Filter {
         HttpServletResponse response = (HttpServletResponse) res;
         HttpServletRequest request = (HttpServletRequest) req;
 
-        // Allow all origins
+        // Always set CORS headers first, even if there's an error
         String origin = request.getHeader("Origin");
-        if (origin != null) {
+        log.debug("CORS Filter - Request from Origin: {}, Method: {}", origin, request.getMethod());
+        
+        if (origin != null && !origin.isEmpty()) {
             response.setHeader("Access-Control-Allow-Origin", origin);
         } else {
             response.setHeader("Access-Control-Allow-Origin", "*");
@@ -40,11 +44,19 @@ public class CorsFilter implements Filter {
 
         // Handle preflight requests
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            log.debug("CORS Filter - Handling OPTIONS preflight request");
             response.setStatus(HttpServletResponse.SC_OK);
             return;
         }
 
-        chain.doFilter(req, res);
+        // Wrap response to ensure CORS headers are always set, even on errors
+        try {
+            chain.doFilter(req, res);
+        } catch (Exception e) {
+            log.error("CORS Filter - Error in filter chain, but CORS headers already set: {}", e.getMessage());
+            // CORS headers are already set, so browser will receive them even if there's an error
+            throw e;
+        }
     }
 
     @Override
