@@ -17,25 +17,19 @@ public class CaptchaServiceImpl implements CaptchaService {
     @Value("${captcha.secret:}")
     private String captchaSecret;
 
-<<<<<<< HEAD
     @Value("${captcha.enabled:true}")
     private boolean captchaEnabled;
 
-=======
->>>>>>> 4e17e77335a9e5ad1176566f3aa54230cbcf7994
     private static final String VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
 
     @Override
     public boolean verify(String token) {
-<<<<<<< HEAD
         // Nếu captcha bị tắt -> cho phép bypass (dùng cho test trên Postman)
         if (!captchaEnabled) {
-            log.warn("⚠️ Captcha đã bị tắt trong cấu hình. Bỏ qua kiểm tra captcha (TEST MODE).");
+            log.warn("⚠️ Captcha đã bị tắt (captcha.enabled=false). Bỏ qua kiểm tra captcha.");
             return true;
         }
 
-=======
->>>>>>> 4e17e77335a9e5ad1176566f3aa54230cbcf7994
         if (token == null || token.isBlank()) {
             throw new BadRequestException("Captcha không được để trống");
         }
