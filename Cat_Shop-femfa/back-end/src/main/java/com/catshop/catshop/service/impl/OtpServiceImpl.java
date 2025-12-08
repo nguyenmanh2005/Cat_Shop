@@ -21,6 +21,7 @@ public class OtpServiceImpl implements OtpService {
 
     private final StringRedisTemplate redisTemplate;
     private final JavaMailSender mailSender;
+    private final com.catshop.catshop.service.ResendEmailService resendEmailService;
 
     private static final String OTP_KEY_PREFIX = "OTP:";
     private static final Duration OTP_TTL = Duration.ofMinutes(5);
@@ -36,9 +37,35 @@ public class OtpServiceImpl implements OtpService {
             log.warn("OTP đang sử dụng bộ nhớ tạm vì không kết nối được Redis.");
         }
 
-        // Gửi email (nếu chưa cấu hình SMTP, sẽ log warning nhưng vẫn trả về OTP để dev test)
+        // Gửi email - Ưu tiên Resend API, fallback về SMTP
         log.info("📧 Attempting to send OTP email to: {}", email);
         log.info("🔑 Generated OTP for {}: {}", email, otp); // Log OTP ngay để debug
+        
+        // Thử gửi qua Resend API trước (không cần SMTP, hoạt động trên Railway)
+        try {
+            resendEmailService.sendOtpEmail(email, otp);
+            log.info("✅ OTP email sent successfully via Resend API to: {}", email);
+            log.info("═══════════════════════════════════════════════════════════");
+            log.info("✅ [SUCCESS] Email đã được gửi thành công qua Resend!");
+            log.info("✅ [SUCCESS] OTP cho {} = {}", email, otp);
+            log.info("═══════════════════════════════════════════════════════════");
+            return "session-" + Math.abs(RANDOM.nextInt());
+        } catch (Exception resendError) {
+            log.warn("⚠️ Resend API failed, falling back to SMTP: {}", resendError.getMessage());
+            // Fallback về SMTP nếu Resend thất bại
+        }
+        
+        // Fallback: Thử gửi qua SMTP (có thể không hoạt động trên Railway)
+        if (mailSender == null) {
+            log.error("❌ MailSender is NULL! Cannot send email.");
+            log.warn("═══════════════════════════════════════════════════════════");
+            log.warn("⚠️ [DEV MODE] Email không được gửi - MailSender chưa được khởi tạo!");
+            log.warn("⚠️ [DEV MODE] OTP cho {} = {}", email, otp);
+            log.warn("⚠️ [DEV MODE] Vui lòng cấu hình Resend API key hoặc SMTP");
+            log.warn("═══════════════════════════════════════════════════════════");
+            return "session-" + Math.abs(RANDOM.nextInt());
+        }
+        
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom("cumanhpt@gmail.com"); // Thêm from address
@@ -48,41 +75,103 @@ public class OtpServiceImpl implements OtpService {
             
             log.info("📧 Sending email with subject: {}", message.getSubject());
             log.info("📧 From: {}, To: {}", message.getFrom(), message.getTo());
+            log.debug("📧 MailSender class: {}", mailSender.getClass().getName());
             
+            // Thử gửi email
+            log.debug("📧 Calling mailSender.send()...");
             mailSender.send(message);
+            log.debug("📧 mailSender.send() completed without exception");
             log.info("✅ OTP email sent successfully to: {}", email);
             log.info("═══════════════════════════════════════════════════════════");
             log.info("✅ [SUCCESS] Email đã được gửi thành công!");
             log.info("✅ [SUCCESS] OTP cho {} = {}", email, otp);
             log.info("═══════════════════════════════════════════════════════════");
         } catch (org.springframework.mail.MailAuthenticationException e) {
+            // Log ERROR (có thể không hiển thị trong production)
             log.error("❌ Mail authentication failed. Please check your email credentials (App Password) in application.properties.");
             log.error("❌ Error details: {}", e.getMessage());
+            log.error("❌ Root cause: {}", e.getCause() != null ? e.getCause().getMessage() : "N/A");
             log.error("❌ Full exception: ", e);
-            // Log OTP để dev có thể test ngay cả khi email không gửi được
+            
+            // Log WARN với thông tin chi tiết để đảm bảo hiển thị trong production
             log.warn("═══════════════════════════════════════════════════════════");
             log.warn("⚠️ [DEV MODE] Email không được gửi do lỗi xác thực!");
+            log.warn("⚠️ [DEV MODE] Error message: {}", e.getMessage());
+            if (e.getCause() != null) {
+                log.warn("⚠️ [DEV MODE] Root cause: {} - {}", 
+                    e.getCause().getClass().getSimpleName(), 
+                    e.getCause().getMessage());
+            }
             log.warn("⚠️ [DEV MODE] OTP cho {} = {}", email, otp);
             log.warn("⚠️ [DEV MODE] Vui lòng kiểm tra App Password trong application.properties");
+            log.warn("⚠️ [DEV MODE] Tạo App Password mới tại: https://myaccount.google.com/apppasswords");
+            log.warn("⚠️ [DEV MODE] Hướng dẫn: https://support.google.com/accounts/answer/185833");
             log.warn("═══════════════════════════════════════════════════════════");
             // Không throw exception - cho phép dev test với OTP từ logs
         } catch (org.springframework.mail.MailSendException e) {
+            // Log ERROR (có thể không hiển thị trong production)
             log.error("❌ Failed to send email to {}. Please check SMTP configuration.", email);
             log.error("❌ Error details: {}", e.getMessage());
-            log.error("❌ Full exception: ", e);
-            // Log OTP để dev có thể test ngay cả khi email không gửi được
+            if (e.getFailedMessages() != null && !e.getFailedMessages().isEmpty()) {
+                e.getFailedMessages().forEach((address, exception) -> {
+                    log.error("❌ Failed address: {}, Exception: {}", address, exception.getMessage());
+                    if (exception.getCause() != null) {
+                        log.error("❌   └─ Cause: {}", exception.getCause().getMessage());
+                        log.error("❌   └─ Cause type: {}", exception.getCause().getClass().getName());
+                    }
+                });
+            }
+            Throwable rootCause = e.getCause();
+            int depth = 0;
+            while (rootCause != null && depth < 5) {
+                log.error("❌ Root cause (depth {}): {} - {}", depth, rootCause.getClass().getName(), rootCause.getMessage());
+                rootCause = rootCause.getCause();
+                depth++;
+            }
+            log.error("❌ Full exception stack trace: ", e);
+            
+            // Log WARN với thông tin chi tiết để đảm bảo hiển thị trong production
             log.warn("═══════════════════════════════════════════════════════════");
             log.warn("⚠️ [DEV MODE] Email không được gửi do lỗi SMTP!");
+            log.warn("⚠️ [DEV MODE] Exception type: {}", e.getClass().getName());
+            log.warn("⚠️ [DEV MODE] Error message: {}", e.getMessage());
+            if (e.getCause() != null) {
+                log.warn("⚠️ [DEV MODE] Root cause: {} - {}", 
+                    e.getCause().getClass().getSimpleName(), 
+                    e.getCause().getMessage());
+            }
             log.warn("⚠️ [DEV MODE] OTP cho {} = {}", email, otp);
-            log.warn("⚠️ [DEV MODE] Vui lòng kiểm tra cấu hình SMTP");
+            log.warn("⚠️ [DEV MODE] Vui lòng kiểm tra:");
+            log.warn("⚠️ [DEV MODE] 1. App Password có đúng không? (https://myaccount.google.com/apppasswords)");
+            log.warn("⚠️ [DEV MODE] 2. SMTP host (smtp.gmail.com) và port (587) có đúng không?");
+            log.warn("⚠️ [DEV MODE] 3. Firewall/Network có chặn port 587 không?");
+            log.warn("⚠️ [DEV MODE] 4. Thử test endpoint: POST /api/auth/test-smtp");
             log.warn("═══════════════════════════════════════════════════════════");
             // Không throw exception - cho phép dev test với OTP từ logs
         } catch (Exception e) {
+            // Log ERROR (có thể không hiển thị trong production)
             log.error("❌ Unexpected error sending email to {}.", email);
-            log.error("❌ Error details: {}", e.getMessage(), e);
-            // Log OTP để dev có thể test ngay cả khi email không gửi được
+            log.error("❌ Error type: {}", e.getClass().getName());
+            log.error("❌ Error details: {}", e.getMessage());
+            Throwable rootCause = e.getCause();
+            int depth = 0;
+            while (rootCause != null && depth < 5) {
+                log.error("❌ Root cause (depth {}): {} - {}", depth, rootCause.getClass().getName(), rootCause.getMessage());
+                rootCause = rootCause.getCause();
+                depth++;
+            }
+            log.error("❌ Full exception stack trace: ", e);
+            
+            // Log WARN với thông tin chi tiết để đảm bảo hiển thị trong production
             log.warn("═══════════════════════════════════════════════════════════");
             log.warn("⚠️ [DEV MODE] Email không được gửi do lỗi không xác định!");
+            log.warn("⚠️ [DEV MODE] Exception type: {}", e.getClass().getName());
+            log.warn("⚠️ [DEV MODE] Error message: {}", e.getMessage());
+            if (e.getCause() != null) {
+                log.warn("⚠️ [DEV MODE] Root cause: {} - {}", 
+                    e.getCause().getClass().getSimpleName(), 
+                    e.getCause().getMessage());
+            }
             log.warn("⚠️ [DEV MODE] OTP cho {} = {}", email, otp);
             log.warn("═══════════════════════════════════════════════════════════");
             // Không throw exception - cho phép dev test với OTP từ logs

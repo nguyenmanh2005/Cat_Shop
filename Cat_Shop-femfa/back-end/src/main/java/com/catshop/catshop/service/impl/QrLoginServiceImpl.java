@@ -151,7 +151,7 @@ public class QrLoginServiceImpl implements QrLoginService {
 
     @Override
     public QrLoginStatusResponse checkStatus(String sessionId) {
-        log.info("🔍 [QR-LOGIN] Checking status for session: {}", sessionId);
+        log.debug("🔍 [QR-LOGIN] Checking status for session: {}", sessionId); // Đổi từ info sang debug để giảm log spam
 
         String status = getSessionStatus(sessionId);
         

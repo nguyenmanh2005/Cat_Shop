@@ -577,11 +577,12 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
             variant: "destructive",
           });
         }
+        // PENDING: tiếp tục polling (không cần làm gì)
       } catch (error) {
         console.error("Error checking QR status:", error);
-        // Continue polling on error
+        // Continue polling on error - không dừng polling khi có lỗi network tạm thời
       }
-    }, 5000); // Poll every 5 seconds (tối ưu để giảm request)
+    }, 10000); // Poll every 10 seconds (tăng từ 5s để giảm request và log spam)
 
     pollingIntervalRef.current = pollInterval;
 

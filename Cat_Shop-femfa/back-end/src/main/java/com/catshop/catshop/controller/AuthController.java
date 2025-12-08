@@ -676,4 +676,40 @@ public class AuthController {
                 "Password reset successfully"));
     }
 
+    // Test SMTP connection endpoint (for debugging)
+    @PostMapping("/test-smtp")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> testSmtp(@RequestParam(required = false) String testEmail) {
+        log.info("🧪 [TEST-SMTP] Testing SMTP connection...");
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            String email = testEmail != null ? testEmail : "cumanhpt@gmail.com";
+            log.info("🧪 [TEST-SMTP] Sending test email to: {}", email);
+            
+            org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+            message.setFrom("cumanhpt@gmail.com");
+            message.setTo(email);
+            message.setSubject("Test SMTP Connection - CatShop");
+            message.setText("This is a test email to verify SMTP configuration.");
+            
+            emailService.sendOtpEmail(email, "123456"); // Sử dụng EmailService để test
+            
+            result.put("status", "success");
+            result.put("message", "Test email sent successfully!");
+            result.put("email", email);
+            log.info("✅ [TEST-SMTP] Test email sent successfully!");
+            
+            return ResponseEntity.ok(ApiResponse.success(result, "SMTP test successful"));
+        } catch (Exception e) {
+            log.error("❌ [TEST-SMTP] Failed to send test email", e);
+            result.put("status", "error");
+            result.put("message", e.getMessage());
+            result.put("errorType", e.getClass().getName());
+            result.put("stackTrace", java.util.Arrays.toString(e.getStackTrace()));
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "SMTP test failed: " + e.getMessage()));
+        }
+    }
+
 }

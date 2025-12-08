@@ -46,11 +46,32 @@ public class MailConfig {
         Properties props = mailSender.getJavaMailProperties();
         props.put("mail.transport.protocol", "smtp");
         props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.smtp.starttls.required", "true");
-        props.put("mail.smtp.connectiontimeout", "5000");
-        props.put("mail.smtp.timeout", "5000");
-        props.put("mail.smtp.writetimeout", "5000");
+        
+        // Cấu hình dựa trên port
+        if (port == 465) {
+            // Port 465: Dùng SSL trực tiếp
+            props.put("mail.smtp.ssl.enable", "true");
+            props.put("mail.smtp.ssl.trust", "smtp.gmail.com");
+            props.put("mail.smtp.ssl.protocols", "TLSv1.2");
+            props.put("mail.smtp.ssl.checkserveridentity", "true");
+            props.put("mail.smtp.starttls.enable", "false");
+            props.put("mail.smtp.starttls.required", "false");
+            log.info("📧 [MAIL-CONFIG] Using SSL on port 465");
+        } else {
+            // Port 587: Dùng STARTTLS
+            props.put("mail.smtp.starttls.enable", "true");
+            props.put("mail.smtp.starttls.required", "true");
+            props.put("mail.smtp.ssl.enable", "false");
+            props.put("mail.smtp.ssl.trust", "smtp.gmail.com");
+            props.put("mail.smtp.ssl.protocols", "TLSv1.2");
+            props.put("mail.smtp.ssl.checkserveridentity", "true");
+            log.info("📧 [MAIL-CONFIG] Using STARTTLS on port 587");
+        }
+        
+        // Tăng timeout để tránh connection timeout trên Railway
+        props.put("mail.smtp.connectiontimeout", "30000"); // 30 giây
+        props.put("mail.smtp.timeout", "30000"); // 30 giây
+        props.put("mail.smtp.writetimeout", "30000"); // 30 giây
         props.put("mail.debug", "true"); // Bật debug để xem chi tiết lỗi
 
         log.info("📧 [MAIL-CONFIG] JavaMailSender configured successfully");

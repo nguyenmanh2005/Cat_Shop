@@ -91,10 +91,10 @@ const QrCodeVerificationForm = () => {
     }
   };
 
-  // Polling để kiểm tra trạng thái
+  // Polling để kiểm tra trạng thái - tăng interval để giảm request
   useEffect(() => {
     if (!sessionId || status !== "pending") return;
-    const interval = setInterval(checkStatus, 2000);
+    const interval = setInterval(checkStatus, 10000); // 10 giây thay vì 2 giây
     return () => clearInterval(interval);
   }, [sessionId, status]);
 
