@@ -51,7 +51,13 @@ public class OtpServiceImpl implements OtpService {
             log.info("═══════════════════════════════════════════════════════════");
             return "session-" + Math.abs(RANDOM.nextInt());
         } catch (Exception resendError) {
-            log.warn("⚠️ Resend API failed, falling back to SMTP: {}", resendError.getMessage());
+            log.warn("⚠️ Resend API failed: {}", resendError.getMessage());
+            if (resendError.getMessage() != null && resendError.getMessage().contains("API key chưa được cấu hình")) {
+                log.error("❌ Resend API key chưa được cấu hình trong Railway!");
+                log.error("❌ Vui lòng thêm RESEND_API_KEY vào Railway Environment Variables");
+                log.error("❌ Xem hướng dẫn: https://resend.com/api-keys");
+            }
+            log.warn("⚠️ Falling back to SMTP (có thể không hoạt động trên Railway)...");
             // Fallback về SMTP nếu Resend thất bại
         }
         

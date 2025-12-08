@@ -16,6 +16,7 @@ const createApiInstance = (): AxiosInstance => {
     (config) => {
       // Danh sách các endpoint không cần access token (public endpoints)
       // Lưu ý: /auth/refresh cần refresh token nhưng được xử lý riêng trong authService
+      // Lưu ý: /auth/qr/confirm-token CẦN access token, không phải public endpoint
       const publicEndpoints = [
         '/auth/login',
         '/auth/register',
@@ -49,18 +50,26 @@ const createApiInstance = (): AxiosInstance => {
       ];
       
       const isPublicEndpoint = config.url && publicEndpoints.some(endpoint => 
-        config.url?.includes(endpoint)
+        config.url?.includes(endpoint) || config.url?.endsWith(endpoint)
       );
       
       // Với public endpoints: XÓA Authorization header nếu có (tránh gửi token cũ)
       if (isPublicEndpoint) {
         // Xóa Authorization header để đảm bảo không gửi token cũ
         delete config.headers.Authorization;
+        console.log('🔓 [API] Public endpoint detected, removed Authorization header:', config.url);
       } else {
         // Chỉ thêm token nếu không phải public endpoint
+        // Đặc biệt: /auth/qr/confirm-token CẦN access token để xác nhận đăng nhập
         const token = localStorage.getItem('access_token');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
+          if (config.url?.includes('/qr/confirm-token')) {
+            console.log('🔐 [QR-LOGIN] Adding Authorization header for /qr/confirm-token');
+          }
+        } else if (config.url?.includes('/qr/confirm-token')) {
+          // Nếu là endpoint confirm-token nhưng không có token, log warning
+          console.warn('⚠️ [QR-LOGIN] No access token found for /qr/confirm-token. User may need to login first.');
         }
       }
       

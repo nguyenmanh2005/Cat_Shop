@@ -473,12 +473,17 @@ export const authService = {
   },
 
   // QR Login methods
+  // NOTE: Thời gian sống QR code (expiresIn) được quyết định bởi backend
+  // Để tăng thời gian sống lên 30 phút, cần sửa backend:
+  // - Tìm QR code generation endpoint trong backend
+  // - Thay đổi expiresIn từ giá trị hiện tại (có thể là 5-10 phút) lên 1800 giây (30 phút)
   async generateQrCode(): Promise<{ sessionId: string; qrCodeBase64: string; expiresIn: number }> {
     try {
       const response = await apiService.post<{ sessionId: string; qrCodeBase64: string; expiresIn: number }>(
         '/auth/qr/generate',
         {}
       );
+      console.log('📱 QR Code generated, expiresIn:', response.expiresIn, 'seconds');
       return response;
     } catch (error: any) {
       console.error('Generate QR code error:', error);
@@ -503,14 +508,42 @@ export const authService = {
   // Xác nhận QR login bằng access token đang có trên thiết bị (không cần nhập lại mật khẩu)
   async confirmQrLoginWithToken(sessionId: string): Promise<{ message: string }> {
     try {
-      const response = await apiService.post<{ message: string }>(
+      // Đảm bảo có token trước khi gọi
+      const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!token) {
+        throw new Error('Access token không tồn tại. Vui lòng đăng nhập lại.');
+      }
+      
+      console.log('🔐 [QR-LOGIN] Calling confirm-token with token:', token.substring(0, 20) + '...');
+      
+      // Sử dụng api trực tiếp để đảm bảo token được gửi đúng
+      const response = await api.post(
         '/auth/qr/confirm-token',
-        { sessionId }
+        { sessionId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          }
+        }
       );
-      return response;
+      
+      // Extract data từ ApiResponse
+      const responseData = response.data?.data || response.data;
+      return responseData;
     } catch (error: any) {
-      console.error('Confirm QR login with token error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Không thể xác nhận đăng nhập QR';
+      console.error('❌ Confirm QR login with token error:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error ||
+                          error.message || 
+                          'Không thể xác nhận đăng nhập QR';
       throw new Error(errorMessage);
     }
   },

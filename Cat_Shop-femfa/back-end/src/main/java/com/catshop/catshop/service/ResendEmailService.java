@@ -29,8 +29,9 @@ public class ResendEmailService {
 
     public void sendOtpEmail(String toEmail, String otp) {
         if (apiKey == null || apiKey.isEmpty()) {
-            log.warn("⚠️ Resend API key chưa được cấu hình. Bỏ qua gửi email.");
-            return;
+            log.error("❌ Resend API key chưa được cấu hình!");
+            log.error("❌ Vui lòng thêm RESEND_API_KEY vào Railway Environment Variables");
+            throw new RuntimeException("Resend API key chưa được cấu hình. Vui lòng thêm RESEND_API_KEY vào Railway Environment Variables.");
         }
 
         try {

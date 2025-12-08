@@ -38,6 +38,17 @@ const Settings = () => {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
 
+  // Helper function to get language display name
+  const getLanguageName = (lang: string) => {
+    const names: Record<string, string> = {
+      vi: "Tiếng Việt",
+      en: "English",
+      zh: "中文",
+      ja: "日本語",
+    };
+    return names[lang] || lang;
+  };
+
   // Notification settings
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -440,12 +451,15 @@ const Settings = () => {
                         setLanguage(value as "vi" | "en" | "zh" | "ja");
                         toast({
                           title: "Đã thay đổi ngôn ngữ",
-                          description: `Ngôn ngữ đã được chuyển sang ${value === "vi" ? "Tiếng Việt" : value === "en" ? "English" : value === "zh" ? "中文" : "日本語"}`,
+                          description: `Ngôn ngữ đã được chuyển sang ${getLanguageName(value)}`,
                         });
                       }}
                     >
                       <SelectTrigger id="language">
-                        <SelectValue />
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4" />
+                          <SelectValue />
+                        </div>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="vi">Tiếng Việt</SelectItem>
@@ -455,7 +469,7 @@ const Settings = () => {
                       </SelectContent>
                     </Select>
                     <p className="text-sm text-muted-foreground">
-                      Ngôn ngữ hiện tại: {language === "vi" ? "Tiếng Việt" : language === "en" ? "English" : language === "zh" ? "中文" : "日本語"}
+                      Ngôn ngữ hiện tại: {getLanguageName(language)}
                     </p>
                   </div>
 
