@@ -135,11 +135,37 @@ public class ResendEmailService {
                 throw new RuntimeException("Resend API returned status " + response.getStatusCode() + ". Response: " + errorBody);
             }
         } catch (org.springframework.web.client.HttpClientErrorException e) {
+            String responseBody = e.getResponseBodyAsString();
             log.error("❌ [RESEND] HTTP Client Error sending email to {}: {}", toEmail, e.getMessage());
             log.error("❌ [RESEND] Status Code: {}", e.getStatusCode());
-            log.error("❌ [RESEND] Response Body: {}", e.getResponseBodyAsString());
+            log.error("❌ [RESEND] Response Body: {}", responseBody);
             log.error("═══════════════════════════════════════════════════════════");
-            throw new RuntimeException("Không thể gửi email qua Resend. Status: " + e.getStatusCode() + ". Error: " + e.getResponseBodyAsString(), e);
+            
+            // Parse error message từ Resend API response
+            String errorMessage = "Không thể gửi email qua Resend";
+            if (responseBody != null && !responseBody.isEmpty()) {
+                try {
+                    // Resend API trả về JSON với format: {"statusCode":403,"name":"validation_error","message":"..."}
+                    if (responseBody.contains("\"message\"")) {
+                        // Extract message từ JSON
+                        int messageStart = responseBody.indexOf("\"message\":\"") + 11;
+                        int messageEnd = responseBody.indexOf("\"", messageStart);
+                        if (messageEnd > messageStart) {
+                            String resendMessage = responseBody.substring(messageStart, messageEnd);
+                            errorMessage = "Resend API Error: " + resendMessage;
+                            
+                            // Thêm hướng dẫn nếu là lỗi 403 (domain chưa verify)
+                            if (e.getStatusCode() != null && e.getStatusCode().value() == 403) {
+                                errorMessage += ". Vui lòng verify domain tại https://resend.com/domains hoặc chỉ gửi email đến địa chỉ đã đăng ký Resend.";
+                            }
+                        }
+                    }
+                } catch (Exception parseError) {
+                    log.warn("⚠️ [RESEND] Could not parse error message: {}", parseError.getMessage());
+                }
+            }
+            
+            throw new RuntimeException(errorMessage + " (Status: " + e.getStatusCode() + ")", e);
         } catch (Exception e) {
             log.error("❌ [RESEND] Error sending email to {}: {}", toEmail, e.getMessage());
             log.error("❌ [RESEND] Exception Type: {}", e.getClass().getName());

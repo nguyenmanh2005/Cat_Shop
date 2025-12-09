@@ -44,18 +44,32 @@ Railway chặn kết nối SMTP (port 465 và 587), nên không thể gửi emai
 6. Click **"Add"** để lưu từng biến
 7. Railway sẽ tự động redeploy service
 
-### Bước 4: Verify Domain (Optional - Khuyến nghị)
-Nếu muốn dùng email của domain riêng (ví dụ: `noreply@yourdomain.com`):
+### Bước 4: Verify Domain (QUAN TRỌNG - Bắt buộc để gửi email đến bất kỳ địa chỉ nào)
 
-1. Vào Resend Dashboard → **Domains**
+**⚠️ LƯU Ý QUAN TRỌNG:**
+- Resend API key ở chế độ test chỉ cho phép gửi email đến **chính email đã đăng ký Resend**
+- Để gửi email đến **bất kỳ địa chỉ nào**, bạn **PHẢI verify domain**
+
+**Cách verify domain:**
+
+1. Vào Resend Dashboard → **Domains**: https://resend.com/domains
 2. Click **"Add Domain"**
-3. Thêm domain của bạn
-4. Thêm DNS records vào domain provider (theo hướng dẫn của Resend)
-5. Đợi verify (thường mất vài phút)
-6. Sau khi verify, cập nhật biến trên Railway:
+3. Nhập domain của bạn (ví dụ: `yourdomain.com`)
+4. Resend sẽ hiển thị các DNS records cần thêm:
+   - **SPF Record**: `v=spf1 include:_spf.resend.com ~all`
+   - **DKIM Record**: (Resend sẽ cung cấp)
+   - **DMARC Record**: (Optional nhưng khuyến nghị)
+5. Thêm các DNS records này vào domain provider của bạn (GoDaddy, Namecheap, Cloudflare, etc.)
+6. Đợi verify (thường mất 5-30 phút)
+7. Sau khi verify thành công (status: ✅ Verified), cập nhật biến trên Railway:
    ```
    RESEND_FROM_EMAIL=noreply@yourdomain.com
    ```
+   (Thay `yourdomain.com` bằng domain bạn đã verify)
+
+**Nếu không có domain:**
+- Bạn chỉ có thể gửi email đến chính email đã đăng ký Resend (ví dụ: `cumanhpt@gmail.com`)
+- Không thể gửi đến email khác (ví dụ: `cumanhpt57@gmail.com`) mà không verify domain
 
 ### Bước 5: Kiểm tra
 1. Đợi Railway redeploy xong (thường 1-2 phút)
