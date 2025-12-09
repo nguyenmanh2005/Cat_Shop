@@ -381,17 +381,66 @@ export const authService = {
         // Nếu endpoint riêng chưa có (404), dùng endpoint chung
         if (error.response?.status === 404) {
           console.warn('Register OTP endpoint not found, using common OTP endpoint');
+          // Dùng endpoint chung /auth/send-otp
           const response = await apiService.post<{ message: string }>(
             API_CONFIG.ENDPOINTS.AUTH.SEND_OTP,
             { email }
           );
           return response;
         }
+        
+        // Xử lý trường hợp email đã tồn tại (400/409) - có thể là chưa verify
+        const status = error.response?.status;
+        const errorMsg = error.response?.data?.message || error.message || '';
+        const isEmailExists = errorMsg.includes('đã được đăng ký') || 
+                             errorMsg.includes('already registered') || 
+                             errorMsg.includes('đã tồn tại') || 
+                             errorMsg.includes('already exists') ||
+                             errorMsg.includes('Email already') ||
+                             status === 409;
+        
+        if (isEmailExists) {
+          // Email đã tồn tại - thử dùng endpoint chung để gửi OTP verify lại
+          console.warn('Email already exists, attempting to resend OTP for verification');
+          try {
+            const response = await apiService.post<{ message: string }>(
+              API_CONFIG.ENDPOINTS.AUTH.SEND_OTP,
+              { email }
+            );
+            return response;
+          } catch (resendError: any) {
+            // Nếu vẫn lỗi, thông báo rõ ràng
+            const resendMsg = resendError.response?.data?.message || resendError.message || '';
+            throw new Error(`Email này đã được đăng ký. ${resendMsg.includes('OTP') ? 'Đang gửi lại mã OTP để xác thực...' : 'Vui lòng kiểm tra email hoặc thử đăng nhập.'}`);
+          }
+        }
+        
         throw error;
       }
     } catch (error: any) {
       console.error('Send Register OTP error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Không thể gửi mã OTP đăng ký';
+      let errorMessage = error.response?.data?.message || error.message || 'Không thể gửi mã OTP đăng ký';
+      
+      // Xử lý trường hợp email đã tồn tại - cho phép gửi OTP lại để verify
+      const errorMsgLower = errorMessage.toLowerCase();
+      if (errorMsgLower.includes('đã được đăng ký') || 
+          errorMsgLower.includes('already registered') ||
+          errorMsgLower.includes('đã tồn tại') ||
+          errorMsgLower.includes('already exists')) {
+        // Không throw error, mà thử gửi OTP lại qua endpoint chung
+        try {
+          console.log('Retrying OTP send via common endpoint for existing email');
+          const response = await apiService.post<{ message: string }>(
+            API_CONFIG.ENDPOINTS.AUTH.SEND_OTP,
+            { email }
+          );
+          return response;
+        } catch (retryError: any) {
+          // Nếu vẫn lỗi, hiển thị thông báo thân thiện
+          errorMessage = 'Email này đã được đăng ký. Nếu bạn chưa xác thực email, vui lòng kiểm tra hộp thư hoặc thử đăng nhập.';
+        }
+      }
+      
       throw new Error(errorMessage);
     }
   },

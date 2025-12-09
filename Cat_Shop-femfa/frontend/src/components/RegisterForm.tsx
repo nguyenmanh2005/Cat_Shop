@@ -142,12 +142,27 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
         setStep("verifyOtp");
       } catch (otpError: any) {
         // Nếu gửi OTP fail, hiện lỗi và KHÔNG cho tiếp tục
-        // (User đã được tạo nhưng chưa verify - cần xử lý ở backend)
-        toast({
-          title: "Lỗi gửi mã xác thực đăng ký",
-          description: otpError.message || "Không thể gửi mã OTP đăng ký. Vui lòng thử lại hoặc liên hệ hỗ trợ.",
-          variant: "destructive",
-        });
+        const errorMsg = otpError.message || "Không thể gửi mã OTP đăng ký. Vui lòng thử lại hoặc liên hệ hỗ trợ.";
+        
+        // Kiểm tra nếu email đã tồn tại - cho phép user thử lại hoặc đăng nhập
+        const isEmailExists = errorMsg.includes('đã được đăng ký') || 
+                             errorMsg.includes('already registered') ||
+                             errorMsg.includes('đã tồn tại');
+        
+        if (isEmailExists) {
+          toast({
+            title: "Email đã được đăng ký",
+            description: "Email này đã được sử dụng. Nếu bạn chưa xác thực, vui lòng kiểm tra email hoặc thử đăng nhập. Bạn cũng có thể thử lại để gửi mã OTP xác thực.",
+            variant: "destructive",
+          });
+          // Vẫn cho phép user thử lại bằng nút "Gửi lại mã"
+        } else {
+          toast({
+            title: "Lỗi gửi mã xác thực đăng ký",
+            description: errorMsg,
+            variant: "destructive",
+          });
+        }
         // KHÔNG chuyển sang bước verify, giữ nguyên ở form
         // User có thể thử lại bằng cách bấm "Gửi lại mã" sau
       }

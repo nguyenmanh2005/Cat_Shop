@@ -6,7 +6,8 @@ export const API_CONFIG = {
   BASE_URL: import.meta.env.DEV
     ? '/api'  // Dev mode: dùng proxy của Vite
     : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'), // Production: dùng absolute URL
-  TIMEOUT: parseInt(import.meta.env.VITE_API_TIMEOUT || '10000'),
+  // Tăng timeout lên 10 phút (600000 ms) nếu không cấu hình env
+  TIMEOUT: parseInt(import.meta.env.VITE_API_TIMEOUT || '600000'),
   
   // Endpoints - Spring Boot REST API
   ENDPOINTS: {
