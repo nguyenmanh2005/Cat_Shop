@@ -23,10 +23,17 @@ Railway chặn kết nối SMTP (port 465 và 587), nên không thể gửi emai
 4. Click **"New Variable"**
 5. Thêm các biến sau:
 
+   **Bắt buộc:** API key cho đăng nhập
    ```
    RESEND_API_KEY=re_xxxxxxxxxxxxx
    ```
    (Thay `re_xxxxxxxxxxxxx` bằng API key bạn đã copy)
+
+   **Tùy chọn:** API key riêng cho đăng ký (nếu muốn tách riêng)
+   ```
+   RESEND_API_KEY_REGISTER=re_yyyyyyyyyyyyy
+   ```
+   (Nếu không có, hệ thống sẽ dùng `RESEND_API_KEY` cho cả đăng nhập và đăng ký)
 
    **Optional:** Thêm biến để set email gửi đi:
    ```
@@ -34,7 +41,7 @@ Railway chặn kết nối SMTP (port 465 và 587), nên không thể gửi emai
    ```
    (Hoặc verify domain và dùng email của bạn)
 
-6. Click **"Add"** để lưu
+6. Click **"Add"** để lưu từng biến
 7. Railway sẽ tự động redeploy service
 
 ### Bước 4: Verify Domain (Optional - Khuyến nghị)
