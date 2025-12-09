@@ -555,8 +555,10 @@ public class AuthController {
             log.error("❌ [SEND-OTP-REGISTER] Exception type: {}", e.getClass().getName());
             log.error("❌ [SEND-OTP-REGISTER] Full exception: ", e);
             log.info("═══════════════════════════════════════════════════════════");
-            // Throw exception để frontend biết lỗi và hiển thị thông báo phù hợp
-            throw new BadRequestException("Không thể gửi mã OTP đăng ký: " + e.getMessage());
+            // KHÔNG chặn flow đăng ký. OTP vẫn được tạo trong Redis và log ra console để test.
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Mã OTP đã được tạo. Vui lòng kiểm tra backend logs để lấy mã OTP (nếu email không gửi được).",
+                    "Register OTP generated (check logs if email not sent)"));
         }
     }
 
