@@ -216,6 +216,39 @@ public class AuthController {
                 "OTP xác thực thành công. Thiết bị đã được đánh dấu là tin cậy."));
     }
 
+    // ✅ Xác thực OTP đăng ký + kích hoạt email
+    @PostMapping("/register/verify-otp")
+    public ResponseEntity<ApiResponse<TokenResponse>> verifyRegisterOtp(
+            @Valid @RequestBody OtpRequest otpRequest,
+            HttpServletRequest request) {
+
+        String email = otpRequest.getEmail();
+        String deviceId = otpRequest.getDeviceId();
+
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new BadRequestException("Thiết bị ID không được để trống");
+        }
+
+        // Kiểm tra + xác thực OTP và đánh dấu email đã verify
+        TokenResponse tokenResponse = authService.verifyRegisterOtp(otpRequest);
+
+        // Sau khi xác thực thành công → đánh dấu thiết bị tin cậy
+        String ip = request.getRemoteAddr();
+        String agent = request.getHeader("User-Agent");
+
+        boolean trusted = deviceService.isTrusted(email, deviceId);
+        if (trusted) {
+            deviceService.updateLastLogin(email, deviceId, ip, agent);
+        } else {
+            deviceService.markTrusted(email, deviceId, ip, agent);
+        }
+
+        return ResponseEntity.ok(ApiResponse.success(
+                tokenResponse,
+                "Đăng ký & xác thực email thành công. Thiết bị đã được đánh dấu là tin cậy."
+        ));
+    }
+
     @PostMapping("/mfa/verify")
     public ResponseEntity<ApiResponse<TokenResponse>> verifyMfa(
             @RequestBody @Valid MfaVerifyRequest request,

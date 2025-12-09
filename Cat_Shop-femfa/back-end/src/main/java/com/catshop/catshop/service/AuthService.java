@@ -20,6 +20,7 @@ public interface AuthService {
 
     // Bước 2: xác thực OTP → trả về token
     TokenResponse verifyOtp(OtpRequest request);
+    TokenResponse verifyRegisterOtp(OtpRequest request);
 
     // Đăng ký tài khoản
     boolean register(UserRequest request);
