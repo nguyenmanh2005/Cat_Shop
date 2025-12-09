@@ -22,50 +22,70 @@ public class ResendEmailService {
     @Value("${resend.api-key:}")
     private String apiKey;
     
+    @Value("${resend.api-key-register:}")
+    private String apiKeyRegister;
+    
     @Value("${resend.from-email:onboarding@resend.dev}")
     private String fromEmail;
     
     private static final String RESEND_API_URL = "https://api.resend.com/emails";
 
     public void sendOtpEmail(String toEmail, String otp) {
-        if (apiKey == null || apiKey.isEmpty() || apiKey.trim().isEmpty()) {
+        sendOtpEmail(toEmail, otp, false);
+    }
+    
+    public void sendOtpEmail(String toEmail, String otp, boolean isRegister) {
+        // Chọn API key: nếu là đăng ký và có apiKeyRegister thì dùng apiKeyRegister, ngược lại dùng apiKey
+        String selectedApiKey = (isRegister && apiKeyRegister != null && !apiKeyRegister.trim().isEmpty()) 
+            ? apiKeyRegister 
+            : apiKey;
+            
+        if (selectedApiKey == null || selectedApiKey.isEmpty() || selectedApiKey.trim().isEmpty()) {
+            String keyType = isRegister ? "RESEND_API_KEY_REGISTER" : "RESEND_API_KEY";
             log.error("═══════════════════════════════════════════════════════════");
             log.error("❌ [CRITICAL] Resend API key chưa được cấu hình!");
-            log.error("❌ [CRITICAL] Vui lòng thêm RESEND_API_KEY vào Railway Environment Variables");
+            log.error("❌ [CRITICAL] Loại: {}", isRegister ? "Đăng ký" : "Đăng nhập");
+            log.error("❌ [CRITICAL] Vui lòng thêm {} vào Railway Environment Variables", keyType);
             log.error("❌ [CRITICAL] Hướng dẫn:");
             log.error("❌ [CRITICAL] 1. Đăng ký tài khoản tại: https://resend.com/signup");
             log.error("❌ [CRITICAL] 2. Tạo API key tại: https://resend.com/api-keys");
             log.error("❌ [CRITICAL] 3. Vào Railway Dashboard → Service → Variables");
-            log.error("❌ [CRITICAL] 4. Thêm biến: RESEND_API_KEY = re_xxxxxxxxxxxxx");
+            log.error("❌ [CRITICAL] 4. Thêm biến: {} = re_xxxxxxxxxxxxx", keyType);
             log.error("❌ [CRITICAL] 5. (Optional) Thêm: RESEND_FROM_EMAIL = your-email@yourdomain.com");
             log.error("❌ [CRITICAL] 6. Redeploy service để áp dụng thay đổi");
             log.error("═══════════════════════════════════════════════════════════");
-            throw new RuntimeException("Resend API key chưa được cấu hình. Vui lòng thêm RESEND_API_KEY vào Railway Environment Variables. Xem hướng dẫn: https://resend.com/api-keys");
+            throw new RuntimeException("Resend API key chưa được cấu hình. Vui lòng thêm " + keyType + " vào Railway Environment Variables. Xem hướng dẫn: https://resend.com/api-keys");
         }
 
         try {
-            log.info("📧 [RESEND] Sending OTP email to: {}", toEmail);
+            String emailType = isRegister ? "đăng ký" : "đăng nhập";
+            log.info("📧 [RESEND] Sending OTP email ({}) to: {}", emailType, toEmail);
+            if (isRegister && apiKeyRegister != null && !apiKeyRegister.trim().isEmpty()) {
+                log.info("📧 [RESEND] Using Register API key");
+            } else {
+                log.info("📧 [RESEND] Using Login API key");
+            }
             
             ResendEmailRequest request = new ResendEmailRequest();
             request.setFrom(fromEmail);
             request.setTo(Collections.singletonList(toEmail));
-            request.setSubject("Cham Pets - Mã OTP đăng nhập");
+            request.setSubject(isRegister ? "Cham Pets - Mã OTP đăng ký" : "Cham Pets - Mã OTP đăng nhập");
             
             String htmlContent = String.format("""
                 <div style="font-family: Arial; padding: 20px; background-color: #f9fafc;">
-                    <h2 style="color: #2b6cb0;">Mã OTP của bạn</h2>
-                    <p>Xin chào, mã xác thực đăng nhập của bạn là:</p>
+                    <h2 style="color: #2b6cb0;">Mã OTP %s của bạn</h2>
+                    <p>Xin chào, mã xác thực %s của bạn là:</p>
                     <h1 style="text-align:center;color:#e53e3e;font-size:32px;">%s</h1>
                     <p>Mã này hết hạn sau 5 phút.</p>
                     <p style="color:#666;font-size:12px;margin-top:20px;">Nếu bạn không yêu cầu mã này, vui lòng bỏ qua email này.</p>
                 </div>
-                """, otp);
+                """, isRegister ? "đăng ký" : "đăng nhập", isRegister ? "đăng ký" : "đăng nhập", otp);
             
             request.setHtml(htmlContent);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
+            headers.setBearerAuth(selectedApiKey);
 
             HttpEntity<ResendEmailRequest> entity = new HttpEntity<>(request, headers);
 

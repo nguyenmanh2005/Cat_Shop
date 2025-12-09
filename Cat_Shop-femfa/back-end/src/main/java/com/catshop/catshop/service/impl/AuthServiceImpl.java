@@ -88,6 +88,13 @@ public class AuthServiceImpl implements AuthService {
         // OtpService.generateAndSendOtp() đã tự động gửi email rồi
         otpService.generateAndSendOtp(email);
     }
+    
+    @Override
+    public void sendOtpForRegister(String email) {
+        // Không kiểm tra email tồn tại (vì đây là đăng ký, email chưa có trong DB)
+        // OtpService.generateAndSendOtpForRegister() đã tự động gửi email rồi
+        otpService.generateAndSendOtpForRegister(email);
+    }
 
     // ------------------------- SMS OTP METHODS -------------------------
     @Override

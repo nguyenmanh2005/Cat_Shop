@@ -459,7 +459,7 @@ public class AuthController {
         }
     }
 
-    // ✅ Gửi OTP khi user click nút "Nhận OTP"
+    // ✅ Gửi OTP khi user click nút "Nhận OTP" (Đăng nhập)
     @PostMapping("/send-otp")
     public ResponseEntity<ApiResponse<String>> sendOtp(@RequestBody Map<String, String> request) {
         log.info("═══════════════════════════════════════════════════════════");
@@ -488,6 +488,39 @@ public class AuthController {
             log.error("❌ [SEND-OTP] Failed to send OTP to {}: {}", email, e.getMessage());
             log.error("❌ [SEND-OTP] Exception type: {}", e.getClass().getName());
             log.error("❌ [SEND-OTP] Full exception: ", e);
+            log.info("═══════════════════════════════════════════════════════════");
+            // Không throw exception - vẫn trả về success để OTP có thể được log và test
+            // OTP vẫn được tạo và lưu, chỉ là email không gửi được
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Mã OTP đã được tạo. Vui lòng kiểm tra backend logs để lấy mã OTP (nếu email không gửi được).",
+                    "OTP generated (check logs if email not sent)"));
+        }
+    }
+    
+    // ✅ Gửi OTP khi user đăng ký (không cần kiểm tra email tồn tại)
+    @PostMapping("/register/send-otp")
+    public ResponseEntity<ApiResponse<String>> sendOtpForRegister(@RequestBody Map<String, String> request) {
+        log.info("═══════════════════════════════════════════════════════════");
+        log.info("📨 [SEND-OTP-REGISTER] Request received: {}", request);
+        String email = request.get("email");
+        if (email == null || email.isBlank()) {
+            log.error("❌ [SEND-OTP-REGISTER] Email is null or blank");
+            throw new BadRequestException("Email không được để trống");
+        }
+        
+        log.info("📧 [SEND-OTP-REGISTER] Processing OTP request for email: {}", email);
+        
+        try {
+            authService.sendOtpForRegister(email);
+            log.info("✅ [SEND-OTP-REGISTER] OTP sent successfully to: {}", email);
+            log.info("═══════════════════════════════════════════════════════════");
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Mã OTP đăng ký đã được gửi đến email của bạn",
+                    "Register OTP sent successfully"));
+        } catch (Exception e) {
+            log.error("❌ [SEND-OTP-REGISTER] Failed to send OTP to {}: {}", email, e.getMessage());
+            log.error("❌ [SEND-OTP-REGISTER] Exception type: {}", e.getClass().getName());
+            log.error("❌ [SEND-OTP-REGISTER] Full exception: ", e);
             log.info("═══════════════════════════════════════════════════════════");
             // Không throw exception - vẫn trả về success để OTP có thể được log và test
             // OTP vẫn được tạo và lưu, chỉ là email không gửi được

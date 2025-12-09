@@ -12,6 +12,7 @@ public interface AuthService {
 //    String login(LoginRequest loginRequest);
     void validateCredentials(LoginRequest loginRequest);
     void sendOtp(String email);
+    void sendOtpForRegister(String email);
 
     // SMS OTP methods
     String sendSmsOtp(String phoneNumber); // Trả về OTP để hiển thị trong dev mode

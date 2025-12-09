@@ -30,6 +30,15 @@ public class OtpServiceImpl implements OtpService {
 
     @Override
     public String generateAndSendOtp(String email) {
+        return generateAndSendOtp(email, false);
+    }
+    
+    @Override
+    public String generateAndSendOtpForRegister(String email) {
+        return generateAndSendOtp(email, true);
+    }
+    
+    private String generateAndSendOtp(String email, boolean isRegister) {
         String otp = String.format("%06d", RANDOM.nextInt(1_000_000));
 
         boolean persisted = saveOtp(email, otp);
@@ -38,14 +47,13 @@ public class OtpServiceImpl implements OtpService {
         }
 
         // Gửi email - Ưu tiên Resend API, fallback về SMTP
-        log.info("📧 Attempting to send OTP email to: {}", email);
+        String emailType = isRegister ? "đăng ký" : "đăng nhập";
+        log.info("📧 Attempting to send OTP email ({}) to: {}", emailType, email);
         log.info("🔑 Generated OTP for {}: {}", email, otp); // Log OTP ngay để debug
         
         // Thử gửi qua Resend API trước (không cần SMTP, hoạt động trên Railway)
-        boolean resendFailed = false;
-        boolean resendApiKeyMissing = false;
         try {
-            resendEmailService.sendOtpEmail(email, otp);
+            resendEmailService.sendOtpEmail(email, otp, isRegister);
             log.info("✅ OTP email sent successfully via Resend API to: {}", email);
             log.info("═══════════════════════════════════════════════════════════");
             log.info("✅ [SUCCESS] Email đã được gửi thành công qua Resend!");
@@ -53,10 +61,8 @@ public class OtpServiceImpl implements OtpService {
             log.info("═══════════════════════════════════════════════════════════");
             return "session-" + Math.abs(RANDOM.nextInt());
         } catch (Exception resendError) {
-            resendFailed = true;
             log.warn("⚠️ Resend API failed: {}", resendError.getMessage());
             if (resendError.getMessage() != null && resendError.getMessage().contains("API key chưa được cấu hình")) {
-                resendApiKeyMissing = true;
                 log.error("═══════════════════════════════════════════════════════════");
                 log.error("❌ [CRITICAL] Resend API key chưa được cấu hình trong Railway!");
                 log.error("❌ [CRITICAL] SMTP không hoạt động trên Railway (bị chặn port 465/587)");
