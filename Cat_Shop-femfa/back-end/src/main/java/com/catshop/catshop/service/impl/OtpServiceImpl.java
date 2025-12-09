@@ -5,8 +5,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -20,7 +18,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class OtpServiceImpl implements OtpService {
 
     private final StringRedisTemplate redisTemplate;
-    private final JavaMailSender mailSender;
     private final com.catshop.catshop.service.ResendEmailService resendEmailService;
 
     private static final String OTP_KEY_PREFIX = "OTP:";
