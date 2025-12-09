@@ -1,6 +1,7 @@
 package com.catshop.catshop.service.impl;
 
 import com.catshop.catshop.service.OtpService;
+import com.catshop.catshop.service.GmailEmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -18,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class OtpServiceImpl implements OtpService {
 
     private final StringRedisTemplate redisTemplate;
-    private final com.catshop.catshop.service.ResendEmailService resendEmailService;
+    private final GmailEmailService gmailEmailService;
 
     private static final String OTP_KEY_PREFIX = "OTP:";
     private static final Duration OTP_TTL = Duration.ofMinutes(5);
@@ -48,34 +49,25 @@ public class OtpServiceImpl implements OtpService {
         log.info("📧 Attempting to send OTP email ({}) to: {}", emailType, email);
         log.info("🔑 Generated OTP for {}: {}", email, otp); // Log OTP ngay để debug
         
-        // Chỉ dùng Resend API - KHÔNG fallback về SMTP vì Railway chặn SMTP
+        // Dùng Gmail API - KHÔNG fallback SMTP/Resend
         try {
-            resendEmailService.sendOtpEmail(email, otp, isRegister);
-            log.info("✅ OTP email sent successfully via Resend API to: {}", email);
+            gmailEmailService.sendOtpEmail(email, otp, isRegister);
+            log.info("✅ OTP email sent successfully via Gmail API to: {}", email);
             log.info("═══════════════════════════════════════════════════════════");
-            log.info("✅ [SUCCESS] Email đã được gửi thành công qua Resend!");
+            log.info("✅ [SUCCESS] Email đã được gửi thành công qua Gmail!");
             log.info("✅ [SUCCESS] OTP cho {} = {}", email, otp);
             log.info("═══════════════════════════════════════════════════════════");
             return "session-" + Math.abs(RANDOM.nextInt());
         } catch (Exception resendError) {
-            // Resend API failed - KHÔNG fallback về SMTP (Railway chặn SMTP)
-            String keyType = isRegister ? "RESEND_API_KEY_REGISTER" : "RESEND_API_KEY";
             log.error("═══════════════════════════════════════════════════════════");
-            log.error("❌ [CRITICAL] Resend API failed!");
+            log.error("❌ [CRITICAL] Gmail API failed!");
             log.error("❌ [CRITICAL] Loại: {}", isRegister ? "Đăng ký" : "Đăng nhập");
             log.error("❌ [CRITICAL] Error: {}", resendError.getMessage());
-            log.error("❌ [CRITICAL] SMTP không hoạt động trên Railway (bị chặn port 465/587)");
-            log.error("❌ [CRITICAL] Vui lòng cấu hình Resend API key:");
-            log.error("❌ [CRITICAL] 1. Đăng ký tại: https://resend.com/signup");
-            log.error("❌ [CRITICAL] 2. Lấy API key tại: https://resend.com/api-keys");
-            log.error("❌ [CRITICAL] 3. Vào Railway Dashboard → Service → Variables");
-            log.error("❌ [CRITICAL] 4. Thêm biến: {} = re_xxxxxxxxxxxxx", keyType);
-            log.error("❌ [CRITICAL] 5. (Optional) Thêm: RESEND_FROM_EMAIL = your-email@yourdomain.com");
-            log.error("❌ [CRITICAL] 6. Redeploy service để áp dụng thay đổi");
+            log.error("❌ [CRITICAL] Vui lòng kiểm tra cấu hình Gmail API (CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN, FROM_EMAIL)");
             log.error("═══════════════════════════════════════════════════════════");
-            log.warn("⚠️ [DEV MODE] OTP cho {} = {} (Email không được gửi - cần cấu hình Resend API)", email, otp);
-            // Throw exception để frontend biết lỗi - KHÔNG fallback về SMTP
-            throw new RuntimeException("Không thể gửi email OTP. Resend API key chưa được cấu hình hoặc có lỗi. Vui lòng thêm " + keyType + " vào Railway Environment Variables. Error: " + resendError.getMessage());
+            log.warn("⚠️ [DEV MODE] OTP cho {} = {} (Email không được gửi - kiểm tra Gmail API)", email, otp);
+            // Throw exception để frontend biết lỗi - KHÔNG fallback
+            throw new RuntimeException("Không thể gửi email OTP qua Gmail API. Vui lòng kiểm tra cấu hình. Error: " + resendError.getMessage());
         }
     }
 
