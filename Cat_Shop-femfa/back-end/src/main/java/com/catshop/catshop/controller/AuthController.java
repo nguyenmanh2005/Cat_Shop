@@ -216,39 +216,6 @@ public class AuthController {
                 "OTP xác thực thành công. Thiết bị đã được đánh dấu là tin cậy."));
     }
 
-    // ✅ Xác thực OTP đăng ký + kích hoạt email
-    @PostMapping("/register/verify-otp")
-    public ResponseEntity<ApiResponse<TokenResponse>> verifyRegisterOtp(
-            @Valid @RequestBody OtpRequest otpRequest,
-            HttpServletRequest request) {
-
-        String email = otpRequest.getEmail();
-        String deviceId = otpRequest.getDeviceId();
-
-        if (deviceId == null || deviceId.isBlank()) {
-            throw new BadRequestException("Thiết bị ID không được để trống");
-        }
-
-        // Kiểm tra + xác thực OTP và đánh dấu email đã verify
-        TokenResponse tokenResponse = authService.verifyRegisterOtp(otpRequest);
-
-        // Sau khi xác thực thành công → đánh dấu thiết bị tin cậy
-        String ip = request.getRemoteAddr();
-        String agent = request.getHeader("User-Agent");
-
-        boolean trusted = deviceService.isTrusted(email, deviceId);
-        if (trusted) {
-            deviceService.updateLastLogin(email, deviceId, ip, agent);
-        } else {
-            deviceService.markTrusted(email, deviceId, ip, agent);
-        }
-
-        return ResponseEntity.ok(ApiResponse.success(
-                tokenResponse,
-                "Đăng ký & xác thực email thành công. Thiết bị đã được đánh dấu là tin cậy."
-        ));
-    }
-
     @PostMapping("/mfa/verify")
     public ResponseEntity<ApiResponse<TokenResponse>> verifyMfa(
             @RequestBody @Valid MfaVerifyRequest request,
@@ -492,7 +459,7 @@ public class AuthController {
         }
     }
 
-    // ✅ Gửi OTP khi user click nút "Nhận OTP" (Đăng nhập)
+    // ✅ Gửi OTP khi user click nút "Nhận OTP"
     @PostMapping("/send-otp")
     public ResponseEntity<ApiResponse<String>> sendOtp(@RequestBody Map<String, String> request) {
         log.info("═══════════════════════════════════════════════════════════");
@@ -527,38 +494,6 @@ public class AuthController {
             return ResponseEntity.ok(ApiResponse.success(
                     "Mã OTP đã được tạo. Vui lòng kiểm tra backend logs để lấy mã OTP (nếu email không gửi được).",
                     "OTP generated (check logs if email not sent)"));
-        }
-    }
-    
-    // ✅ Gửi OTP khi user đăng ký (không cần kiểm tra email tồn tại)
-    @PostMapping("/register/send-otp")
-    public ResponseEntity<ApiResponse<String>> sendOtpForRegister(@RequestBody Map<String, String> request) {
-        log.info("═══════════════════════════════════════════════════════════");
-        log.info("📨 [SEND-OTP-REGISTER] Request received: {}", request);
-        String email = request.get("email");
-        if (email == null || email.isBlank()) {
-            log.error("❌ [SEND-OTP-REGISTER] Email is null or blank");
-            throw new BadRequestException("Email không được để trống");
-        }
-        
-        log.info("📧 [SEND-OTP-REGISTER] Processing OTP request for email: {}", email);
-        
-        try {
-            authService.sendOtpForRegister(email);
-            log.info("✅ [SEND-OTP-REGISTER] OTP sent successfully to: {}", email);
-            log.info("═══════════════════════════════════════════════════════════");
-            return ResponseEntity.ok(ApiResponse.success(
-                    "Mã OTP đăng ký đã được gửi đến email của bạn",
-                    "Register OTP sent successfully"));
-        } catch (Exception e) {
-            log.error("❌ [SEND-OTP-REGISTER] Failed to send OTP to {}: {}", email, e.getMessage());
-            log.error("❌ [SEND-OTP-REGISTER] Exception type: {}", e.getClass().getName());
-            log.error("❌ [SEND-OTP-REGISTER] Full exception: ", e);
-            log.info("═══════════════════════════════════════════════════════════");
-            // KHÔNG chặn flow đăng ký. OTP vẫn được tạo trong Redis và log ra console để test.
-            return ResponseEntity.ok(ApiResponse.success(
-                    "Mã OTP đã được tạo. Vui lòng kiểm tra backend logs để lấy mã OTP (nếu email không gửi được).",
-                    "Register OTP generated (check logs if email not sent)"));
         }
     }
 

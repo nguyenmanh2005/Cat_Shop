@@ -12,7 +12,6 @@ public interface AuthService {
 //    String login(LoginRequest loginRequest);
     void validateCredentials(LoginRequest loginRequest);
     void sendOtp(String email);
-    void sendOtpForRegister(String email);
 
     // SMS OTP methods
     String sendSmsOtp(String phoneNumber); // Trả về OTP để hiển thị trong dev mode
@@ -20,7 +19,6 @@ public interface AuthService {
 
     // Bước 2: xác thực OTP → trả về token
     TokenResponse verifyOtp(OtpRequest request);
-    TokenResponse verifyRegisterOtp(OtpRequest request);
 
     // Đăng ký tài khoản
     boolean register(UserRequest request);

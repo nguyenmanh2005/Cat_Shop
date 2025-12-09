@@ -88,13 +88,6 @@ public class AuthServiceImpl implements AuthService {
         // OtpService.generateAndSendOtp() đã tự động gửi email rồi
         otpService.generateAndSendOtp(email);
     }
-    
-    @Override
-    public void sendOtpForRegister(String email) {
-        // Không kiểm tra email tồn tại (vì đây là đăng ký, email chưa có trong DB)
-        // OtpService.generateAndSendOtpForRegister() đã tự động gửi email rồi
-        otpService.generateAndSendOtpForRegister(email);
-    }
 
     // ------------------------- SMS OTP METHODS -------------------------
     @Override
@@ -199,20 +192,6 @@ public class AuthServiceImpl implements AuthService {
     // ------------------------- LOGIN STEP 2 (Xác thực OTP) -------------------------
     @Override
     public TokenResponse verifyOtp(OtpRequest request) {
-        return verifyOtpInternal(request, false);
-    }
-
-    @Override
-    public TokenResponse verifyRegisterOtp(OtpRequest request) {
-        return verifyOtpInternal(request, true);
-    }
-
-    /**
-     * Xác thực OTP và cấp token.
-     * @param request thông tin OTP/email/device
-     * @param markEmailVerified true nếu đây là flow đăng ký và cần đánh dấu email đã verify
-     */
-    private TokenResponse verifyOtpInternal(OtpRequest request, boolean markEmailVerified) {
         boolean valid = otpService.verifyOtp(request.getEmail(), request.getOtp());
         if (!valid) {
             throw new BadRequestException("OTP không hợp lệ hoặc đã hết hạn");
@@ -220,13 +199,6 @@ public class AuthServiceImpl implements AuthService {
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
-
-        // Đánh dấu email đã verify cho flow đăng ký
-        if (markEmailVerified && !Boolean.TRUE.equals(user.getEmailVerified())) {
-            user.setEmailVerified(true);
-            userRepository.save(user);
-            log.info("✅ Email {} đã được xác thực qua OTP đăng ký", user.getEmail());
-        }
 
         // Xóa OTP sau khi xác thực (để an toàn) - có thể fail nếu Redis không chạy
         try {

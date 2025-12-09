@@ -240,12 +240,7 @@ export const apiService = {
 
   // POST request
   post: async <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> => {
-    // Đảm bảo timeout được áp dụng từ config hoặc override từ parameter
-    const finalConfig = {
-      ...config,
-      timeout: config?.timeout || API_CONFIG.TIMEOUT,
-    };
-    const response = await api.post<ApiResponse<T>>(url, data, finalConfig);
+    const response = await api.post<ApiResponse<T>>(url, data, config);
     return response.data.data;
   },
 

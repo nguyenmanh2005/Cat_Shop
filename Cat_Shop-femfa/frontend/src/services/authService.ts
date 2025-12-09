@@ -379,22 +379,14 @@ export const authService = {
         return response;
       } catch (error: any) {
         // Nếu endpoint riêng chưa có (404), dùng endpoint chung
-        if (error.response?.status === 404 || error.code === 'ECONNABORTED') {
-          console.warn('Register OTP endpoint not found or timeout, using common OTP endpoint');
-          // Dùng endpoint chung /auth/send-otp với timeout dài hơn
-          try {
-            const response = await apiService.post<{ message: string }>(
-              API_CONFIG.ENDPOINTS.AUTH.SEND_OTP,
-              { email }
-            );
-            return response;
-          } catch (fallbackError: any) {
-            // Xử lý timeout hoặc lỗi khác
-            if (fallbackError.code === 'ECONNABORTED' || fallbackError.message?.includes('timeout')) {
-              throw new Error('Gửi mã OTP mất quá nhiều thời gian. Vui lòng kiểm tra kết nối mạng và thử lại.');
-            }
-            throw fallbackError;
-          }
+        if (error.response?.status === 404) {
+          console.warn('Register OTP endpoint not found, using common OTP endpoint');
+          // Dùng endpoint chung /auth/send-otp
+          const response = await apiService.post<{ message: string }>(
+            API_CONFIG.ENDPOINTS.AUTH.SEND_OTP,
+            { email }
+          );
+          return response;
         }
         
         // Xử lý trường hợp email đã tồn tại (400/409) - có thể là chưa verify
@@ -417,19 +409,10 @@ export const authService = {
             );
             return response;
           } catch (resendError: any) {
-            // Xử lý timeout
-            if (resendError.code === 'ECONNABORTED' || resendError.message?.includes('timeout')) {
-              throw new Error('Gửi mã OTP mất quá nhiều thời gian. Vui lòng kiểm tra kết nối mạng và thử lại.');
-            }
             // Nếu vẫn lỗi, thông báo rõ ràng
             const resendMsg = resendError.response?.data?.message || resendError.message || '';
             throw new Error(`Email này đã được đăng ký. ${resendMsg.includes('OTP') ? 'Đang gửi lại mã OTP để xác thực...' : 'Vui lòng kiểm tra email hoặc thử đăng nhập.'}`);
           }
-        }
-        
-        // Xử lý timeout
-        if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-          throw new Error('Gửi mã OTP mất quá nhiều thời gian. Vui lòng kiểm tra kết nối mạng và thử lại.');
         }
         
         throw error;
@@ -437,11 +420,6 @@ export const authService = {
     } catch (error: any) {
       console.error('Send Register OTP error:', error);
       let errorMessage = error.response?.data?.message || error.message || 'Không thể gửi mã OTP đăng ký';
-      
-      // Xử lý timeout
-      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-        errorMessage = 'Gửi mã OTP mất quá nhiều thời gian. Vui lòng kiểm tra kết nối mạng và thử lại sau vài phút.';
-      }
       
       // Xử lý trường hợp email đã tồn tại - cho phép gửi OTP lại để verify
       const errorMsgLower = errorMessage.toLowerCase();
@@ -458,12 +436,8 @@ export const authService = {
           );
           return response;
         } catch (retryError: any) {
-          // Xử lý timeout khi retry
-          if (retryError.code === 'ECONNABORTED' || retryError.message?.includes('timeout')) {
-            errorMessage = 'Gửi mã OTP mất quá nhiều thời gian. Vui lòng kiểm tra kết nối mạng và thử lại sau vài phút.';
-          } else {
-            errorMessage = 'Email này đã được đăng ký. Nếu bạn chưa xác thực email, vui lòng kiểm tra hộp thư hoặc thử đăng nhập.';
-          }
+          // Nếu vẫn lỗi, hiển thị thông báo thân thiện
+          errorMessage = 'Email này đã được đăng ký. Nếu bạn chưa xác thực email, vui lòng kiểm tra hộp thư hoặc thử đăng nhập.';
         }
       }
       
