@@ -28,10 +28,19 @@ public class ResendEmailService {
     private static final String RESEND_API_URL = "https://api.resend.com/emails";
 
     public void sendOtpEmail(String toEmail, String otp) {
-        if (apiKey == null || apiKey.isEmpty()) {
-            log.error("❌ Resend API key chưa được cấu hình!");
-            log.error("❌ Vui lòng thêm RESEND_API_KEY vào Railway Environment Variables");
-            throw new RuntimeException("Resend API key chưa được cấu hình. Vui lòng thêm RESEND_API_KEY vào Railway Environment Variables.");
+        if (apiKey == null || apiKey.isEmpty() || apiKey.trim().isEmpty()) {
+            log.error("═══════════════════════════════════════════════════════════");
+            log.error("❌ [CRITICAL] Resend API key chưa được cấu hình!");
+            log.error("❌ [CRITICAL] Vui lòng thêm RESEND_API_KEY vào Railway Environment Variables");
+            log.error("❌ [CRITICAL] Hướng dẫn:");
+            log.error("❌ [CRITICAL] 1. Đăng ký tài khoản tại: https://resend.com/signup");
+            log.error("❌ [CRITICAL] 2. Tạo API key tại: https://resend.com/api-keys");
+            log.error("❌ [CRITICAL] 3. Vào Railway Dashboard → Service → Variables");
+            log.error("❌ [CRITICAL] 4. Thêm biến: RESEND_API_KEY = re_xxxxxxxxxxxxx");
+            log.error("❌ [CRITICAL] 5. (Optional) Thêm: RESEND_FROM_EMAIL = your-email@yourdomain.com");
+            log.error("❌ [CRITICAL] 6. Redeploy service để áp dụng thay đổi");
+            log.error("═══════════════════════════════════════════════════════════");
+            throw new RuntimeException("Resend API key chưa được cấu hình. Vui lòng thêm RESEND_API_KEY vào Railway Environment Variables. Xem hướng dẫn: https://resend.com/api-keys");
         }
 
         try {

@@ -42,6 +42,8 @@ public class OtpServiceImpl implements OtpService {
         log.info("🔑 Generated OTP for {}: {}", email, otp); // Log OTP ngay để debug
         
         // Thử gửi qua Resend API trước (không cần SMTP, hoạt động trên Railway)
+        boolean resendFailed = false;
+        boolean resendApiKeyMissing = false;
         try {
             resendEmailService.sendOtpEmail(email, otp);
             log.info("✅ OTP email sent successfully via Resend API to: {}", email);
@@ -51,14 +53,24 @@ public class OtpServiceImpl implements OtpService {
             log.info("═══════════════════════════════════════════════════════════");
             return "session-" + Math.abs(RANDOM.nextInt());
         } catch (Exception resendError) {
+            resendFailed = true;
             log.warn("⚠️ Resend API failed: {}", resendError.getMessage());
             if (resendError.getMessage() != null && resendError.getMessage().contains("API key chưa được cấu hình")) {
-                log.error("❌ Resend API key chưa được cấu hình trong Railway!");
-                log.error("❌ Vui lòng thêm RESEND_API_KEY vào Railway Environment Variables");
-                log.error("❌ Xem hướng dẫn: https://resend.com/api-keys");
+                resendApiKeyMissing = true;
+                log.error("═══════════════════════════════════════════════════════════");
+                log.error("❌ [CRITICAL] Resend API key chưa được cấu hình trong Railway!");
+                log.error("❌ [CRITICAL] SMTP không hoạt động trên Railway (bị chặn port 465/587)");
+                log.error("❌ [CRITICAL] Vui lòng cấu hình Resend API key:");
+                log.error("❌ [CRITICAL] 1. Đăng ký tại: https://resend.com/signup");
+                log.error("❌ [CRITICAL] 2. Lấy API key tại: https://resend.com/api-keys");
+                log.error("❌ [CRITICAL] 3. Thêm vào Railway: RESEND_API_KEY=your-api-key");
+                log.error("❌ [CRITICAL] 4. (Optional) Thêm RESEND_FROM_EMAIL=your-email@yourdomain.com");
+                log.error("═══════════════════════════════════════════════════════════");
+                log.warn("⚠️ [DEV MODE] OTP cho {} = {} (Email không được gửi - cần cấu hình Resend API)", email, otp);
+                // Không fallback về SMTP nếu Resend API key chưa được cấu hình (Railway chặn SMTP)
+                return "session-" + Math.abs(RANDOM.nextInt());
             }
-            log.warn("⚠️ Falling back to SMTP (có thể không hoạt động trên Railway)...");
-            // Fallback về SMTP nếu Resend thất bại
+            log.warn("⚠️ Resend API failed, falling back to SMTP (có thể không hoạt động trên Railway)...");
         }
         
         // Fallback: Thử gửi qua SMTP (có thể không hoạt động trên Railway)
