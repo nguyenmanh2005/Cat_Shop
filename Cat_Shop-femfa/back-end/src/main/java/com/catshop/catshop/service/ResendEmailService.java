@@ -35,6 +35,15 @@ public class ResendEmailService {
     }
     
     public void sendOtpEmail(String toEmail, String otp, boolean isRegister) {
+        // Log API keys status (không log giá trị thật để bảo mật)
+        log.info("═══════════════════════════════════════════════════════════");
+        log.info("📧 [RESEND] Preparing to send OTP email");
+        log.info("📧 [RESEND] Type: {}", isRegister ? "Đăng ký" : "Đăng nhập");
+        log.info("📧 [RESEND] To: {}", toEmail);
+        log.info("📧 [RESEND] RESEND_API_KEY configured: {}", (apiKey != null && !apiKey.trim().isEmpty()));
+        log.info("📧 [RESEND] RESEND_API_KEY_REGISTER configured: {}", (apiKeyRegister != null && !apiKeyRegister.trim().isEmpty()));
+        log.info("📧 [RESEND] RESEND_FROM_EMAIL: {}", fromEmail);
+        
         // Chọn API key: nếu là đăng ký và có apiKeyRegister thì dùng apiKeyRegister, ngược lại dùng apiKey
         String selectedApiKey = (isRegister && apiKeyRegister != null && !apiKeyRegister.trim().isEmpty()) 
             ? apiKeyRegister 
@@ -61,9 +70,13 @@ public class ResendEmailService {
             String emailType = isRegister ? "đăng ký" : "đăng nhập";
             log.info("📧 [RESEND] Sending OTP email ({}) to: {}", emailType, toEmail);
             if (isRegister && apiKeyRegister != null && !apiKeyRegister.trim().isEmpty()) {
-                log.info("📧 [RESEND] Using Register API key");
+                log.info("📧 [RESEND] Using Register API key (first {} chars: {})", 
+                    Math.min(selectedApiKey.length(), 10), 
+                    selectedApiKey.substring(0, Math.min(selectedApiKey.length(), 10)) + "...");
             } else {
-                log.info("📧 [RESEND] Using Login API key");
+                log.info("📧 [RESEND] Using Login API key (first {} chars: {})", 
+                    Math.min(selectedApiKey.length(), 10), 
+                    selectedApiKey.substring(0, Math.min(selectedApiKey.length(), 10)) + "...");
             }
             
             ResendEmailRequest request = new ResendEmailRequest();
@@ -89,6 +102,11 @@ public class ResendEmailService {
 
             HttpEntity<ResendEmailRequest> entity = new HttpEntity<>(request, headers);
 
+            log.info("📧 [RESEND] Request URL: {}", RESEND_API_URL);
+            log.info("📧 [RESEND] Request From: {}", request.getFrom());
+            log.info("📧 [RESEND] Request To: {}", request.getTo());
+            log.info("📧 [RESEND] Request Subject: {}", request.getSubject());
+            
             ResponseEntity<ResendEmailResponse> response = restTemplate.exchange(
                     RESEND_API_URL,
                     HttpMethod.POST,
@@ -96,18 +114,40 @@ public class ResendEmailService {
                     ResendEmailResponse.class
             );
 
+            log.info("📧 [RESEND] Response Status: {}", response.getStatusCode());
+            log.info("📧 [RESEND] Response Headers: {}", response.getHeaders());
+            
             if (response.getStatusCode().is2xxSuccessful()) {
                 ResendEmailResponse body = response.getBody();
                 if (body != null && body.getId() != null) {
                     log.info("✅ [RESEND] Email sent successfully! ID: {}", body.getId());
+                    log.info("═══════════════════════════════════════════════════════════");
                 } else {
+                    log.warn("⚠️ [RESEND] Email sent but response body is null or missing ID");
                     log.info("✅ [RESEND] Email sent successfully!");
+                    log.info("═══════════════════════════════════════════════════════════");
                 }
             } else {
+                String errorBody = response.getBody() != null ? response.getBody().toString() : "No response body";
                 log.error("❌ [RESEND] Failed to send email. Status: {}", response.getStatusCode());
+                log.error("❌ [RESEND] Response Body: {}", errorBody);
+                log.error("═══════════════════════════════════════════════════════════");
+                throw new RuntimeException("Resend API returned status " + response.getStatusCode() + ". Response: " + errorBody);
             }
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            log.error("❌ [RESEND] HTTP Client Error sending email to {}: {}", toEmail, e.getMessage());
+            log.error("❌ [RESEND] Status Code: {}", e.getStatusCode());
+            log.error("❌ [RESEND] Response Body: {}", e.getResponseBodyAsString());
+            log.error("═══════════════════════════════════════════════════════════");
+            throw new RuntimeException("Không thể gửi email qua Resend. Status: " + e.getStatusCode() + ". Error: " + e.getResponseBodyAsString(), e);
         } catch (Exception e) {
-            log.error("❌ [RESEND] Error sending email to {}: {}", toEmail, e.getMessage(), e);
+            log.error("❌ [RESEND] Error sending email to {}: {}", toEmail, e.getMessage());
+            log.error("❌ [RESEND] Exception Type: {}", e.getClass().getName());
+            if (e.getCause() != null) {
+                log.error("❌ [RESEND] Cause: {}", e.getCause().getMessage());
+            }
+            log.error("❌ [RESEND] Full Stack Trace: ", e);
+            log.error("═══════════════════════════════════════════════════════════");
             throw new RuntimeException("Không thể gửi email qua Resend: " + e.getMessage(), e);
         }
     }
