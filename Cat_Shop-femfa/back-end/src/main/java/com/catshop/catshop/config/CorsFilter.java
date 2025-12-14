@@ -11,12 +11,12 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
 @Slf4j
-@Component
+// Tạm thời tắt CorsFilter để tránh xung đột với SecurityConfig CORS
+// @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class CorsFilter implements Filter {
 
@@ -30,16 +30,19 @@ public class CorsFilter implements Filter {
         String origin = request.getHeader("Origin");
         log.debug("CORS Filter - Request from Origin: {}, Method: {}", origin, request.getMethod());
         
+        // Khi allowCredentials = true, không thể dùng "*", phải set origin cụ thể
         if (origin != null && !origin.isEmpty()) {
             response.setHeader("Access-Control-Allow-Origin", origin);
+            response.setHeader("Access-Control-Allow-Credentials", "true");
         } else {
+            // Nếu không có origin, không set credentials để có thể dùng "*"
             response.setHeader("Access-Control-Allow-Origin", "*");
+            // Không set Access-Control-Allow-Credentials khi dùng "*"
         }
 
         response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
         response.setHeader("Access-Control-Allow-Headers", "*");
         response.setHeader("Access-Control-Expose-Headers", "*");
-        response.setHeader("Access-Control-Allow-Credentials", "true");
         response.setHeader("Access-Control-Max-Age", "3600");
 
         // Handle preflight requests

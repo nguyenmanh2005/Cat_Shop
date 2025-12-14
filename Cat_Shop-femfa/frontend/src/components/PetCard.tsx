@@ -32,7 +32,7 @@ const PetCard = ({ product, onClick }: PetCardProps) => {
         {/* Badge - Top Left */}
         {product.catDetail?.vaccinated && (
           <div className="absolute top-3 left-3 z-10">
-            <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm shadow-lg flex items-center gap-1">
+            <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm shadow-lg flex items-center gap-1">
               <span>✓</span> Đã tiêm phòng
             </span>
           </div>

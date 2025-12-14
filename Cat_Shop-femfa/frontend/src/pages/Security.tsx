@@ -722,12 +722,12 @@ const Security = () => {
                 </div>
               ) : userProfile && userProfile.phone && userProfile.phone.trim() !== '' ? (
                 <div className="space-y-4">
-                  <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      <CheckCircle2 className="h-5 w-5 text-blue-600" />
                       <div>
-                        <p className="text-sm font-semibold text-green-800">Số điện thoại đã được đăng ký</p>
-                        <p className="text-sm text-green-700 mt-1">Số điện thoại: <strong>{userProfile.phone}</strong></p>
+                        <p className="text-sm font-semibold text-blue-800">Số điện thoại đã được đăng ký</p>
+                        <p className="text-sm text-blue-700 mt-1">Số điện thoại: <strong>{userProfile.phone}</strong></p>
                       </div>
                     </div>
                   </div>
@@ -911,11 +911,11 @@ const Security = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                        <p className="text-sm font-semibold text-green-800">MFA đã được bật</p>
+                        <div className="h-2 w-2 rounded-full bg-blue-500"></div>
+                        <p className="text-sm font-semibold text-blue-800">MFA đã được bật</p>
                       </div>
                       <Button
                         variant="destructive"
@@ -1369,8 +1369,8 @@ const Security = () => {
                         </div>
                       </div>
                       {device.trusted && (
-                        <div className="rounded-full bg-green-100 px-2 py-1">
-                          <span className="text-xs font-medium text-green-800">Đã tin cậy</span>
+                        <div className="rounded-full bg-blue-100 px-2 py-1">
+                          <span className="text-xs font-medium text-blue-800">Đã tin cậy</span>
                         </div>
                       )}
                     </div>

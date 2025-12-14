@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -111,7 +112,16 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<ProductResponse> getAllProducts() {
-        return productMapper.toDtoList(productRepository.findAllAvailableProducts());
+        try {
+            List<Product> products = productRepository.findAllAvailableProducts();
+            // Filter out products with null productType to avoid mapping errors
+            products = products.stream()
+                    .filter(p -> p.getProductType() != null)
+                    .collect(Collectors.toList());
+            return productMapper.toDtoList(products);
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi khi lấy danh sách sản phẩm: " + e.getMessage(), e);
+        }
     }
 
     @Override

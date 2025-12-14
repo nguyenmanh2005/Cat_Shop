@@ -226,7 +226,7 @@ const RegisterForm = () => {
             <div className="mt-2 space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-500">Độ mạnh mật khẩu:</span>
-                <span className={`font-medium ${passwordStrength.strength === "weak" ? "text-red-500" : passwordStrength.strength === "fair" ? "text-orange-500" : passwordStrength.strength === "good" ? "text-yellow-500" : "text-green-500"}`}>
+                <span className={`font-medium ${passwordStrength.strength === "weak" ? "text-red-500" : passwordStrength.strength === "fair" ? "text-blue-500" : passwordStrength.strength === "good" ? "text-blue-400" : "text-blue-600"}`}>
                   {getStrengthLabel(passwordStrength.strength)}
                 </span>
               </div>
@@ -236,10 +236,10 @@ const RegisterForm = () => {
                     passwordStrength.strength === "weak"
                       ? "bg-red-500"
                       : passwordStrength.strength === "fair"
-                      ? "bg-orange-500"
+                      ? "bg-blue-500"
                       : passwordStrength.strength === "good"
-                      ? "bg-yellow-500"
-                      : "bg-green-500"
+                      ? "bg-blue-400"
+                      : "bg-blue-600"
                   }`}
                   style={{ width: `${passwordStrength.score}%` }}
                 />
@@ -326,7 +326,7 @@ const RegisterForm = () => {
       <div className="mt-4 space-y-2">
         <ErrorAlert message={error} />
         {successMessage && (
-          <div className="rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-700">
             {successMessage}
           </div>
         )}

@@ -257,7 +257,7 @@ const UserManagement = () => {
             <CardTitle className="text-sm font-medium">Hoạt động</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-blue-600">
               {users.length}
             </div>
           </CardContent>

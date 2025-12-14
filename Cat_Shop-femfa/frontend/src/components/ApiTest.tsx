@@ -125,7 +125,7 @@ export const ApiTest: React.FC = () => {
       case 'pending':
         return <Badge variant="secondary">Đang test</Badge>;
       case 'success':
-        return <Badge variant="default" className="bg-green-500">Thành công</Badge>;
+        return <Badge variant="default" className="bg-blue-500">Thành công</Badge>;
       case 'error':
         return <Badge variant="destructive">Lỗi</Badge>;
     }

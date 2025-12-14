@@ -781,7 +781,7 @@ const ProductManagement = () => {
             <CardTitle className="text-sm font-medium">Thức ăn</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-blue-600">
               {products.filter(p => p.typeId === 2).length}
             </div>
           </CardContent>
@@ -791,7 +791,7 @@ const ProductManagement = () => {
             <CardTitle className="text-sm font-medium">Phụ kiện</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
+            <div className="text-2xl font-bold text-blue-600">
               {products.filter(p => p.typeId === 3 || p.typeId === 4).length}
             </div>
           </CardContent>
@@ -923,7 +923,7 @@ const ProductManagement = () => {
                         <Badge variant="outline">{product.typeName}</Badge>
                       </TableCell>
                       <TableCell>{product.categoryName}</TableCell>
-                      <TableCell className="font-medium text-green-600">
+                      <TableCell className="font-medium text-blue-600">
                         {formatCurrencyVND(product.price)}
                       </TableCell>
                       <TableCell>{product.stockQuantity}</TableCell>
@@ -996,7 +996,7 @@ const ProductManagement = () => {
                 </div>
                 <div>
                   <label className="text-sm font-medium">Giá</label>
-                  <p className="text-lg font-semibold text-green-600">
+                  <p className="text-lg font-semibold text-blue-600">
                     {formatCurrencyVND(selectedProduct.price)}
                   </p>
                 </div>

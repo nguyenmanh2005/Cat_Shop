@@ -35,16 +35,16 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
       <DialogOverlay className="bg-black/50" />
       <DialogContent className="max-w-7xl w-full p-0 bg-transparent border-0 shadow-none max-h-[90vh] overflow-y-auto">
         <DialogTitle className="sr-only">
-          {mode === "login" ? "Đăng nhập" : "Đăng ký"}
+          {mode === "login" ? "Login" : "Register"}
         </DialogTitle>
         <DialogDescription className="sr-only">
-          {mode === "login" ? "Đăng nhập vào tài khoản của bạn" : "Tạo tài khoản mới"}
+          {mode === "login" ? "Login to your account" : "Create a new account"}
         </DialogDescription>
         <div className="relative">
           <button
             onClick={handleClose}
-            className="absolute top-4 right-4 z-20 rounded-full bg-white border border-border p-2 hover:bg-muted transition-colors shadow-lg"
-            aria-label="Đóng"
+            className="absolute top-4 right-4 z-20 rounded-full bg-gray-800 border border-gray-700 text-white p-2 hover:bg-gray-700 transition-colors shadow-lg"
+            aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>

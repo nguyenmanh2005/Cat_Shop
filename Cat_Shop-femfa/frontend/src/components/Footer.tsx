@@ -48,14 +48,14 @@ const Footer = () => {
           {/* Middle Column - Website Information */}
           <div className="space-y-4 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             <h3 className="text-lg font-bold text-foreground uppercase">
-              THÔNG TIN WEBSITE
+              WEBSITE INFORMATION
             </h3>
             <div className="space-y-2 text-sm text-muted-foreground">
               {[
-                { label: "Chủ sở hữu:", value: "Công ty TNHH Cham Pets" },
-                { label: "Mã số thuế:", value: "0123456789" },
-                { label: "Địa chỉ:", value: "123 Đường ABC, Quận XYZ, TP.HCM" },
-                { label: "Điện thoại:", value: "0123 456 789" }
+                { label: "Owner:", value: "Cham Pets Co., Ltd." },
+                { label: "Tax ID:", value: "0123456789" },
+                { label: "Address:", value: "123 ABC Street, XYZ District, Ho Chi Minh City" },
+                { label: "Phone:", value: "0123 456 789" }
               ].map((info, index) => (
                 <div key={index} className="hover:text-foreground transition-colors duration-300">
                   <span className="font-medium">{info.label}</span>
@@ -68,17 +68,17 @@ const Footer = () => {
           {/* Right Column - Policy Information */}
           <div className="space-y-4 animate-fade-in-right" style={{ animationDelay: '0.4s' }}>
             <h3 className="text-lg font-bold text-foreground uppercase">
-              THÔNG TIN CHÍNH SÁCH
+              POLICY INFORMATION
             </h3>
             <div className="space-y-2 text-sm">
               {[
-                "Chính sách bảo mật",
-                "Điều khoản dịch vụ",
-                "Điều kiện giao dịch",
-                "Hàng hóa",
-                "Dịch vụ",
-                "Vận chuyển",
-                "Đổi trả"
+                "Privacy Policy",
+                "Terms of Service",
+                "Transaction Terms",
+                "Products",
+                "Services",
+                "Shipping",
+                "Returns"
               ].map((policy, index) => (
                 <a 
                   key={policy}
@@ -96,7 +96,7 @@ const Footer = () => {
         {/* Bottom border */}
         <div className="mt-8 pt-6 border-t border-border animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
           <p className="text-center text-sm text-muted-foreground">
-            © 2024 Cham Pets. Tất cả quyền được bảo lưu.
+            © 2024 Cham Pets. All rights reserved.
           </p>
         </div>
       </div>

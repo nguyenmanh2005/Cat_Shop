@@ -125,14 +125,14 @@ const Analytics = () => {
 
   const getGrowthIcon = (growth: number) => {
     return growth >= 0 ? (
-      <TrendingUp className="h-4 w-4 text-green-600" />
+      <TrendingUp className="h-4 w-4 text-blue-600" />
     ) : (
       <TrendingDown className="h-4 w-4 text-red-600" />
     );
   };
 
   const getGrowthColor = (growth: number) => {
-    return growth >= 0 ? "text-green-600" : "text-red-600";
+    return growth >= 0 ? "text-blue-600" : "text-red-600";
   };
 
   const getStatusLabel = (status: string) => {
@@ -285,11 +285,11 @@ const Analytics = () => {
                       <span>{month.users}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <PawPrint className="h-4 w-4 text-green-600" />
+                      <PawPrint className="h-4 w-4 text-blue-600" />
                       <span>{month.pets}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <ShoppingCart className="h-4 w-4 text-orange-600" />
+                      <ShoppingCart className="h-4 w-4 text-blue-600" />
                       <span>{month.orders}</span>
                     </div>
                   </div>

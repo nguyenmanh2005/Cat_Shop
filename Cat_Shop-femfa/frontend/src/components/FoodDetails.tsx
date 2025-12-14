@@ -213,7 +213,7 @@ const FoodDetails: React.FC = () => {
           <div className="mb-6">
             <span className="text-sm font-medium">
               Status: {isInStock ? (
-                <span className="text-green-600">In Stock ({product.stockQuantity} available)</span>
+                <span className="text-blue-600">In Stock ({product.stockQuantity} available)</span>
               ) : (
                 <span className="text-red-600">Out of Stock</span>
               )}

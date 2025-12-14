@@ -218,10 +218,10 @@ const ForgotPasswordForm = ({ onBack, onClose }: ForgotPasswordFormProps) => {
                             passwordStrength.strength === "weak"
                               ? "text-red-500"
                               : passwordStrength.strength === "fair"
-                              ? "text-orange-500"
+                              ? "text-blue-500"
                               : passwordStrength.strength === "good"
-                              ? "text-yellow-500"
-                              : "text-green-500"
+                              ? "text-blue-400"
+                              : "text-blue-600"
                           }`}
                         >
                           {getStrengthLabel(passwordStrength.strength)}
@@ -233,10 +233,10 @@ const ForgotPasswordForm = ({ onBack, onClose }: ForgotPasswordFormProps) => {
                             passwordStrength.strength === "weak"
                               ? "bg-red-500"
                               : passwordStrength.strength === "fair"
-                              ? "bg-orange-500"
+                              ? "bg-blue-500"
                               : passwordStrength.strength === "good"
-                              ? "bg-yellow-500"
-                              : "bg-green-500"
+                              ? "bg-blue-400"
+                              : "bg-blue-600"
                           }`}
                           style={{ width: `${passwordStrength.score}%` }}
                         />

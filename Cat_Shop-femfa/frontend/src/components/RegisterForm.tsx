@@ -342,13 +342,13 @@ const RegisterForm = ({ onSwitchToLogin, onClose }: RegisterFormProps) => {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Độ mạnh mật khẩu:</span>
-                  <span className={`font-medium ${passwordStrength.strength === "weak" ? "text-red-500" : passwordStrength.strength === "fair" ? "text-orange-500" : passwordStrength.strength === "good" ? "text-yellow-500" : "text-green-500"}`}>
+                  <span className={`font-medium ${passwordStrength.strength === "weak" ? "text-red-500" : passwordStrength.strength === "fair" ? "text-blue-500" : passwordStrength.strength === "good" ? "text-blue-400" : "text-blue-600"}`}>
                     {getStrengthLabel(passwordStrength.strength)}
                   </span>
                 </div>
                 <Progress 
                   value={passwordStrength.score} 
-                  className={`h-2 ${passwordStrength.strength === "weak" ? "[&>div]:bg-red-500" : passwordStrength.strength === "fair" ? "[&>div]:bg-orange-500" : passwordStrength.strength === "good" ? "[&>div]:bg-yellow-500" : "[&>div]:bg-green-500"}`}
+                  className={`h-2 ${passwordStrength.strength === "weak" ? "[&>div]:bg-red-500" : passwordStrength.strength === "fair" ? "[&>div]:bg-blue-500" : passwordStrength.strength === "good" ? "[&>div]:bg-blue-400" : "[&>div]:bg-blue-600"}`}
                 />
                 {passwordStrength.feedback.length > 0 && (
                   <ul className="text-xs text-muted-foreground space-y-0.5 mt-1">
