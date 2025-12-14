@@ -196,7 +196,7 @@ const CatDetailView = () => {
           <div className="animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
             <p className="text-sm text-muted-foreground">
               Tình trạng:{" "}
-              <span className={`font-medium ${isInStock ? "text-green-600" : "text-red-600"}`}>
+              <span className={`font-medium ${isInStock ? "text-blue-600" : "text-red-600"}`}>
                 {isInStock ? `Còn ${product.stockQuantity} ${getStockUnit()}` : "Hết hàng"}
               </span>
             </p>

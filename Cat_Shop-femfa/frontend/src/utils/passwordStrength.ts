@@ -98,7 +98,7 @@ export function getStrengthColor(strength: PasswordStrength): string {
     case "weak":
       return "bg-red-500";
     case "fair":
-      return "bg-orange-500";
+      return "bg-blue-500";
     case "good":
       return "bg-yellow-500";
     case "strong":

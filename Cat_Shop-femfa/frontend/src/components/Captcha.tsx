@@ -83,7 +83,7 @@ const Captcha = ({ onVerify, className = "" }: CaptchaProps) => {
         <p className="text-xs text-red-500">{error}</p>
       )}
       {isVerified && (
-        <p className="text-xs text-green-500">✓ Xác thực thành công</p>
+        <p className="text-xs text-blue-500">✓ Xác thực thành công</p>
       )}
       <p className="text-xs text-muted-foreground">
         Vui lòng giải phép tính để xác minh bạn không phải robot

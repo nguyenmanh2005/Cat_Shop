@@ -390,7 +390,7 @@ const UserManagementDB = () => {
             <CardTitle className="text-sm font-medium">Moderator</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-blue-600">
               {users.filter(u => u.roleName === 'Moderator').length}
             </div>
           </CardContent>
@@ -473,7 +473,7 @@ const UserManagementDB = () => {
                       <TableCell>
                         <Badge variant="outline">{user.orderCount} đơn</Badge>
                       </TableCell>
-                      <TableCell className="font-medium text-green-600">
+                      <TableCell className="font-medium text-blue-600">
                         {formatCurrencyVND(user.totalSpent)}
                       </TableCell>
                       <TableCell className="text-right">
@@ -567,7 +567,7 @@ const UserManagementDB = () => {
                   </div>
                   <div>
                     <label className="text-sm font-medium">Tổng chi tiêu</label>
-                    <p className="text-lg font-semibold text-green-600">
+                    <p className="text-lg font-semibold text-blue-600">
                       {formatCurrencyVND(selectedUser.totalSpent)}
                     </p>
                   </div>

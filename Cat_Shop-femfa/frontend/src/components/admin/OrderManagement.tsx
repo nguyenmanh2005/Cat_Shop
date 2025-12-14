@@ -380,7 +380,7 @@ const OrderManagement = () => {
             <CardTitle className="text-sm font-medium">Đang giao</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
+            <div className="text-2xl font-bold text-blue-600">
               {orders.filter(o => o.status === 'shipping').length}
             </div>
           </CardContent>
@@ -390,7 +390,7 @@ const OrderManagement = () => {
             <CardTitle className="text-sm font-medium">Đã giao</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-blue-600">
               {orders.filter(o => o.status === 'delivered').length}
             </div>
           </CardContent>
@@ -490,7 +490,7 @@ const OrderManagement = () => {
                           <div className="text-sm text-muted-foreground">{order.petBreed}</div>
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium text-green-600">
+                      <TableCell className="font-medium text-blue-600">
                         {formatCurrencyVND(order.amount)}
                       </TableCell>
                       <TableCell>

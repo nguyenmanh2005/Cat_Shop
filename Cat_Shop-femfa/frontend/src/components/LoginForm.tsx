@@ -233,8 +233,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
 
     if (!email || !password) {
       toast({
-        title: "Thông tin không đầy đủ",
-        description: "Vui lòng nhập email và mật khẩu",
+        title: "Incomplete Information",
+        description: "Please enter email and password",
         variant: "destructive",
       });
       return;
@@ -242,8 +242,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
 
     if (hasRecaptchaSiteKey && !recaptchaToken) {
       toast({
-        title: "Xác thực reCAPTCHA",
-        description: "Vui lòng xác thực reCAPTCHA để tiếp tục",
+        title: "reCAPTCHA Verification",
+        description: "Please verify reCAPTCHA to continue",
         variant: "destructive",
       });
       return;
@@ -279,13 +279,13 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       resetOtpState();
       
       toast({
-        title: "Xác minh tài khoản",
-        description: result.message || "Vui lòng chọn phương thức xác minh để tiếp tục đăng nhập",
+        title: "Account Verification",
+        description: result.message || "Please select a verification method to continue login",
       });
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Email hoặc mật khẩu không chính xác";
+      const errorMessage = error instanceof Error ? error.message : "Email or password is incorrect";
       toast({
-        title: "Đăng nhập thất bại",
+        title: "Login Failed",
         description: errorMessage,
         variant: "destructive",
       });
@@ -298,7 +298,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     if (!verificationEmail) {
       toast({
         title: "Email không hợp lệ",
-        description: "Vui lòng đăng nhập lại bằng email và mật khẩu",
+        description: "Please login again with email and password",
         variant: "destructive",
       });
       return;
@@ -310,13 +310,13 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       setOtpSent(true);
       setOtpCountdown(120); // Bắt đầu countdown 2 phút (120 giây)
       toast({
-        title: "OTP đã được gửi",
-        description: "Vui lòng kiểm tra email của bạn để lấy mã OTP. Mã có hiệu lực trong 2 phút.",
+        title: "OTP Sent",
+        description: "Please check your email for the OTP code. The code is valid for 2 minutes.",
       });
     } catch (error: unknown) {
       toast({
-        title: "Lỗi gửi OTP",
-        description: error instanceof Error ? error.message : "Không thể gửi mã OTP",
+        title: "OTP Send Error",
+        description: error instanceof Error ? error.message : "Unable to send OTP code",
         variant: "destructive",
       });
     } finally {
@@ -370,8 +370,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     
     if (!cleanPhone || !phoneRegex.test(cleanPhone)) {
       toast({
-        title: "Số điện thoại không hợp lệ",
-        description: "Vui lòng nhập số điện thoại đúng định dạng (VD: 0912345678 hoặc +84912345678)",
+        title: "Invalid Phone Number",
+        description: "Please enter phone number in correct format (e.g., 0912345678 or +84912345678)",
         variant: "destructive",
       });
       return;
@@ -384,8 +384,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       
       if (normalizedInputPhone !== normalizedUserPhone) {
         toast({
-          title: "Số điện thoại không khớp",
-          description: `Số điện thoại bạn nhập không khớp với số điện thoại đã đăng ký (${userPhoneNumber}). Vui lòng sử dụng số điện thoại đã đăng ký hoặc nhập số điện thoại mới.`,
+          title: "Phone Number Mismatch",
+          description: `The phone number you entered does not match the registered phone number (${userPhoneNumber}). Please use the registered phone number or enter a new phone number.`,
           variant: "destructive",
         });
         return;
@@ -398,13 +398,13 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       setSmsOtpSent(true);
       setSmsOtpCountdown(120); // Bắt đầu countdown 2 phút (120 giây)
       toast({
-        title: "OTP đã được gửi",
-        description: `Mã OTP đã được gửi đến số điện thoại ${cleanPhone}. Mã có hiệu lực trong 2 phút.`,
+        title: "OTP Sent",
+        description: `OTP code has been sent to phone number ${cleanPhone}. The code is valid for 2 minutes.`,
       });
     } catch (error: unknown) {
       toast({
         title: "Lỗi gửi OTP",
-        description: error instanceof Error ? error.message : "Không thể gửi mã OTP qua SMS",
+        description: error instanceof Error ? error.message : "Unable to send OTP code via SMS",
         variant: "destructive",
       });
     } finally {
@@ -426,8 +426,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   const handleVerifySmsOtp = async () => {
     if (!smsOtp || smsOtp.length !== 6) {
       toast({
-        title: "OTP không hợp lệ",
-        description: "Vui lòng nhập mã OTP 6 chữ số",
+        title: "Invalid OTP",
+        description: "Please enter 6-digit OTP code",
         variant: "destructive",
       });
       return;
@@ -436,7 +436,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     if (!verificationEmail) {
       toast({
         title: "Email không hợp lệ",
-        description: "Vui lòng đăng nhập lại bằng email và mật khẩu",
+        description: "Please login again with email and password",
         variant: "destructive",
       });
       return;
@@ -450,8 +450,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
 
       if (result.success) {
         toast({
-          title: "Đăng nhập thành công!",
-          description: "Chào mừng bạn quay trở lại với Cham Pets",
+          title: "Login Successful!",
+          description: "Welcome back to Cham Pets",
         });
         setNeedsVerification(false);
         setVerificationMethod(null);
@@ -462,14 +462,14 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
 
       // OTP từ SMS không chính xác
       toast({
-        title: "Mã OTP không chính xác",
-        description: result.message || "Vui lòng kiểm tra lại mã OTP đã được gửi đến số điện thoại của bạn",
+        title: "Incorrect OTP Code",
+        description: result.message || "Please check the OTP code sent to your phone number",
         variant: "destructive",
       });
     } catch (error: unknown) {
       toast({
-        title: "Lỗi xác thực",
-        description: error instanceof Error ? error.message : "Đã xảy ra lỗi khi xác thực OTP SMS",
+        title: "Verification Error",
+        description: error instanceof Error ? error.message : "An error occurred while verifying SMS OTP",
         variant: "destructive",
       });
     } finally {
@@ -500,8 +500,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       
     } catch (error: unknown) {
       toast({
-        title: "Lỗi tạo QR Code",
-        description: error instanceof Error ? error.message : "Không thể tạo mã QR",
+        title: "QR Code Generation Error",
+        description: error instanceof Error ? error.message : "Unable to generate QR code",
         variant: "destructive",
       });
     } finally {
@@ -547,8 +547,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
           }
           
           toast({
-            title: "Đăng nhập thành công!",
-            description: "Chào mừng bạn quay trở lại với Cham Pets",
+            title: "Login Successful!",
+            description: "Welcome back to Cham Pets",
           });
           
           setNeedsVerification(false);
@@ -606,8 +606,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   const handleVerifyOtp = async () => {
     if (!otp || otp.length !== 6) {
       toast({
-        title: "OTP không hợp lệ",
-        description: "Vui lòng nhập mã OTP 6 chữ số",
+        title: "Invalid OTP",
+        description: "Please enter 6-digit OTP code",
         variant: "destructive",
       });
       return;
@@ -619,8 +619,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
 
       if (result.success) {
         toast({
-          title: "Đăng nhập thành công!",
-          description: "Chào mừng bạn quay trở lại với Cham Pets",
+          title: "Login Successful!",
+          description: "Welcome back to Cham Pets",
         });
         setNeedsVerification(false);
         setVerificationMethod(null);
@@ -631,13 +631,13 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       // OTP từ email không chính xác
       toast({
         title: "Mã OTP không chính xác",
-        description: result.message || "Vui lòng kiểm tra lại mã OTP đã được gửi đến email của bạn",
+        description: result.message || "Please check the OTP code sent to your email",
         variant: "destructive",
       });
     } catch (error: unknown) {
       toast({
-        title: "Lỗi xác thực",
-        description: error instanceof Error ? error.message : "Đã xảy ra lỗi khi xác thực OTP",
+        title: "Verification Error",
+        description: error instanceof Error ? error.message : "An error occurred while verifying OTP",
         variant: "destructive",
       });
     } finally {
@@ -649,7 +649,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     if (!googleAuthCode || googleAuthCode.length !== 6) {
       toast({
         title: "Mã không hợp lệ",
-        description: "Vui lòng nhập mã Google Authenticator 6 chữ số",
+        description: "Please enter 6-digit Google Authenticator code",
         variant: "destructive",
       });
       return;
@@ -658,7 +658,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     if (!verificationEmail) {
       toast({
         title: "Email không hợp lệ",
-        description: "Vui lòng đăng nhập lại bằng email và mật khẩu",
+        description: "Please login again with email and password",
         variant: "destructive",
       });
       return;
@@ -675,8 +675,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
         localStorage.setItem('user_email', verificationEmail);
 
         toast({
-          title: "Đăng nhập thành công!",
-          description: "Chào mừng bạn quay trở lại với Cham Pets",
+          title: "Login Successful!",
+          description: "Welcome back to Cham Pets",
         });
         setNeedsVerification(false);
         setVerificationMethod(null);
@@ -693,8 +693,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       });
     } catch (error: unknown) {
       toast({
-        title: "Lỗi xác thực",
-        description: error instanceof Error ? error.message : "Đã xảy ra lỗi khi xác thực Google Authenticator",
+        title: "Verification Error",
+        description: error instanceof Error ? error.message : "An error occurred while verifying Google Authenticator",
         variant: "destructive",
       });
     } finally {
@@ -707,7 +707,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     if (!backupCode || !/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(backupCode.toUpperCase())) {
       toast({
         title: "Mã backup không hợp lệ",
-        description: "Vui lòng nhập mã backup code đúng định dạng (XXXX-XXXX)",
+        description: "Please enter backup code in correct format (XXXX-XXXX)",
         variant: "destructive",
       });
       return;
@@ -716,7 +716,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
     if (!verificationEmail) {
       toast({
         title: "Email không hợp lệ",
-        description: "Vui lòng đăng nhập lại bằng email và mật khẩu",
+        description: "Please login again with email and password",
         variant: "destructive",
       });
       return;
@@ -733,7 +733,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
         localStorage.setItem('user_email', verificationEmail);
 
         toast({
-          title: "Đăng nhập thành công!",
+          title: "Login Successful!",
           description: "Backup code đã được sử dụng và không thể dùng lại.",
         });
         setNeedsVerification(false);
@@ -751,8 +751,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       });
     } catch (error: unknown) {
       toast({
-        title: "Lỗi xác thực",
-        description: error instanceof Error ? error.message : "Đã xảy ra lỗi khi xác thực backup code",
+        title: "Verification Error",
+        description: error instanceof Error ? error.message : "An error occurred while verifying backup code",
         variant: "destructive",
       });
     } finally {
@@ -794,7 +794,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
   return (
     <div
       ref={animationScope}
-      className="bg-white rounded-2xl shadow-xl overflow-hidden grid grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)] max-w-[90vw] mx-auto w-full"
+      className="bg-black rounded-2xl shadow-xl overflow-hidden grid grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)] max-w-[90vw] mx-auto w-full"
     >
       {/* Left Panel - Branding (thu nhỏ) */}
       <div className="login-panel bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-6 lg:p-8 flex flex-col justify-center text-white relative overflow-hidden">
@@ -815,16 +815,16 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
             <h2 className="text-2xl font-bold tracking-tight drop-shadow-md">SECURE ACCESS</h2>
             <p className="text-blue-100 text-sm leading-relaxed">
               {!needsVerification
-                ? "Đăng nhập bằng Email & Mật khẩu"
+                ? "Login with Email & Password"
                 : verificationMethod === "otp"
-                ? "Nhập mã OTP được gửi tới email của bạn"
+                ? "Enter OTP code sent to your email"
                 : verificationMethod === "sms"
-                ? "Nhập mã OTP được gửi tới số điện thoại của bạn"
+                ? "Enter OTP code sent to your phone"
                 : verificationMethod === "qr"
-                ? "Quét mã QR để xác minh"
+                ? "Scan QR code to verify"
                 : verificationMethod === "google-authenticator"
-                ? "Nhập mã từ Google Authenticator"
-                : "Chọn phương thức xác minh"}
+                ? "Enter code from Google Authenticator"
+                : "Select verification method"}
             </p>
           </div>
         </div>
@@ -837,7 +837,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
       </div>
 
       {/* Right Panel - Login Form */}
-      <div className="login-panel p-8 lg:p-10 flex flex-col justify-center bg-gradient-to-br from-gray-50 to-white">
+      <div className="login-panel p-8 lg:p-10 flex flex-col justify-center bg-black text-white">
         <div className="space-y-5">
           {!needsVerification ? (
             <>
@@ -847,16 +847,16 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                 <div className="space-y-3 flex-1">
                   <form onSubmit={handleEmailPasswordLogin} className="space-y-3">
                     <div className="space-y-2">
-                      <Label htmlFor="email" className="text-sm font-semibold text-gray-700">Email</Label>
+                      <Label htmlFor="email" className="text-sm font-semibold text-white">Email</Label>
                       <div className="relative group">
-                        <Mail className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
+                        <Mail className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-400 transition-colors" />
                         <Input
                           id="email"
                           type="email"
-                          placeholder="Nhập email của bạn"
+                          placeholder="Enter your email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="pl-10 h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 transition-all"
+                          className="pl-10 h-11 bg-gray-900 border-gray-700 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/20 transition-all"
                           required
                           disabled={isLoading}
                         />
@@ -864,16 +864,16 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="password" className="text-sm font-semibold text-gray-700">Mật khẩu</Label>
+                      <Label htmlFor="password" className="text-sm font-semibold text-white">Password</Label>
                       <div className="relative group">
-                        <Lock className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
+                        <Lock className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-400 transition-colors" />
                         <Input
                           id="password"
                           type={showPassword ? "text" : "password"}
-                          placeholder="Nhập mật khẩu"
+                          placeholder="Enter password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="pl-10 pr-10 h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500/20 transition-all"
+                          className="pl-10 pr-10 h-11 bg-gray-900 border-gray-700 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/20 transition-all"
                           required
                           disabled={isLoading}
                         />
@@ -881,7 +881,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-gray-400 hover:text-gray-600"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-gray-400 hover:text-gray-200"
                           onClick={() => setShowPassword(!showPassword)}
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -901,19 +901,19 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                       className="w-full h-11 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
                       disabled={isLoading || (hasRecaptchaSiteKey && !recaptchaToken)}
                     >
-                      {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
+                      {isLoading ? "Logging in..." : "Login"}
                     </Button>
 
                     <div className="flex items-center gap-3 text-xs font-medium uppercase text-gray-400 my-4">
-                      <span className="h-px w-full bg-gray-200"></span>
-                      <span>HOẶC</span>
-                      <span className="h-px w-full bg-gray-200"></span>
+                      <span className="h-px w-full bg-gray-700"></span>
+                      <span>OR</span>
+                      <span className="h-px w-full bg-gray-700"></span>
                     </div>
 
                     <button
                       type="button"
                       onClick={handleGoogleLogin}
-                      className="flex w-full items-center justify-center gap-3 rounded-lg border-2 border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition-all hover:border-gray-300 hover:shadow-md active:scale-[0.98]"
+                      className="flex w-full items-center justify-center gap-3 rounded-lg border-2 border-gray-700 bg-gray-900 px-4 py-3 text-sm font-semibold text-white transition-all hover:border-gray-600 hover:bg-gray-800 active:scale-[0.98]"
                     >
                       <svg aria-hidden="true" focusable="false" className="h-5 w-5" viewBox="0 0 24 24">
                         <path
@@ -934,35 +934,35 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                         />
                         <path fill="none" d="M1 1h22v22H1z" />
                       </svg>
-                      <span>Đăng nhập bằng Google</span>
+                      <span>Login with Google</span>
                     </button>
                   </form>
                 </div>
 
                 {/* Cột phải: Đăng nhập bằng mã QR */}
-                <div className="space-y-3 rounded-xl border-2 border-dashed border-blue-200 bg-gradient-to-br from-blue-50/50 to-indigo-50/30 p-4 flex flex-col items-center justify-between backdrop-blur-sm shadow-inner flex-1">
+                <div className="space-y-3 rounded-xl border-2 border-dashed border-gray-700 bg-gray-900 p-4 flex flex-col items-center justify-between backdrop-blur-sm shadow-inner flex-1">
                   <div className="text-center space-y-1 w-full">
                     <div className="flex items-center justify-center gap-2 mb-1">
-                      <QrCode className="h-4 w-4 text-blue-600" />
-                      <p className="text-sm font-bold text-blue-900">Đăng nhập bằng Mã QR</p>
+                      <QrCode className="h-4 w-4 text-blue-400" />
+                      <p className="text-sm font-bold text-white">Login with QR Code</p>
                     </div>
-                    <p className="text-xs text-blue-700 leading-relaxed px-1">
+                    <p className="text-xs text-gray-400 leading-relaxed px-1">
                       
                     </p>
                   </div>
 
-                  <div className="flex justify-center items-center p-3 bg-white rounded-lg shadow-md border border-blue-100 min-h-[180px] w-full">
+                  <div className="flex justify-center items-center p-3 bg-black rounded-lg shadow-md border border-gray-700 min-h-[180px] w-full">
                     {qrCodeData ? (
                       <div className="relative">
                         <img
                           src={`data:image/png;base64,${qrCodeData}`}
-                          alt="QR Code đăng nhập"
+                          alt="Login QR Code"
                           className="w-40 h-40 rounded-lg shadow-sm"
                         />
                         <div className="absolute inset-0 rounded-lg border-2 border-blue-400/30 animate-pulse"></div>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center text-xs text-gray-500 gap-2">
+                      <div className="flex flex-col items-center justify-center text-xs text-gray-400 gap-2">
                         <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-500 border-r-transparent" />
                         <span className="font-medium">Đang tạo mã QR...</span>
                       </div>
@@ -970,7 +970,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   </div>
 
                   <div className="space-y-2 text-center w-full">
-                    <p className="text-xs text-blue-600 leading-relaxed">
+                    <p className="text-xs text-gray-400 leading-relaxed">
                       
                     </p>
                     <Button
@@ -979,7 +979,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                       size="sm"
                       disabled={isLoading}
                       onClick={handleGenerateQrCode}
-                      className="w-full flex items-center justify-center gap-2 border-blue-300 text-blue-700 hover:bg-blue-50 hover:border-blue-400 transition-all h-9 text-xs"
+                      className="w-full flex items-center justify-center gap-2 border-gray-600 text-white hover:bg-gray-800 hover:border-gray-500 transition-all h-9 text-xs"
                     >
                       <QrCode className="h-3.5 w-3.5" />
                       <span className="font-semibold">Tạo mã QR mới</span>
@@ -993,8 +993,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
               {/* Bước 2: Chọn phương thức xác minh */}
               <div className="space-y-5">
               <div className="text-center space-y-1.5">
-                <h3 className="text-xl font-bold text-gray-900">Xác minh tài khoản</h3>
-                <p className="text-sm text-gray-600">
+                <h3 className="text-xl font-bold text-white">Xác minh tài khoản</h3>
+                <p className="text-sm text-gray-300">
                   Vui lòng chọn phương thức xác minh để tiếp tục đăng nhập
                 </p>
               </div>
@@ -1006,14 +1006,14 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                     setVerificationMethod("otp");
                     setOtpSent(false);
                   }}
-                  className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50/50 transition-all duration-200 active:scale-[0.98] shadow-sm hover:shadow-md"
+                  className="flex items-center gap-3 p-4 border-2 border-gray-700 rounded-lg hover:border-blue-500 hover:bg-gray-800 transition-all duration-200 active:scale-[0.98] shadow-sm hover:shadow-md"
                 >
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center shadow-sm">
-                    <Mail className="h-6 w-6 text-blue-600" />
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-900 to-blue-800 rounded-lg flex items-center justify-center shadow-sm">
+                    <Mail className="h-6 w-6 text-blue-400" />
                   </div>
                   <div className="flex-1 text-left">
-                    <h4 className="font-bold text-gray-900 text-sm">Xác minh bằng Email OTP</h4>
-                    <p className="text-xs text-gray-600 mt-0.5">Nhận mã OTP qua email</p>
+                    <h4 className="font-bold text-white text-sm">Verify with Email OTP</h4>
+                    <p className="text-xs text-gray-400 mt-0.5">Nhận mã OTP qua email</p>
                   </div>
                 </button>
 
@@ -1032,20 +1032,20 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   disabled={checkingPhone}
                   className={`flex items-center gap-3 p-4 border-2 rounded-lg transition-all duration-200 ${
                     checkingPhone
-                      ? "border-gray-200 bg-gray-50 cursor-not-allowed opacity-60"
-                      : "border-gray-200 hover:border-green-500 hover:bg-green-50/50 active:scale-[0.98] shadow-sm hover:shadow-md"
+                      ? "border-gray-700 bg-gray-900 cursor-not-allowed opacity-60"
+                      : "border-gray-700 hover:border-blue-500 hover:bg-gray-800 active:scale-[0.98] shadow-sm hover:shadow-md"
                   }`}
                 >
                   <div className={`w-12 h-12 rounded-lg flex items-center justify-center shadow-sm ${
-                    checkingPhone ? "bg-gray-100" : "bg-gradient-to-br from-green-100 to-green-200"
+                    checkingPhone ? "bg-gray-800" : "bg-gradient-to-br from-blue-900 to-blue-800"
                   }`}>
                     <Phone className={`h-6 w-6 ${
-                      checkingPhone ? "text-gray-400" : "text-green-600"
+                      checkingPhone ? "text-gray-500" : "text-blue-400"
                     }`} />
                   </div>
                   <div className="flex-1 text-left">
-                    <h4 className="font-bold text-gray-900 text-sm">Xác minh bằng SMS OTP</h4>
-                    <p className="text-xs text-gray-600 mt-0.5">
+                    <h4 className="font-bold text-white text-sm">Verify with SMS OTP</h4>
+                    <p className="text-xs text-gray-400 mt-0.5">
                       {checkingPhone 
                         ? "Đang kiểm tra..." 
                         : userPhoneNumber 
@@ -1061,14 +1061,14 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                     setVerificationMethod("google-authenticator");
                     setGoogleAuthCode("");
                   }}
-                  className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50/50 transition-all duration-200 active:scale-[0.98] shadow-sm hover:shadow-md"
+                  className="flex items-center gap-3 p-4 border-2 border-gray-700 rounded-lg hover:border-purple-500 hover:bg-gray-800 transition-all duration-200 active:scale-[0.98] shadow-sm hover:shadow-md"
                 >
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg flex items-center justify-center shadow-sm">
-                    <KeyRound className="h-6 w-6 text-purple-600" />
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-900 to-purple-800 rounded-lg flex items-center justify-center shadow-sm">
+                    <KeyRound className="h-6 w-6 text-purple-400" />
                   </div>
                   <div className="flex-1 text-left">
-                    <h4 className="font-bold text-gray-900 text-sm">Xác minh bằng Google Authenticator</h4>
-                    <p className="text-xs text-gray-600 mt-0.5">Nhập mã từ ứng dụng Google Authenticator</p>
+                    <h4 className="font-bold text-white text-sm">Verify with Google Authenticator</h4>
+                    <p className="text-xs text-gray-400 mt-0.5">Enter code from Google Authenticator app</p>
                   </div>
                 </button>
 
@@ -1078,14 +1078,14 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                     setVerificationMethod("backup-code");
                     setBackupCode("");
                   }}
-                  className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg hover:border-orange-500 hover:bg-orange-50/50 transition-all duration-200 active:scale-[0.98] shadow-sm hover:shadow-md"
+                  className="flex items-center gap-3 p-4 border-2 border-gray-700 rounded-lg hover:border-blue-500 hover:bg-gray-800 transition-all duration-200 active:scale-[0.98] shadow-sm hover:shadow-md"
                 >
-                  <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg flex items-center justify-center shadow-sm">
-                    <ShieldCheck className="h-6 w-6 text-orange-600" />
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-900 to-blue-800 rounded-lg flex items-center justify-center shadow-sm">
+                    <ShieldCheck className="h-6 w-6 text-blue-400" />
                   </div>
                   <div className="flex-1 text-left">
-                    <h4 className="font-bold text-gray-900 text-sm">Xác minh bằng Backup Code</h4>
-                    <p className="text-xs text-gray-600 mt-0.5">Nhập mã backup code (định dạng: XXXX-XXXX)</p>
+                    <h4 className="font-bold text-white text-sm">Verify with Backup Code</h4>
+                    <p className="text-xs text-gray-400 mt-0.5">Enter backup code (format: XXXX-XXXX)</p>
                   </div>
                 </button>
               </div>
@@ -1094,9 +1094,9 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                 type="button"
                 variant="outline"
                 onClick={handleBackToLogin}
-                className="w-full h-10 border-gray-300 hover:bg-gray-50 font-semibold text-sm"
+                className="w-full h-10 border-gray-700 hover:bg-gray-800 text-white font-semibold text-sm"
               >
-                Quay lại đăng nhập
+                Back to Login
               </Button>
             </div>
             </>
@@ -1105,9 +1105,9 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
               {/* Bước 3a: Xác minh OTP */}
               <div className="space-y-4">
               <div className="text-center space-y-1">
-                <h3 className="text-xl font-bold text-gray-900">Xác minh bằng Email OTP</h3>
-                <p className="text-xs text-gray-600">
-                  Mã OTP sẽ được gửi đến: <strong className="text-gray-900">{verificationEmail}</strong>
+                <h3 className="text-xl font-bold text-white">Xác minh bằng Email OTP</h3>
+                <p className="text-xs text-gray-300">
+                  Mã OTP sẽ được gửi đến: <strong className="text-white">{verificationEmail}</strong>
                 </p>
               </div>
 
@@ -1124,14 +1124,14 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                 <>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="otp" className="text-sm font-semibold text-gray-700">Mã OTP</Label>
+                      <Label htmlFor="otp" className="text-sm font-semibold text-white">Mã OTP</Label>
                       {otpCountdown > 0 && (
-                        <span className="text-sm text-gray-600">
-                          Còn lại: <span className="font-bold text-blue-600">{Math.floor(otpCountdown / 60)}:{(otpCountdown % 60).toString().padStart(2, '0')}</span>
+                        <span className="text-sm text-gray-300">
+                          Còn lại: <span className="font-bold text-blue-400">{Math.floor(otpCountdown / 60)}:{(otpCountdown % 60).toString().padStart(2, '0')}</span>
                         </span>
                       )}
                       {otpCountdown === 0 && otpSent && (
-                        <span className="text-sm text-red-600 font-semibold">
+                        <span className="text-sm text-red-400 font-semibold">
                           Mã OTP đã hết hạn
                         </span>
                       )}
@@ -1139,15 +1139,15 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                     <Input
                       id="otp"
                       type="text"
-                      placeholder="Nhập mã 6 chữ số"
+                      placeholder="Enter 6-digit code"
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
                       maxLength={6}
-                      className={`text-center text-2xl tracking-[0.6rem] h-14 border-2 ${otpCountdown === 0 ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500/20'} transition-all font-mono`}
+                      className={`text-center text-2xl tracking-[0.6rem] h-14 border-2 bg-gray-900 text-white ${otpCountdown === 0 ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : 'border-gray-700 focus:border-blue-500 focus:ring-blue-500/20'} transition-all font-mono`}
                       disabled={isLoading}
                     />
                     {otpCountdown === 0 && otpSent && (
-                      <p className="text-xs text-red-600 text-center bg-red-50 p-2 rounded-lg">
+                      <p className="text-xs text-red-400 text-center bg-red-900/30 border border-red-800 p-2 rounded-lg">
                         ⚠️ Mã OTP đã hết hạn. Vui lòng gửi lại mã mới hoặc thử nhập mã hiện tại (có thể vẫn còn hiệu lực).
                       </p>
                     )}
@@ -1166,9 +1166,9 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                       variant="outline" 
                       onClick={handleResendOtp} 
                       disabled={isLoading}
-                      className="h-11 border-gray-300 hover:bg-gray-50 font-semibold"
+                      className="h-11 border-gray-700 hover:bg-gray-800 text-white font-semibold"
                     >
-                      {otpCountdown > 0 ? `Gửi lại (${Math.floor(otpCountdown / 60)}:${(otpCountdown % 60).toString().padStart(2, '0')})` : "Gửi lại mã mới"}
+                      {otpCountdown > 0 ? `Resend (${Math.floor(otpCountdown / 60)}:${(otpCountdown % 60).toString().padStart(2, '0')})` : "Resend New Code"}
                     </Button>
                   </div>
                 </>
@@ -1181,7 +1181,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   setVerificationMethod(null);
                   resetOtpState();
                 }}
-                className="w-full h-11 border-gray-300 hover:bg-gray-50 font-semibold"
+                className="w-full h-11 border-gray-700 hover:bg-gray-800 text-white font-semibold"
               >
                 Chọn phương thức khác
               </Button>
@@ -1192,8 +1192,8 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
               {/* Bước 3b: Xác minh SMS OTP */}
               <div className="space-y-5">
               <div className="text-center space-y-1.5">
-                <h3 className="text-xl font-bold text-gray-900">Xác minh bằng SMS OTP</h3>
-                <p className="text-sm text-gray-600">
+                <h3 className="text-xl font-bold text-white">Xác minh bằng SMS OTP</h3>
+                <p className="text-sm text-gray-300">
                   Nhập số điện thoại để nhận mã OTP qua tin nhắn SMS
                 </p>
               </div>
@@ -1201,30 +1201,30 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
               {!smsOtpSent ? (
                 <>
                   <div className="space-y-3">
-                    <Label htmlFor="phoneNumber" className="text-sm font-semibold text-gray-700">Số điện thoại</Label>
+                    <Label htmlFor="phoneNumber" className="text-sm font-semibold text-white">Số điện thoại</Label>
                     <div className="relative group">
-                      <Phone className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-green-600 transition-colors" />
+                      <Phone className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-400 transition-colors" />
                       <Input
                         id="phoneNumber"
                         type="tel"
-                        placeholder="Nhập số điện thoại (VD: 0912345678)"
+                        placeholder="Enter phone number (e.g., 0912345678)"
                         value={phoneNumber}
                         onChange={(e) => {
                           // Chỉ cho phép số và dấu +
                           const value = e.target.value.replace(/[^0-9+]/g, '');
                           setPhoneNumber(value);
                         }}
-                        className="pl-10 h-11 border-gray-300 focus:border-green-500 focus:ring-green-500/20 transition-all"
+                        className="pl-10 h-11 bg-gray-900 border-gray-700 text-white placeholder:text-gray-500 focus:border-blue-500 focus:ring-blue-500/20 transition-all"
                         disabled={isLoading}
                       />
                     </div>
                     {userPhoneNumber && (
-                      <p className="text-xs text-gray-600 bg-green-50 p-2 rounded-lg">
-                        Số điện thoại đã đăng ký: <strong className="text-green-700">{userPhoneNumber}</strong>
+                      <p className="text-xs text-gray-300 bg-gray-800 border border-gray-700 p-2 rounded-lg">
+                        Số điện thoại đã đăng ký: <strong className="text-blue-400">{userPhoneNumber}</strong>
                       </p>
                     )}
                     {!userPhoneNumber && (
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-400">
                         Nhập số điện thoại để nhận mã OTP qua SMS
                       </p>
                     )}
@@ -1232,7 +1232,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   <Button 
                     type="button" 
                     onClick={handleRequestSmsOtp} 
-                    className="w-full h-11 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
+                    className="w-full h-11 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
                     disabled={isLoading || !phoneNumber}
                   >
                     {isLoading ? "Đang gửi..." : "Gửi mã OTP"}
@@ -1242,14 +1242,14 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                 <>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="smsOtp" className="text-sm font-semibold text-gray-700">Mã OTP</Label>
+                      <Label htmlFor="smsOtp" className="text-sm font-semibold text-white">Mã OTP</Label>
                       {smsOtpCountdown > 0 && (
-                        <span className="text-sm text-gray-600">
-                          Còn lại: <span className="font-bold text-green-600">{Math.floor(smsOtpCountdown / 60)}:{(smsOtpCountdown % 60).toString().padStart(2, '0')}</span>
+                        <span className="text-sm text-gray-300">
+                          Còn lại: <span className="font-bold text-blue-400">{Math.floor(smsOtpCountdown / 60)}:{(smsOtpCountdown % 60).toString().padStart(2, '0')}</span>
                         </span>
                       )}
                       {smsOtpCountdown === 0 && smsOtpSent && (
-                        <span className="text-sm text-red-600 font-semibold">
+                        <span className="text-sm text-red-400 font-semibold">
                           Mã OTP đã hết hạn
                         </span>
                       )}
@@ -1257,18 +1257,18 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                     <Input
                       id="smsOtp"
                       type="text"
-                      placeholder="Nhập mã 6 chữ số"
+                      placeholder="Enter 6-digit code"
                       value={smsOtp}
                       onChange={(e) => setSmsOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
                       maxLength={6}
-                      className={`text-center text-2xl tracking-[0.6rem] h-14 border-2 ${smsOtpCountdown === 0 ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20' : 'border-gray-300 focus:border-green-500 focus:ring-green-500/20'} transition-all font-mono`}
+                      className={`text-center text-2xl tracking-[0.6rem] h-14 border-2 bg-gray-900 text-white ${smsOtpCountdown === 0 ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : 'border-gray-700 focus:border-blue-500 focus:ring-blue-500/20'} transition-all font-mono`}
                       disabled={isLoading}
                     />
-                    <p className="text-xs text-gray-600 text-center bg-green-50 p-2 rounded-lg">
-                      Mã OTP đã được gửi đến: <strong className="text-green-700">{phoneNumber}</strong>
+                    <p className="text-xs text-gray-300 text-center bg-gray-800 border border-gray-700 p-2 rounded-lg">
+                      Mã OTP đã được gửi đến: <strong className="text-blue-400">{phoneNumber}</strong>
                     </p>
                     {smsOtpCountdown === 0 && smsOtpSent && (
-                      <p className="text-xs text-red-600 text-center bg-red-50 p-2 rounded-lg">
+                      <p className="text-xs text-red-400 text-center bg-red-900/30 border border-red-800 p-2 rounded-lg">
                         ⚠️ Mã OTP đã hết hạn. Vui lòng gửi lại mã mới hoặc thử nhập mã hiện tại (có thể vẫn còn hiệu lực).
                       </p>
                     )}
@@ -1277,7 +1277,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   <div className="flex gap-3">
                     <Button 
                       onClick={handleVerifySmsOtp} 
-                      className="flex-1 h-11 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
+                      className="flex-1 h-11 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
                       disabled={isLoading || smsOtp.length !== 6}
                     >
                       {isLoading ? "Đang xác thực..." : "Xác thực OTP"}
@@ -1287,7 +1287,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                       variant="outline" 
                       onClick={handleResendSmsOtp} 
                       disabled={isLoading}
-                      className="h-11 border-gray-300 hover:bg-gray-50 font-semibold"
+                      className="h-11 border-gray-700 hover:bg-gray-800 text-white font-semibold"
                     >
                       {smsOtpCountdown > 0 ? `Gửi lại (${Math.floor(smsOtpCountdown / 60)}:${(smsOtpCountdown % 60).toString().padStart(2, '0')})` : "Gửi lại mã mới"}
                     </Button>
@@ -1302,7 +1302,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   setVerificationMethod(null);
                   resetSmsOtpState();
                 }}
-                className="w-full h-11 border-gray-300 hover:bg-gray-50 font-semibold"
+                className="w-full h-11 border-gray-700 hover:bg-gray-800 text-white font-semibold"
               >
                 Chọn phương thức khác
               </Button>
@@ -1313,15 +1313,15 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
               {/* Bước 3b: Xác minh QR Code */}
               <div className="space-y-5">
               <div className="text-center space-y-1.5">
-                <h3 className="text-xl font-bold text-gray-900">Xác minh bằng QR Code</h3>
-                <p className="text-sm text-gray-600">
+                <h3 className="text-xl font-bold text-white">Xác minh bằng QR Code</h3>
+                <p className="text-sm text-gray-300">
                   Quét mã QR bằng ứng dụng di động để xác minh
                 </p>
               </div>
 
               {qrCodeData ? (
                 <div className="space-y-3">
-                  <div className="flex justify-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-100">
+                  <div className="flex justify-center p-4 bg-gray-900 rounded-xl border-2 border-gray-700">
                     <div className="relative">
                       <img 
                         src={`data:image/png;base64,${qrCodeData}`}
@@ -1335,17 +1335,17 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   </div>
                   <div className={`text-center p-4 rounded-xl ${
                     qrStatus === "pending" 
-                      ? "bg-blue-50 border border-blue-200"
+                      ? "bg-gray-800 border border-gray-700"
                       : qrStatus === "approved"
-                      ? "bg-green-50 border border-green-200"
-                      : "bg-red-50 border border-red-200"
+                      ? "bg-gray-800 border border-gray-700"
+                      : "bg-red-900/30 border border-red-800"
                   }`}>
                     <p className={`text-sm font-semibold ${
                       qrStatus === "pending" 
-                        ? "text-blue-700"
+                        ? "text-blue-400"
                         : qrStatus === "approved"
-                        ? "text-green-700"
-                        : "text-red-700"
+                        ? "text-blue-400"
+                        : "text-red-400"
                     }`}>
                       {qrStatus === "pending" 
                         ? "⏳ Quét mã QR bằng ứng dụng di động để xác minh"
@@ -1354,7 +1354,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                         : "❌ QR code đã hết hạn. Vui lòng tạo mã mới."}
                     </p>
                     {qrStatus === "pending" && (
-                      <p className="text-xs text-blue-600 mt-2">
+                      <p className="text-xs text-blue-400 mt-2">
                         Đang chờ xác nhận từ ứng dụng di động...
                       </p>
                     )}
@@ -1397,7 +1397,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                     pollingTimeoutRef.current = null;
                   }
                 }}
-                className="w-full h-11 border-gray-300 hover:bg-gray-50 font-semibold"
+                className="w-full h-11 border-gray-700 hover:bg-gray-800 text-white font-semibold"
               >
                 Chọn phương thức khác
               </Button>
@@ -1408,14 +1408,14 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
               {/* Bước 3c: Xác minh Google Authenticator */}
               <div className="space-y-5">
               <div className="text-center space-y-1.5">
-                <h3 className="text-xl font-bold text-gray-900">Xác minh bằng Google Authenticator</h3>
-                <p className="text-sm text-gray-600">
+                <h3 className="text-xl font-bold text-white">Xác minh bằng Google Authenticator</h3>
+                <p className="text-sm text-gray-300">
                   Mở ứng dụng Google Authenticator và nhập mã 6 chữ số
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="googleAuthCode" className="text-sm font-semibold text-gray-700">Mã Google Authenticator</Label>
+                <Label htmlFor="googleAuthCode" className="text-sm font-semibold text-white">Mã Google Authenticator</Label>
                 <Input
                   id="googleAuthCode"
                   type="text"
@@ -1423,7 +1423,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   value={googleAuthCode}
                   onChange={(e) => setGoogleAuthCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
                   maxLength={6}
-                  className="text-center text-2xl tracking-[0.6rem] h-14 border-2 border-gray-300 focus:border-purple-500 focus:ring-purple-500/20 transition-all font-mono"
+                  className="text-center text-2xl tracking-[0.6rem] h-14 border-2 bg-gray-900 border-gray-700 text-white focus:border-purple-500 focus:ring-purple-500/20 transition-all font-mono"
                   disabled={isLoading}
                 />
               </div>
@@ -1443,7 +1443,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   setVerificationMethod(null);
                   setGoogleAuthCode("");
                 }}
-                className="w-full h-11 border-gray-300 hover:bg-gray-50 font-semibold"
+                className="w-full h-11 border-gray-700 hover:bg-gray-800 text-white font-semibold"
               >
                 Chọn phương thức khác
               </Button>
@@ -1454,14 +1454,14 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
               {/* Bước 3d: Xác minh Backup Code */}
               <div className="space-y-5">
               <div className="text-center space-y-1.5">
-                <h3 className="text-xl font-bold text-gray-900">Xác minh bằng Backup Code</h3>
-                <p className="text-sm text-gray-600">
+                <h3 className="text-xl font-bold text-white">Xác minh bằng Backup Code</h3>
+                <p className="text-sm text-gray-300">
                   Nhập mã backup code (định dạng: XXXX-XXXX)
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="backupCode" className="text-sm font-semibold text-gray-700">Mã Backup Code</Label>
+                <Label htmlFor="backupCode" className="text-sm font-semibold text-white">Mã Backup Code</Label>
                 <Input
                   id="backupCode"
                   type="text"
@@ -1479,17 +1479,17 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                     setBackupCode(value);
                   }}
                   maxLength={9}
-                  className="text-center text-xl tracking-wider font-mono h-12 border-2 border-gray-300 focus:border-orange-500 focus:ring-orange-500/20 transition-all"
+                  className="text-center text-xl tracking-wider font-mono h-12 border-2 bg-gray-900 border-gray-700 text-white focus:border-blue-500 focus:ring-blue-500/20 transition-all"
                   disabled={isLoading}
                 />
-                <p className="text-xs text-gray-600 text-center bg-orange-50 p-2 rounded-lg">
+                <p className="text-xs text-gray-300 text-center bg-gray-800 border border-gray-700 p-2 rounded-lg">
                   Định dạng: 4 chữ cái/số - 4 chữ cái/số (ví dụ: ABCD-1234)
                 </p>
               </div>
 
               <Button
                 onClick={handleVerifyBackupCode}
-                className="w-full h-11 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                className="w-full h-11 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
                 disabled={isLoading || !/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(backupCode.toUpperCase())}
               >
                 {isLoading ? "Đang xác thực..." : "Xác thực"}
@@ -1502,7 +1502,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
                   setVerificationMethod(null);
                   setBackupCode("");
                 }}
-                className="w-full h-11 border-gray-300 hover:bg-gray-50 font-semibold"
+                className="w-full h-11 border-gray-700 hover:bg-gray-800 text-white font-semibold"
               >
                 Chọn phương thức khác
               </Button>
@@ -1512,10 +1512,10 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
           }
 
           {!needsVerification && (
-            <div className="flex items-center justify-between pt-4 border-t border-gray-200 mt-4">
+            <div className="flex items-center justify-between pt-4 border-t border-gray-700 mt-4">
               <Button 
                 variant="link" 
-                className="p-0 h-auto text-xs text-gray-600 hover:text-blue-600 transition-colors"
+                className="p-0 h-auto text-xs text-gray-400 hover:text-blue-400 transition-colors"
                 onClick={() => setShowForgotPassword(true)}
                 type="button"
               >
@@ -1523,7 +1523,7 @@ const LoginForm = ({ onSwitchToRegister, onClose }: LoginFormProps) => {
               </Button>
               <Button 
                 variant="link" 
-                className="p-0 h-auto text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors" 
+                className="p-0 h-auto text-xs font-semibold text-blue-400 hover:text-blue-300 transition-colors" 
                 onClick={onSwitchToRegister}
               >
                 Tạo tài khoản

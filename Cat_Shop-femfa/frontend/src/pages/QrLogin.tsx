@@ -508,10 +508,10 @@ const QrLogin = () => {
 
           {status === "success" && (
             <div className="text-center space-y-4">
-              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="h-8 w-8 text-green-600" />
+              <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="h-8 w-8 text-blue-600" />
               </div>
-              <p className="text-lg font-semibold text-green-600">Đăng nhập thành công!</p>
+              <p className="text-lg font-semibold text-blue-600">Đăng nhập thành công!</p>
               <p className="text-sm text-muted-foreground">
                 Bạn có thể quay lại trình duyệt trên máy tính
               </p>

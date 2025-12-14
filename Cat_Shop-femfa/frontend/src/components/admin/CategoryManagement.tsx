@@ -711,7 +711,7 @@ const CategoryManagement = () => {
             <CardTitle className="text-sm font-medium">Thức ăn</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-blue-600">
               {categories.filter(c => c.typeId === 2).length}
             </div>
           </CardContent>
@@ -721,7 +721,7 @@ const CategoryManagement = () => {
             <CardTitle className="text-sm font-medium">Phụ kiện</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
+            <div className="text-2xl font-bold text-blue-600">
               {categories.filter(c => c.typeId === 3 || c.typeId === 4).length}
             </div>
           </CardContent>

@@ -20,7 +20,7 @@ import {
 
 const About = () => {
   useEffect(() => {
-    document.title = "Giới thiệu - Cham Pets";
+    document.title = "About - Cham Pets";
   }, []);
 
   const features = [
@@ -108,7 +108,7 @@ const About = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-16">
               <div>
                 <h2 className="text-3xl font-bold text-foreground mb-6">
-                  Câu chuyện của chúng tôi
+                  Our Story
                 </h2>
                 <p className="text-muted-foreground mb-6">
                   Cham Pets được thành lập với tình yêu đặc biệt dành cho những chú mèo cảnh. 
@@ -124,7 +124,7 @@ const About = () => {
                     Khám phá mèo cảnh
                   </Button>
                   <Button variant="outline" size="lg">
-                    Liên hệ chúng tôi
+                    Contact Us
                   </Button>
                 </div>
               </div>
@@ -147,7 +147,7 @@ const About = () => {
                   <Card>
                     <CardContent className="p-6">
                       <div className="text-3xl font-bold text-primary mb-2">1000+</div>
-                      <div className="text-sm text-muted-foreground">Khách hàng hài lòng</div>
+                      <div className="text-sm text-muted-foreground">Satisfied Customers</div>
                     </CardContent>
                   </Card>
                   <Card>
@@ -190,21 +190,21 @@ const About = () => {
             {/* Services */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center text-foreground mb-12">
-                Dịch vụ của chúng tôi
+                Our Services
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Target className="h-5 w-5 text-primary" />
-                      Dịch vụ chính
+                      Main Services
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
                       {services.map((service, index) => (
                         <div key={index} className="flex items-center gap-3">
-                          <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+                          <CheckCircle className="h-5 w-5 text-blue-600 flex-shrink-0" />
                           <span>{service}</span>
                         </div>
                       ))}
@@ -245,7 +245,7 @@ const About = () => {
             {/* Testimonials */}
             <div className="mb-16">
               <h2 className="text-3xl font-bold text-center text-foreground mb-12">
-                Khách hàng nói gì về chúng tôi
+                What Our Customers Say
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {testimonials.map((testimonial, index) => (
@@ -276,14 +276,14 @@ const About = () => {
             {/* Contact Info */}
             <div className="bg-muted/30 rounded-lg p-8">
               <h2 className="text-2xl font-bold text-center text-foreground mb-8">
-                Liên hệ với chúng tôi
+                Contact Us
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="text-center">
                   <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
                     <Phone className="h-6 w-6 text-primary" />
                   </div>
-                  <h3 className="font-semibold mb-1">Điện thoại</h3>
+                  <h3 className="font-semibold mb-1">Phone</h3>
                   <p className="text-muted-foreground">0911.079.086</p>
                 </div>
                 <div className="text-center">
@@ -297,7 +297,7 @@ const About = () => {
                   <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
                     <MapPin className="h-6 w-6 text-primary" />
                   </div>
-                  <h3 className="font-semibold mb-1">Địa chỉ</h3>
+                  <h3 className="font-semibold mb-1">Address</h3>
                   <p className="text-muted-foreground">123 Đường ABC, Quận XYZ, TP.HCM</p>
                 </div>
               </div>

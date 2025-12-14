@@ -80,7 +80,7 @@ const PublicReview: React.FC<PublicReviewProps> = ({ productId }) => {
 
       {/* Average Rating Summary */}
       {!loading && reviews.length > 0 && (
-        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg shadow-sm border border-yellow-200 p-6 mb-6">
+        <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg shadow-sm border border-blue-200 p-6 mb-6">
           <div className="flex items-center gap-8">
             <div className="text-center">
               <div className="text-5xl font-bold text-yellow-600">{averageRating.toFixed(1)}</div>

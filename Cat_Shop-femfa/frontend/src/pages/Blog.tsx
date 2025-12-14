@@ -276,9 +276,9 @@ const Blog = () => {
                  </h2>
                  {filteredPosts.length === 0 ? (
                    <div className="text-center py-12">
-                     <p className="text-muted-foreground text-lg">Không tìm thấy bài viết nào</p>
+                     <p className="text-muted-foreground text-lg">No posts found</p>
                      <p className="text-sm text-muted-foreground mt-2">
-                       Thử tìm kiếm với từ khóa khác hoặc chọn danh mục khác
+                       Try searching with different keywords or select a different category
                      </p>
                    </div>
                  ) : (

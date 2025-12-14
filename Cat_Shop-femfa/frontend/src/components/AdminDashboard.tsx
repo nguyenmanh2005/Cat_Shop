@@ -187,7 +187,7 @@ const AdminDashboard = () => {
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalUsers.toLocaleString()}</div>
               <p className="text-xs text-muted-foreground">
-                <span className="text-green-600">+{stats.userGrowth}%</span> từ tháng trước
+                <span className="text-blue-600">+{stats.userGrowth}%</span> từ tháng trước
               </p>
             </CardContent>
           </Card>
@@ -200,7 +200,7 @@ const AdminDashboard = () => {
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalPets}</div>
               <p className="text-xs text-muted-foreground">
-                <span className="text-green-600">+3</span> mèo mới tuần này
+                <span className="text-blue-600">+3</span> mèo mới tuần này
               </p>
             </CardContent>
           </Card>
@@ -213,7 +213,7 @@ const AdminDashboard = () => {
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalOrders}</div>
               <p className="text-xs text-muted-foreground">
-                <span className="text-green-600">+{stats.orderGrowth}%</span> từ tháng trước
+                <span className="text-blue-600">+{stats.orderGrowth}%</span> từ tháng trước
               </p>
             </CardContent>
           </Card>
@@ -228,7 +228,7 @@ const AdminDashboard = () => {
                 {isStatsLoading ? "..." : formatCurrencyVND(stats.revenue)}
               </div>
               <p className="text-xs text-muted-foreground">
-                <span className="text-green-600">+15.2%</span> từ tháng trước
+                <span className="text-blue-600">+15.2%</span> từ tháng trước
               </p>
             </CardContent>
           </Card>
@@ -307,7 +307,7 @@ const AdminDashboard = () => {
                       <div>
                         <p className="font-medium">{order.customer}</p>
                         <p className="text-sm text-muted-foreground">{order.pet || "—"}</p>
-                        <p className="text-sm font-medium text-green-600">
+                        <p className="text-sm font-medium text-blue-600">
                           {formatCurrencyVND(order.amount)}
                         </p>
                       </div>

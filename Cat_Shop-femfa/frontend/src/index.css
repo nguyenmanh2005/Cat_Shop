@@ -17,28 +17,28 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    /* Warm orange primary color from Cham Pets design */
-    --primary: 25 100% 60%;
+    /* Soft blue primary color */
+    --primary: 210 60% 65%;
     --primary-foreground: 0 0% 100%;
-    --primary-light: 35 100% 75%;
-    --primary-dark: 20 100% 45%;
+    --primary-light: 210 50% 75%;
+    --primary-dark: 210 70% 55%;
 
-    /* Warm secondary colors */
-    --secondary: 45 100% 96%;
-    --secondary-foreground: 25 100% 45%;
+    /* Soft secondary colors */
+    --secondary: 210 30% 96%;
+    --secondary-foreground: 210 60% 45%;
 
     --muted: 0 0% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 35 100% 85%;
-    --accent-foreground: 25 100% 35%;
+    --accent: 210 40% 85%;
+    --accent-foreground: 210 60% 35%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 25 100% 60%;
+    --ring: 210 60% 65%;
 
     --radius: 0.5rem;
 
@@ -69,10 +69,10 @@ All colors MUST be HSL.
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 25 100% 65%;
+    --primary: 210 65% 70%;
     --primary-foreground: 222.2 47.4% 11.2%;
-    --primary-light: 35 100% 75%;
-    --primary-dark: 20 100% 50%;
+    --primary-light: 210 55% 80%;
+    --primary-dark: 210 75% 60%;
 
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -373,8 +373,8 @@ All colors MUST be HSL.
   }
 
   .hover-glow:hover {
-    box-shadow: 0 0 30px rgba(255, 152, 0, 0.5),
-                0 0 60px rgba(255, 152, 0, 0.2);
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.5),
+                0 0 60px rgba(59, 130, 246, 0.2);
   }
 
   /* Smooth scale on hover */

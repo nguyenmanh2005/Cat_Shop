@@ -28,6 +28,7 @@ import QrLogin from "./pages/QrLogin";
 import LoginSuccess from "./pages/LoginSuccess";
 import AuthFlowApp from "./authFlow/AuthFlowApp";
 import ResetPasswordSecurity from "./components/ResetPasswordSecurity";
+import ContactFloatingButtons from "./components/ContactFloatingButtons";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +69,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+              <ContactFloatingButtons />
               </BrowserRouter>
             </TooltipProvider>
           </CartProvider>

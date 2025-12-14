@@ -84,6 +84,8 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**", "/api/auth/**", "/public/**", "/oauth2/**").permitAll()
                         // ✅ Cho phép GET categories cho customer (không cần auth)
                         .requestMatchers(HttpMethod.GET, "/api/categories/customer").permitAll()
+                        // ✅ Cho phép GET products cho customer (không cần auth)
+                        .requestMatchers(HttpMethod.GET, "/api/customer/products/**").permitAll()
                         // ✅ Admin endpoints
                         .requestMatchers(
                                 "/api/users/**",

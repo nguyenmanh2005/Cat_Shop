@@ -252,7 +252,7 @@ const PetManagement = () => {
             <CardTitle className="text-sm font-medium">Có sẵn</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+            <div className="text-2xl font-bold text-blue-600">
               {pets.filter(p => p.status === 'available').length}
             </div>
           </CardContent>
@@ -374,7 +374,7 @@ const PetManagement = () => {
                       <TableCell className="font-medium">{pet.name}</TableCell>
                       <TableCell>{pet.breed || "—"}</TableCell>
                       <TableCell>{pet.age ? `${pet.age} tháng` : "—"}</TableCell>
-                      <TableCell className="font-medium text-green-600">
+                      <TableCell className="font-medium text-blue-600">
                         {formatCurrencyVND(pet.price)}
                       </TableCell>
                       <TableCell>{getStatusBadge(pet.status)}</TableCell>

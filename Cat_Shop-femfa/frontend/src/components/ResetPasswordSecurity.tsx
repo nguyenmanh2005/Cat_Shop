@@ -115,15 +115,15 @@ const ResetPasswordSecurity = () => {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
             <div className="flex items-center justify-center mb-4">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="h-10 w-10 text-green-600" />
+              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="h-10 w-10 text-blue-600" />
               </div>
             </div>
-            <CardTitle className="text-center text-green-700">Đổi mật khẩu thành công!</CardTitle>
+            <CardTitle className="text-center text-blue-700">Đổi mật khẩu thành công!</CardTitle>
             <CardDescription className="text-center">
               Mật khẩu của bạn đã được đổi thành công. Tất cả các thiết bị đã được đăng xuất để bảo mật.
             </CardDescription>
