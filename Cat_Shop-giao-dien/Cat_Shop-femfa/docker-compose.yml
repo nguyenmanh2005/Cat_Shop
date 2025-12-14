@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: catshop-postgres
+    environment:
+      POSTGRES_DB: catshop
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-your_secure_password_here}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Backup volume (tùy chọn)
+      - ./backups:/backups
+    networks:
+      - catshop-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: catshop-redis
+    environment:
+      # Redis password (nếu có)
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - catshop-network
+    restart: unless-stopped
+    command: >
+      sh -c "if [ -n \"$$REDIS_PASSWORD\" ]; then
+        redis-server --requirepass $$REDIS_PASSWORD --appendonly yes
+      else
+        redis-server --appendonly yes
+      fi"
+    healthcheck:
+      test: >
+        sh -c "if [ -n \"$$REDIS_PASSWORD\" ]; then
+          redis-cli -a $$REDIS_PASSWORD ping
+        else
+          redis-cli ping
+        fi"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Backend (Spring Boot)
+  backend:
+    build:
+      context: ./back-end
+      dockerfile: Dockerfile
+    container_name: catshop-backend
+    environment:
+      # Spring Profile (prod cho production, không set = dev)
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/catshop
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-your_secure_password_here}
+      # Redis
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      # Frontend URL
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      # Email (Gmail SMTP)
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      # reCAPTCHA
+      CAPTCHA_SECRET: ${CAPTCHA_SECRET:-}
+      CAPTCHA_ENABLED: ${CAPTCHA_ENABLED:-true}
+      # SMS (ESMS)
+      SMS_ENABLED: ${SMS_ENABLED:-true}
+      SMS_PROVIDER: ${SMS_PROVIDER:-esms}
+      SMS_ESMS_API_KEY: ${SMS_ESMS_API_KEY:-}
+      SMS_ESMS_SECRET_KEY: ${SMS_ESMS_SECRET_KEY:-}
+      SMS_ESMS_BRAND_NAME: ${SMS_ESMS_BRAND_NAME:-}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - ./back-end/uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - catshop-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend (React/Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Build-time variables (phải set trước khi build)
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api}
+        VITE_RECAPTCHA_SITE_KEY: ${VITE_RECAPTCHA_SITE_KEY:-}
+    container_name: catshop-frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - catshop-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  catshop-network:
+    driver: bridge
+
